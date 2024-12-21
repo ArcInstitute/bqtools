@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+binseq = { path = "../../lib/binseq" }
+anyhow = "1.0.94"
+niffler = "2.6.0"
+seq_io = "0.3.2"
+clap = { version = "4.5.23", features = ["derive"] }
+itoa = "1.0.14"
