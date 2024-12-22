@@ -14,6 +14,7 @@ fn main() -> Result<()> {
         },
         Commands::Export(export) => match export {
             ExportCommand::Fastq(args) => commands::export::fastq::run(args),
+            ExportCommand::Fasta(args) => commands::export::fasta::run(args),
         },
     }
 }
