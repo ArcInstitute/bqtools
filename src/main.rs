@@ -17,5 +17,6 @@ fn main() -> Result<()> {
             ExportCommand::Fastq(args) => commands::export::fastq::run(args),
             ExportCommand::Fasta(args) => commands::export::fasta::run(args),
         },
+        Commands::Encode(encode) => commands::encode::run(encode),
     }
 }

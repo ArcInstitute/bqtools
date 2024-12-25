@@ -1,3 +1,4 @@
+pub mod encode;
 pub mod export;
 pub mod import;
 mod utils;
