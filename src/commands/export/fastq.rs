@@ -1,5 +1,5 @@
 use anyhow::Result;
-use binseq::BinseqReader;
+use binseq::{BinseqRead, SingleReader};
 use std::io::Write;
 
 use crate::cli::FastqExport;
@@ -25,7 +25,7 @@ pub fn run(args: FastqExport) -> Result<()> {
     let mut out_handle = args.output.as_writer()?;
 
     // Open the input BINSEQ
-    let mut reader = BinseqReader::new(in_handle)?;
+    let mut reader = SingleReader::new(in_handle)?;
     let header = reader.header();
     let mut num_records = 0;
     let qual = vec![b'?'; header.slen as usize]; // dummy quality values

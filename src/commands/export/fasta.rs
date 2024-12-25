@@ -1,5 +1,5 @@
 use anyhow::Result;
-use binseq::BinseqReader;
+use binseq::{BinseqRead, SingleReader};
 use std::io::Write;
 
 use crate::cli::FastaExport;
@@ -18,7 +18,7 @@ pub fn run(args: FastaExport) -> Result<()> {
     let mut out_handle = args.output.as_writer()?;
 
     // Open the input BINSEQ
-    let mut reader = BinseqReader::new(in_handle)?;
+    let mut reader = SingleReader::new(in_handle)?;
     let mut num_records = 0;
 
     let mut ibuf = itoa::Buffer::new();
