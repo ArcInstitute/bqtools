@@ -4,7 +4,7 @@ use std::io::Write;
 
 use crate::{
     cli::FileFormat,
-    commands::{compress_output_passthrough, match_output},
+    commands::{compress_gzip_passthrough, compress_zstd_passthrough, match_output},
 };
 
 #[derive(Parser, Debug)]
@@ -42,7 +42,7 @@ pub struct OutputFile {
 impl OutputFile {
     pub fn as_writer(&self) -> Result<Box<dyn Write>> {
         let writer = match_output(self.output.as_ref())?;
-        compress_output_passthrough(writer, self.compress, self.threads())
+        compress_gzip_passthrough(writer, self.compress, self.threads())
     }
 
     pub fn format(&self) -> Result<FileFormat> {
@@ -94,8 +94,8 @@ impl OutputFile {
         let r2 = match_output(Some(&r2_name))?;
 
         // Compress the output files (if necessary)
-        let r1 = compress_output_passthrough(r1, self.compress, self.threads())?;
-        let r2 = compress_output_passthrough(r2, self.compress, self.threads())?;
+        let r1 = compress_gzip_passthrough(r1, self.compress, self.threads())?;
+        let r2 = compress_gzip_passthrough(r2, self.compress, self.threads())?;
 
         Ok((r1, r2))
     }
@@ -105,9 +105,47 @@ impl OutputFile {
 pub struct OutputBinseq {
     #[clap(short = 'o', long, help = "Output binseq file [default: stdout]")]
     pub output: Option<String>,
+
+    /// Zstd compress output file
+    #[clap(short, long)]
+    pub compress: bool,
+
+    /// Number of threads to use for parallel compression
+    /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
+    #[clap(short = 'T', long, default_value = "1")]
+    pub threads: usize,
+
+    /// Zstd compression level
+    /// The compression level is between 1 and 22, with 3 being the default.
+    /// Higher levels provide better compression at the cost of speed.
+    /// Level 0 disables compression.
+    #[clap(short, long, default_value = "3")]
+    pub level: i32,
 }
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
-        match_output(self.output.as_ref())
+        let writer = match_output(self.output.as_ref())?;
+        compress_zstd_passthrough(writer, self.compress(), self.level(), self.threads())
+    }
+
+    fn compress(&self) -> bool {
+        self.output.as_ref().map_or(self.compress, |path| {
+            if path.ends_with(".bqz") {
+                true
+            } else {
+                self.compress
+            }
+        })
+    }
+
+    fn threads(&self) -> usize {
+        match self.threads {
+            0 => num_cpus::get(),
+            n => n.min(num_cpus::get()),
+        }
+    }
+
+    fn level(&self) -> i32 {
+        self.level.min(22).max(0)
     }
 }

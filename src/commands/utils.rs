@@ -37,7 +37,7 @@ pub fn match_output(path: Option<&String>) -> Result<Box<dyn Write + Send>> {
     }
 }
 
-pub fn compress_output_passthrough(
+pub fn compress_gzip_passthrough(
     writer: Box<dyn Write + Send>,
     compress: bool,
     num_threads: usize,
@@ -46,6 +46,21 @@ pub fn compress_output_passthrough(
         let encoder: ParCompress<Gzip> = ParCompressBuilder::new()
             .num_threads(num_threads)?
             .from_writer(writer);
+        Ok(Box::new(encoder))
+    } else {
+        Ok(writer)
+    }
+}
+
+pub fn compress_zstd_passthrough(
+    writer: Box<dyn Write + Send>,
+    compress: bool,
+    level: i32,
+    num_threads: usize,
+) -> Result<Box<dyn Write + Send>> {
+    if compress {
+        let mut encoder = zstd::Encoder::new(writer, level)?;
+        encoder.multithread(num_threads as u32)?;
         Ok(Box::new(encoder))
     } else {
         Ok(writer)
