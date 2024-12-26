@@ -9,7 +9,7 @@ use gzp::{
     par::compress::{ParCompress, ParCompressBuilder},
 };
 
-pub fn match_input(path: Option<&String>) -> Result<Box<dyn Read>> {
+pub fn match_input(path: Option<&String>) -> Result<Box<dyn Read + Send>> {
     if let Some(path) = path {
         let handle = File::open(path)?;
         let buffer = BufReader::new(handle);
@@ -61,8 +61,21 @@ pub fn compress_zstd_passthrough(
     if compress {
         let mut encoder = zstd::Encoder::new(writer, level)?;
         encoder.multithread(num_threads as u32)?;
+        let encoder = encoder.auto_finish();
         Ok(Box::new(encoder))
     } else {
         Ok(writer)
+    }
+}
+
+pub fn decompress_zstd_passthrough(
+    reader: Box<dyn Read + Send>,
+    decompress: bool,
+) -> Result<Box<dyn Read + Send>> {
+    if decompress {
+        let decoder = zstd::Decoder::new(reader)?;
+        Ok(Box::new(decoder))
+    } else {
+        Ok(reader)
     }
 }
