@@ -6,7 +6,11 @@ use super::FileFormat;
 use crate::commands::{decompress_zstd_passthrough, match_input};
 
 #[derive(Parser, Debug)]
+#[clap(next_help_heading = "INPUT FILE OPTIONS")]
 pub struct InputFile {
+    /// Input file [default: stdin]
+    ///
+    /// Can specify either zero (stdin), one, or two (paired) input files.
     #[clap(help = "Input file [default: stdin]", num_args = 0..=2)]
     pub input: Vec<String>,
 
@@ -74,6 +78,7 @@ impl InputFile {
 }
 
 #[derive(Parser, Debug)]
+#[clap(next_help_heading = "INPUT FILE OPTIONS")]
 pub struct InputBinseq {
     #[clap(help = "Input binseq file")]
     pub input: String,

@@ -8,6 +8,7 @@ use crate::{
 };
 
 #[derive(Parser, Debug)]
+#[clap(next_help_heading = "OUTPUT FILE OPTIONS")]
 pub struct OutputFile {
     #[clap(short = 'o', long, help = "Output file [default: stdout]")]
     pub output: Option<String>,
@@ -132,6 +133,7 @@ pub enum Mate {
 }
 
 #[derive(Parser, Debug)]
+#[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 pub struct OutputBinseq {
     #[clap(short = 'o', long, help = "Output binseq file [default: stdout]")]
     pub output: Option<String>,
