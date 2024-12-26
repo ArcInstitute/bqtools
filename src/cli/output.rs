@@ -48,7 +48,17 @@ pub struct OutputFile {
 impl OutputFile {
     pub fn as_writer(&self) -> Result<Box<dyn Write>> {
         let writer = match_output(self.output.as_ref())?;
-        compress_gzip_passthrough(writer, self.compress, self.threads())
+        compress_gzip_passthrough(writer, self.compress(), self.threads())
+    }
+
+    pub fn compress(&self) -> bool {
+        self.output.as_ref().map_or(self.compress, |path| {
+            if path.ends_with(".gz") {
+                true
+            } else {
+                self.compress
+            }
+        })
     }
 
     pub fn mate(&self) -> Mate {
