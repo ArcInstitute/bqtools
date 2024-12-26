@@ -1,5 +1,5 @@
 #[macro_export]
-macro_rules! process_single_fastx {
+macro_rules! encode_single_fastx {
     ($reader:ty, $in_handle:expr, $writer:expr) => {{
         use anyhow::bail;
         use binseq::{BinseqHeader, BinseqWriter};
@@ -59,7 +59,7 @@ macro_rules! process_single_fastx {
 }
 
 #[macro_export]
-macro_rules! process_paired_fastx {
+macro_rules! encode_paired_fastx {
     ($reader:ty, $r1_handle:expr, $r2_handle:expr, $writer:expr) => {{
         use anyhow::bail;
         use binseq::{BinseqHeader, BinseqWriter};

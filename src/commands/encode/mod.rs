@@ -1,11 +1,11 @@
-mod process;
+mod encode_macros;
 
 use anyhow::Result;
 use std::io::Read;
 
 use crate::{
     cli::{EncodeCommand, FileFormat},
-    process_paired_fastx, process_single_fastx,
+    encode_paired_fastx, encode_single_fastx,
 };
 
 fn encode_single(args: EncodeCommand) -> Result<()> {
@@ -18,10 +18,10 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
 
     match args.input.format()? {
         FileFormat::Fastq => {
-            process_single_fastx!(seq_io::fastq::Reader<Box<dyn Read>>, in_handle, out_handle)
+            encode_single_fastx!(seq_io::fastq::Reader<Box<dyn Read>>, in_handle, out_handle)
         }
         FileFormat::Fasta => {
-            process_single_fastx!(seq_io::fasta::Reader<Box<dyn Read>>, in_handle, out_handle)
+            encode_single_fastx!(seq_io::fasta::Reader<Box<dyn Read>>, in_handle, out_handle)
         }
     }
 }
@@ -37,7 +37,7 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
 
     match args.input.format()? {
         FileFormat::Fastq => {
-            process_paired_fastx!(
+            encode_paired_fastx!(
                 seq_io::fastq::Reader<Box<dyn Read>>,
                 r1_handle,
                 r2_handle,
@@ -45,7 +45,7 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
             )
         }
         FileFormat::Fasta => {
-            process_paired_fastx!(
+            encode_paired_fastx!(
                 seq_io::fasta::Reader<Box<dyn Read>>,
                 r1_handle,
                 r2_handle,
