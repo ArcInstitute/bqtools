@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! decode_paired {
-    // Base implementation that handles the common logic
+    // Base implementation for processing both pairs that handles the common logic
     (@impl $reader:expr, $out_r1:expr, $out_r2:expr, $write_fn:expr) => {{
         let mut ibuf = itoa::Buffer::new(); // index buffer
         let mut sbuffer = Vec::new(); // reusable buffer for decoding nucleotides (sequence)
@@ -49,6 +49,54 @@ macro_rules! decode_paired {
             write_fastq_parts(out1, index, seq1, &$qual_r1)?;
             write_fastq_parts(out2, index, seq2, &$qual_r2)
         })
+    }};
+}
+
+#[macro_export]
+macro_rules! decode_paired_mate {
+    // Base implementation for processing a single mate that handles the common logic
+    (@impl $reader:expr, $out:expr, $next_fn:expr, $write_fn:expr) => {{
+        let mut ibuf = itoa::Buffer::new(); // index buffer
+        let mut buffer = Vec::new(); // reusable buffer for decoding nucleotides
+
+        let mut num_records = 0;
+        while let Some(record) = $next_fn(&mut $reader) {
+            // Catch any errors that occur during reading
+            let record = record?;
+
+            // Decode the nucleotides
+            record.decode(&mut buffer)?;
+
+            // Encode the index
+            let index = ibuf.format(num_records).as_bytes();
+
+            // Use the provided write function
+            $write_fn(&mut $out, &index, &buffer)?;
+
+            num_records += 1;
+
+            // Clear the buffers for the next record
+            buffer.clear();
+        }
+
+        // Finalize the writers
+        $out.flush()?;
+
+        Ok(())
+    }};
+
+    // FASTA format (without quality scores)
+    ($reader:expr, $out:expr, $next_fn:expr) => {{
+        decode_paired_mate!(@impl $reader, $out, $next_fn, |out, index, seq| {
+            write_fasta_parts(out, index, seq)
+        })
+    }};
+
+    // FASTQ format (with quality scores)
+    ($reader:expr, $out:expr, $next_fn:expr, $qual:expr) => {{
+        decode_paired_mate!(@impl $reader, $out, $next_fn, |out, index, seq|
+            write_fastq_parts(out, index, seq, &$qual)
+        )
     }};
 }
 

@@ -8,8 +8,8 @@ use binseq::{BinseqRead, PairedRead, PairedReader, SingleReader};
 use std::io::Read;
 
 use crate::{
-    cli::{DecodeCommand, FileFormat},
-    decode_paired, decode_single,
+    cli::{DecodeCommand, FileFormat, Mate},
+    decode_paired, decode_paired_mate, decode_single,
 };
 
 fn process_single<R: Read>(args: DecodeCommand, mut reader: SingleReader<R>) -> Result<()> {
@@ -27,19 +27,63 @@ fn process_single<R: Read>(args: DecodeCommand, mut reader: SingleReader<R>) -> 
 
 fn process_paired<R: Read>(args: DecodeCommand, mut reader: PairedReader<R>) -> Result<()> {
     let format = args.output.format()?;
-    let (mut out_r1, mut out_r2) = args.output.as_paired_writer(format)?;
 
-    match args.output.format()? {
-        FileFormat::Fastq => {
-            let header = reader.header();
-            let qual_r1 = vec![b'?'; header.slen as usize]; // dummy quality values
-            let qual_r2 = vec![b'?'; header.xlen as usize]; // dummy quality values
-            decode_paired!(reader, out_r1, out_r2, qual_r1, qual_r2)
+    PairedRead::next_primary(&mut reader);
+
+    match args.output.mate() {
+        Mate::Both => {
+            let (mut out_r1, mut out_r2) = args.output.as_paired_writer(format)?;
+            match format {
+                FileFormat::Fastq => {
+                    let header = reader.header();
+                    let qual_r1 = vec![b'?'; header.slen as usize]; // dummy quality values
+                    let qual_r2 = vec![b'?'; header.xlen as usize]; // dummy quality values
+                    decode_paired!(reader, out_r1, out_r2, qual_r1, qual_r2)
+                }
+                FileFormat::Fasta => {
+                    decode_paired!(reader, out_r1, out_r2)
+                }
+            }
         }
-        FileFormat::Fasta => {
-            decode_paired!(reader, out_r1, out_r2)
+        m => {
+            let mut out = args.output.as_writer()?;
+            match format {
+                FileFormat::Fastq => {
+                    let header = reader.header();
+                    match m {
+                        Mate::One => {
+                            let qual = vec![b'?'; header.slen as usize];
+                            decode_paired_mate!(reader, out, PairedRead::next_primary, qual)
+                        }
+                        Mate::Two => {
+                            let qual = vec![b'?'; header.xlen as usize];
+                            decode_paired_mate!(reader, out, PairedRead::next_extended, qual)
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                FileFormat::Fasta => match m {
+                    Mate::One => decode_paired_mate!(reader, out, PairedRead::next_primary),
+                    Mate::Two => decode_paired_mate!(reader, out, PairedRead::next_extended),
+                    _ => unreachable!(),
+                },
+            }
         }
     }
+
+    // let (mut out_r1, mut out_r2) = args.output.as_paired_writer(format)?;
+
+    // match args.output.format()? {
+    //     FileFormat::Fastq => {
+    //         let header = reader.header();
+    //         let qual_r1 = vec![b'?'; header.slen as usize]; // dummy quality values
+    //         let qual_r2 = vec![b'?'; header.xlen as usize]; // dummy quality values
+    //         decode_paired!(reader, out_r1, out_r2, qual_r1, qual_r2)
+    //     }
+    //     FileFormat::Fasta => {
+    //         decode_paired!(reader, out_r1, out_r2)
+    //     }
+    // }
 }
 
 pub fn run(args: DecodeCommand) -> Result<()> {

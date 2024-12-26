@@ -10,4 +10,4 @@ pub use decode::DecodeCommand;
 pub use encode::EncodeCommand;
 pub use formats::FileFormat;
 pub use input::{InputBinseq, InputFile};
-pub use output::{OutputBinseq, OutputFile};
+pub use output::{Mate, OutputBinseq, OutputFile};

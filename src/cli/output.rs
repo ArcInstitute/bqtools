@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::io::Write;
 
 use crate::{
@@ -19,6 +19,12 @@ pub struct OutputFile {
         conflicts_with = "output"
     )]
     pub prefix: Option<String>,
+
+    /// Designate which of the two mates is being processed
+    ///
+    /// This is only relevant for paired BINSEQ files. The mate number is 1-based.
+    #[clap(short = 'm', long, default_value = "both")]
+    pub mate: Mate,
 
     #[clap(short, long, help = "Output file format")]
     pub format: Option<FileFormat>,
@@ -43,6 +49,10 @@ impl OutputFile {
     pub fn as_writer(&self) -> Result<Box<dyn Write>> {
         let writer = match_output(self.output.as_ref())?;
         compress_gzip_passthrough(writer, self.compress, self.threads())
+    }
+
+    pub fn mate(&self) -> Mate {
+        self.mate
     }
 
     pub fn format(&self) -> Result<FileFormat> {
@@ -99,6 +109,16 @@ impl OutputFile {
 
         Ok((r1, r2))
     }
+}
+
+#[derive(ValueEnum, PartialEq, Eq, Clone, Copy, Debug, Default)]
+pub enum Mate {
+    #[clap(name = "1")]
+    One,
+    #[clap(name = "2")]
+    Two,
+    #[default]
+    Both,
 }
 
 #[derive(Parser, Debug)]
