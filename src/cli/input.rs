@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use std::io::Read;
 
+use super::FileFormat;
 use crate::commands::match_input;
 
 #[derive(Parser, Debug)]
@@ -72,25 +73,6 @@ impl InputFile {
     }
 }
 
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileFormat {
-    Fasta,
-    Fastq,
-}
-impl FileFormat {
-    pub fn from_path(path: &str) -> Option<Self> {
-        let ext = match path.split('.').last()? {
-            "gz" => path.split('.').nth_back(1)?,
-            ext => ext,
-        };
-        match ext {
-            "fasta" | "fa" => Some(Self::Fasta),
-            "fastq" | "fq" => Some(Self::Fastq),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Parser, Debug)]
 pub struct InputFastq {
     #[clap(short = 'i', long, help = "Input FASTQ file [default: stdin]")]
@@ -115,11 +97,14 @@ impl InputFasta {
 
 #[derive(Parser, Debug)]
 pub struct InputBinseq {
-    #[clap(short = 'i', long, help = "Input binseq file [default: stdin]")]
-    pub input: Option<String>,
+    // #[clap(short = 'i', long, help = "Input binseq file [default: stdin]")]
+    // pub input: Option<String>,
+    #[clap(help = "Input binseq file")]
+    pub input: String,
 }
 impl InputBinseq {
     pub fn as_reader(&self) -> Result<Box<dyn Read>> {
-        match_input(self.input.as_ref())
+        // match_input(self.input.as_ref())
+        match_input(Some(&self.input))
     }
 }

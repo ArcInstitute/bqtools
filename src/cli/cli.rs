@@ -6,7 +6,7 @@ use clap::{
     Parser,
 };
 
-use super::{EncodeCommand, ExportCommand, ImportCommand};
+use super::{DecodeCommand, EncodeCommand, ExportCommand, ImportCommand};
 
 // Configures Clap v3-style help menu colors
 const STYLES: Styles = Styles::styled()
@@ -32,4 +32,6 @@ pub enum Commands {
     Export(ExportCommand),
 
     Encode(EncodeCommand),
+
+    Decode(DecodeCommand),
 }

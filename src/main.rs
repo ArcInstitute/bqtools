@@ -18,5 +18,6 @@ fn main() -> Result<()> {
             ExportCommand::Fasta(args) => commands::export::fasta::run(args),
         },
         Commands::Encode(encode) => commands::encode::run(encode),
+        Commands::Decode(decode) => commands::decode::run(decode),
     }
 }
