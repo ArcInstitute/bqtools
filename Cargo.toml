@@ -13,3 +13,7 @@ itoa = "1.0.14"
 gzp = "0.11.3"
 num_cpus = "1.16.0"
 zstd = { version = "0.13.2", features = ["zstdmt"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
