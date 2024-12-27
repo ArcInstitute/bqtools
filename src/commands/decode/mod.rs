@@ -70,20 +70,6 @@ fn process_paired<R: Read>(args: DecodeCommand, mut reader: PairedReader<R>) -> 
             }
         }
     }
-
-    // let (mut out_r1, mut out_r2) = args.output.as_paired_writer(format)?;
-
-    // match args.output.format()? {
-    //     FileFormat::Fastq => {
-    //         let header = reader.header();
-    //         let qual_r1 = vec![b'?'; header.slen as usize]; // dummy quality values
-    //         let qual_r2 = vec![b'?'; header.xlen as usize]; // dummy quality values
-    //         decode_paired!(reader, out_r1, out_r2, qual_r1, qual_r2)
-    //     }
-    //     FileFormat::Fasta => {
-    //         decode_paired!(reader, out_r1, out_r2)
-    //     }
-    // }
 }
 
 pub fn run(args: DecodeCommand) -> Result<()> {
