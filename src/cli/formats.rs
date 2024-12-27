@@ -2,7 +2,9 @@ use clap::ValueEnum;
 
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileFormat {
+    #[clap(name = "a")]
     Fasta,
+    #[clap(name = "q")]
     Fastq,
 }
 impl FileFormat {
