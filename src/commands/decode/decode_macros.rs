@@ -2,6 +2,7 @@
 macro_rules! decode_paired {
     // Base implementation for processing both pairs that handles the common logic
     (@impl $reader:expr, $out_r1:expr, $out_r2:expr, $write_fn:expr) => {{
+
         let mut ibuf = itoa::Buffer::new(); // index buffer
         let mut sbuffer = Vec::new(); // reusable buffer for decoding nucleotides (sequence)
         let mut xbuffer = Vec::new(); // reusable buffer for decoding nucleotides (extended)
@@ -56,6 +57,8 @@ macro_rules! decode_paired {
 macro_rules! decode_paired_mate {
     // Base implementation for processing a single mate that handles the common logic
     (@impl $reader:expr, $out:expr, $next_fn:expr, $write_fn:expr) => {{
+        use binseq::BinseqRecord;
+
         let mut ibuf = itoa::Buffer::new(); // index buffer
         let mut buffer = Vec::new(); // reusable buffer for decoding nucleotides
 
@@ -104,6 +107,9 @@ macro_rules! decode_paired_mate {
 macro_rules! decode_single {
     // Base implementation that handles the common logic
     (@impl $reader:expr, $out:expr, $write_fn:expr) => {{
+
+        use binseq::BinseqRecord;
+
         let mut ibuf = itoa::Buffer::new(); // index buffer
         let mut sbuffer = Vec::new(); // reusable buffer for decoding nucleotides (sequence)
 
