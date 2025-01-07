@@ -82,7 +82,7 @@ pub fn run(args: DecodeCommand) -> Result<()> {
             let in_handle = args.input.as_reader()?;
             match PairedReader::new(in_handle) {
                 Ok(reader) => process_paired(args, reader),
-                Err(e) => return Err(e.into()),
+                Err(e) => Err(e),
             }
         }
     }

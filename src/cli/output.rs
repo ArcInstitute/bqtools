@@ -72,13 +72,11 @@ impl OutputFile {
         } else {
             if let Some(path) = self.output.as_ref() {
                 if let Some(format) = FileFormat::from_path(path) {
-                    Ok(format)
-                } else {
-                    anyhow::bail!("Could not infer file format.")
+                    return Ok(format);
                 }
-            } else {
-                anyhow::bail!("Can not infer file format from stdout.")
+                anyhow::bail!("Could not infer file format.")
             }
+            anyhow::bail!("Can not infer file format from stdout.")
         }
     }
 
@@ -178,6 +176,6 @@ impl OutputBinseq {
     }
 
     fn level(&self) -> i32 {
-        self.level.min(22).max(0)
+        self.level.clamp(0, 22)
     }
 }
