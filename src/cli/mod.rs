@@ -1,11 +1,13 @@
 mod cli;
-mod export;
-mod import;
+mod decode;
+mod encode;
+mod formats;
 mod input;
 mod output;
 
 pub use cli::{Cli, Commands};
-pub use export::{ExportCommand, FastaExport, FastqExport};
-pub use import::{FastaImport, FastqImport, ImportCommand};
-pub use input::{InputBinseq, InputFasta, InputFastq};
-pub use output::{OutputBinseq, OutputFasta, OutputFastq};
+pub use decode::DecodeCommand;
+pub use encode::EncodeCommand;
+pub use formats::FileFormat;
+pub use input::{InputBinseq, InputFile};
+pub use output::{Mate, OutputBinseq, OutputFile};
