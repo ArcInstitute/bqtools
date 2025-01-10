@@ -158,6 +158,10 @@ impl OutputBinseq {
         compress_zstd_passthrough(writer, self.compress(), self.level(), self.threads())
     }
 
+    pub fn owned_path(&self) -> Option<String> {
+        self.output.clone()
+    }
+
     fn compress(&self) -> bool {
         self.output.as_ref().map_or(self.compress, |path| {
             if path.ends_with(".bqz") {
@@ -168,7 +172,7 @@ impl OutputBinseq {
         })
     }
 
-    fn threads(&self) -> usize {
+    pub fn threads(&self) -> usize {
         match self.threads {
             0 => num_cpus::get(),
             n => n.min(num_cpus::get()),

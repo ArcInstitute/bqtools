@@ -1,6 +1,9 @@
 mod encode_macros;
+mod parallel;
 
-use anyhow::Result;
+use parallel::Processor;
+
+use anyhow::{bail, Result};
 use std::io::Read;
 
 use crate::{
@@ -29,28 +32,49 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
 fn encode_paired(args: EncodeCommand) -> Result<()> {
     // Open the IO handles
     let (r1_handle, r2_handle) = args.input.as_reader_pair()?;
-    let out_handle = args.output.as_writer()?;
 
     // Compression passthrough on input
-    let (r1_handle, _comp) = niffler::get_reader(r1_handle)?;
-    let (r2_handle, _comp) = niffler::get_reader(r2_handle)?;
+    let (r1_handle, _comp) = niffler::send::get_reader(r1_handle)?;
+    let (r2_handle, _comp) = niffler::send::get_reader(r2_handle)?;
 
     match args.input.format()? {
         FileFormat::Fastq => {
-            encode_paired_fastx!(
-                seq_io::fastq::Reader<Box<dyn Read>>,
-                r1_handle,
-                r2_handle,
-                out_handle
-            )
+            if args.output.threads() > 1 {
+                encode_paired_fastx!(
+                    seq_io::fastq::Reader<Box<dyn Read + Send>>,
+                    r1_handle,
+                    r2_handle,
+                    args.output.as_writer()?,
+                    args.output.owned_path(),
+                    args.output.threads()
+                )
+            } else {
+                encode_paired_fastx!(
+                    seq_io::fastq::Reader<Box<dyn Read>>,
+                    r1_handle,
+                    r2_handle,
+                    args.output.as_writer()?
+                )
+            }
         }
         FileFormat::Fasta => {
-            encode_paired_fastx!(
-                seq_io::fasta::Reader<Box<dyn Read>>,
-                r1_handle,
-                r2_handle,
-                out_handle
-            )
+            if args.output.threads() > 1 {
+                encode_paired_fastx!(
+                    seq_io::fasta::Reader<Box<dyn Read + Send>>,
+                    r1_handle,
+                    r2_handle,
+                    args.output.as_writer()?,
+                    args.output.owned_path(),
+                    args.output.threads()
+                )
+            } else {
+                encode_paired_fastx!(
+                    seq_io::fasta::Reader<Box<dyn Read>>,
+                    r1_handle,
+                    r2_handle,
+                    args.output.as_writer()?
+                )
+            }
         }
     }
 }
