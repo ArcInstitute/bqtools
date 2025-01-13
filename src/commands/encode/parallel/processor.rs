@@ -1,10 +1,11 @@
+use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+
 use anyhow::{bail, Result};
 use binseq::{
     writer::{write_buffer, write_flag},
     BinseqHeader,
 };
 use seq_io_parallel::{MinimalRefRecord, PairedParallelProcessor, ParallelProcessor};
-use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
 use crate::commands::reopen_output;
 

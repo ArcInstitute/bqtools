@@ -1,30 +1,36 @@
-mod encode_macros;
+mod encodings;
 mod parallel;
 
-use parallel::Processor;
+use anyhow::Result;
 
-use anyhow::{bail, Result};
-use std::io::Read;
-
-use crate::{
-    cli::{EncodeCommand, FileFormat},
-    encode_paired_fastx, encode_single_fastx,
+use crate::cli::{EncodeCommand, FileFormat};
+use encodings::{
+    encode_paired_fasta, encode_paired_fastq, encode_single_fasta, encode_single_fastq,
 };
+use parallel::{encode_paired_fastq_parallel, encode_single_fastq_parallel};
 
 fn encode_single(args: EncodeCommand) -> Result<()> {
     // Open the IO handles
     let in_handle = args.input.as_reader()?;
-    let out_handle = args.output.as_writer()?;
 
     // Compression passthrough on input
-    let (in_handle, _comp) = niffler::get_reader(in_handle)?;
+    let (in_handle, _comp) = niffler::send::get_reader(in_handle)?;
 
     match args.input.format()? {
         FileFormat::Fastq => {
-            encode_single_fastx!(seq_io::fastq::Reader<Box<dyn Read>>, in_handle, out_handle)
+            if args.output.threads() > 1 {
+                encode_single_fastq_parallel(
+                    in_handle,
+                    args.output.owned_path(),
+                    args.output.threads(),
+                )
+            } else {
+                encode_single_fastq(in_handle, args.output.as_writer()?)
+            }
         }
         FileFormat::Fasta => {
-            encode_single_fastx!(seq_io::fasta::Reader<Box<dyn Read>>, in_handle, out_handle)
+            // only single-threaded fasta is supported for now
+            encode_single_fasta(in_handle, args.output.as_writer()?)
         }
     }
 }
@@ -40,41 +46,19 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
     match args.input.format()? {
         FileFormat::Fastq => {
             if args.output.threads() > 1 {
-                encode_paired_fastx!(
-                    seq_io::fastq::Reader<Box<dyn Read + Send>>,
+                encode_paired_fastq_parallel(
                     r1_handle,
                     r2_handle,
-                    args.output.as_writer()?,
                     args.output.owned_path(),
-                    args.output.threads()
+                    args.output.threads(),
                 )
             } else {
-                encode_paired_fastx!(
-                    seq_io::fastq::Reader<Box<dyn Read>>,
-                    r1_handle,
-                    r2_handle,
-                    args.output.as_writer()?
-                )
+                encode_paired_fastq(r1_handle, r2_handle, args.output.as_writer()?)
             }
         }
         FileFormat::Fasta => {
-            if args.output.threads() > 1 {
-                encode_paired_fastx!(
-                    seq_io::fasta::Reader<Box<dyn Read + Send>>,
-                    r1_handle,
-                    r2_handle,
-                    args.output.as_writer()?,
-                    args.output.owned_path(),
-                    args.output.threads()
-                )
-            } else {
-                encode_paired_fastx!(
-                    seq_io::fasta::Reader<Box<dyn Read>>,
-                    r1_handle,
-                    r2_handle,
-                    args.output.as_writer()?
-                )
-            }
+            // only single-threaded fasta is supported for now
+            encode_paired_fasta(r1_handle, r2_handle, args.output.as_writer()?)
         }
     }
 }
