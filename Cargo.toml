@@ -7,14 +7,14 @@ edition = "2021"
 binseq = { git = "ssh://github.com/noamteyssier/binseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
-seq_io = "0.3.2"
-seq_io_parallel = "0.1.3"
+seq_io_parallel = { git = "https://github.com/noamteyssier/seq_io_parallel", branch = "seq-io-patch" }
 clap = { version = "4.5.23", features = ["derive"] }
 itoa = "1.0.14"
 gzp = "0.11.3"
 num_cpus = "1.16.0"
 zstd = { version = "0.13.2", features = ["zstdmt"] }
 bitnuc = "0.2.9"
+parking_lot = "0.12.3"
 
 [profile.release]
 lto = true

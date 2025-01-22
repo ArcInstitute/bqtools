@@ -32,7 +32,7 @@ pub fn encode_single_fastq_parallel(
     // Prepare the output HEADER
     let header = BinseqHeader::new(seq.len() as u32);
 
-    // Write the header (but not first sequence)
+    // Write the header and the first sequence
     {
         // Prepare the output handle
         let out_handle = match_output(out_path.as_ref())?;
@@ -99,7 +99,7 @@ pub fn encode_paired_fastq_parallel(
     // Prepare the output HEADER
     let header = BinseqHeader::new_extended(seq1.len() as u32, seq2.len() as u32);
 
-    // Write the header (but not first sequence)
+    // Write the header and the first sequence pair
     {
         // Prepare the output handle
         let out_handle = match_output(out_path.as_ref())?;
@@ -127,9 +127,9 @@ pub fn encode_paired_fastq_parallel(
     num_skipped += processor.get_global_num_skipped();
 
     // print the summary
-    eprintln!("{} records written", num_records);
+    eprintln!("{} record pairs written", num_records);
     if num_skipped > 0 {
-        eprintln!("{} records skipped (invalid nucleotides)", num_skipped);
+        eprintln!("{} record pairs skipped (invalid nucleotides)", num_skipped);
     }
 
     Ok(())

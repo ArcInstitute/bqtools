@@ -1,10 +1,11 @@
-use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+use std::sync::{atomic::AtomicUsize, Arc};
 
 use anyhow::{bail, Result};
 use binseq::{
     writer::{write_buffer, write_flag},
     BinseqHeader,
 };
+use parking_lot::Mutex;
 use seq_io_parallel::{MinimalRefRecord, PairedParallelProcessor, ParallelProcessor};
 
 use crate::commands::reopen_output;
@@ -56,8 +57,8 @@ impl Processor {
     fn write_batch(&mut self) -> Result<()> {
         // Write the buffer to the output
         {
-            let _lock = self.writing.lock().unwrap();
-            let mut out_handle = reopen_output(self.path.as_ref()).unwrap();
+            let _lock = self.writing.lock();
+            let mut out_handle = reopen_output(self.path.as_ref())?;
             out_handle.write_all(&self.wbuf)?;
             out_handle.flush()?;
         }
