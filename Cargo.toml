@@ -4,7 +4,8 @@ version = "0.2.3"
 edition = "2021"
 
 [dependencies]
-binseq = { git = "ssh://github.com/noamteyssier/binseq" }
+# binseq = { git = "ssh://github.com/noamteyssier/binseq" }
+binseq = { path = "../../lib/binseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
 seq_io_parallel = { git = "https://github.com/noamteyssier/seq_io_parallel", branch = "seq-io-patch" }
@@ -16,6 +17,7 @@ zstd = { version = "0.13.2", features = ["zstdmt"] }
 bitnuc = "0.2.9"
 parking_lot = "0.12.3"
 rand = "0.8.5"
+memmap2 = "0.9.5"
 
 [profile.release]
 lto = true
