@@ -2,10 +2,11 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use anyhow::{bail, Result};
 use binseq::{
-    writer::{write_buffer, write_flag},
+    writer::{write_buffer, write_flag, Policy},
     BinseqHeader,
 };
 use parking_lot::Mutex;
+use rand::prelude::*;
 use seq_io_parallel::{MinimalRefRecord, PairedParallelProcessor, ParallelProcessor};
 
 use crate::commands::reopen_output;
@@ -24,6 +25,18 @@ pub struct Processor {
     /// Local buffer for encoding (used by individual threads)
     ebuf_r2: Vec<u64>,
 
+    /// Local buffer for replacing Ns (used by individual threads)
+    ibuf_r1: Vec<u8>,
+
+    /// Local buffer for replacing Ns (used by individual threads)
+    ibuf_r2: Vec<u8>,
+
+    /// Thread local RNG
+    rng: StdRng,
+
+    /// Policy for handling Ns
+    policy: Policy,
+
     /// Local buffer for write queue
     wbuf: Vec<u8>,
 
@@ -39,12 +52,16 @@ pub struct Processor {
     global_num_skipped: Arc<AtomicUsize>,
 }
 impl Processor {
-    pub fn new(header: BinseqHeader, path: Option<String>) -> Self {
+    pub fn new(header: BinseqHeader, path: Option<String>, policy: Policy) -> Self {
         Self {
             header,
             path,
+            policy,
             ebuf_r1: Vec::new(),
             ebuf_r2: Vec::new(),
+            ibuf_r1: Vec::new(),
+            ibuf_r2: Vec::new(),
+            rng: StdRng::from_entropy(),
             wbuf: Vec::new(),
             writing: Arc::new(Mutex::new(())),
             local_num_records: 0,
@@ -79,6 +96,16 @@ impl Processor {
         self.local_num_skipped = 0;
     }
 
+    fn convert_r1<'a, Rf: MinimalRefRecord<'a>>(&mut self, record: Rf) -> Result<bool> {
+        self.policy
+            .handle(record.ref_seq(), &mut self.ibuf_r1, &mut self.rng)
+    }
+
+    fn convert_r2<'a, Rf: MinimalRefRecord<'a>>(&mut self, record: Rf) -> Result<bool> {
+        self.policy
+            .handle(record.ref_seq(), &mut self.ibuf_r2, &mut self.rng)
+    }
+
     pub fn get_global_num_records(&self) -> usize {
         self.global_num_records
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -101,8 +128,24 @@ impl ParallelProcessor for Processor {
             // Write the encoded sequence to the output
             write_flag(&mut self.wbuf, 0)?;
             write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
+
+            // Increment the number of records processed
+            self.local_num_records += 1;
+        } else if self.convert_r1(record)? {
+            // Clear the encoding buffer in case of partial write
+            self.ebuf_r1.clear();
+
+            // Encode the modified sequence
+            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)?;
+
+            // Write the encoded sequence to the output
+            write_flag(&mut self.wbuf, 0)?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
+
+            // Increment the number of records processed
             self.local_num_records += 1;
         } else {
+            // Increment the number of records skipped
             self.local_num_skipped += 1;
         }
 
@@ -142,8 +185,27 @@ impl PairedParallelProcessor for Processor {
             write_flag(&mut self.wbuf, 0)?;
             write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
             write_buffer(&mut self.wbuf, &self.ebuf_r2)?;
+
+            // Increment the number of records processed
+            self.local_num_records += 1;
+        } else if self.convert_r1(r1)? && self.convert_r2(r2)? {
+            // Clear the encoding buffers in case of partial write
+            self.ebuf_r1.clear();
+            self.ebuf_r2.clear();
+
+            // Encode the sequences
+            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)?;
+            bitnuc::encode(&self.ibuf_r2, &mut self.ebuf_r2)?;
+
+            // Write the encoded sequence to the output
+            write_flag(&mut self.wbuf, 0)?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r2)?;
+
+            // Increment the number of records processed
             self.local_num_records += 1;
         } else {
+            // Increment the number of records skipped
             self.local_num_skipped += 1;
         }
 

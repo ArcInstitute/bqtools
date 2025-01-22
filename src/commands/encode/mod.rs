@@ -23,14 +23,15 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
                     in_handle,
                     args.output.owned_path(),
                     args.output.threads(),
+                    args.output.policy(),
                 )
             } else {
-                encode_single_fastq(in_handle, args.output.as_writer()?)
+                encode_single_fastq(in_handle, args.output.as_writer()?, args.output.policy())
             }
         }
         FileFormat::Fasta => {
             // only single-threaded fasta is supported for now
-            encode_single_fasta(in_handle, args.output.as_writer()?)
+            encode_single_fasta(in_handle, args.output.as_writer()?, args.output.policy())
         }
     }
 }
@@ -51,14 +52,25 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
                     r2_handle,
                     args.output.owned_path(),
                     args.output.threads(),
+                    args.output.policy(),
                 )
             } else {
-                encode_paired_fastq(r1_handle, r2_handle, args.output.as_writer()?)
+                encode_paired_fastq(
+                    r1_handle,
+                    r2_handle,
+                    args.output.as_writer()?,
+                    args.output.policy(),
+                )
             }
         }
         FileFormat::Fasta => {
             // only single-threaded fasta is supported for now
-            encode_paired_fasta(r1_handle, r2_handle, args.output.as_writer()?)
+            encode_paired_fasta(
+                r1_handle,
+                r2_handle,
+                args.output.as_writer()?,
+                args.output.policy(),
+            )
         }
     }
 }

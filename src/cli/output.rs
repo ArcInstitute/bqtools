@@ -1,4 +1,5 @@
 use anyhow::Result;
+use binseq::Policy;
 use clap::{Parser, ValueEnum};
 use std::io::Write;
 
@@ -136,13 +137,19 @@ pub struct OutputBinseq {
     #[clap(short = 'o', long, help = "Output binseq file [default: stdout]")]
     pub output: Option<String>,
 
+    /// Policy for handling Ns in sequences
+    #[clap(short = 'p', long, default_value = "r")]
+    pub policy: PolicyWrapper,
+
     /// Zstd compress output file
     #[clap(short, long)]
     pub compress: bool,
 
     /// Number of threads to use for parallel compression
     /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
-    #[clap(short = 'T', long, default_value = "1")]
+    ///
+    /// Generally you won't see much or any improvement past 2 threads.
+    #[clap(short = 'T', long, default_value = "2")]
     pub threads: usize,
 
     /// Zstd compression level
@@ -181,5 +188,53 @@ impl OutputBinseq {
 
     fn level(&self) -> i32 {
         self.level.clamp(0, 22)
+    }
+
+    pub fn policy(&self) -> Policy {
+        Policy::from(self.policy)
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum PolicyWrapper {
+    /// Ignore any sequence if it contains an N
+    #[clap(name = "i")]
+    IgnoreSequence,
+
+    /// Panic if any sequence contains an N
+    #[clap(name = "p")]
+    BreakOnInvalid,
+
+    /// Randomly draw a nucleotide for each N in sequences.
+    #[clap(name = "r")]
+    RandomDraw,
+
+    /// Sets all Ns to A
+    #[clap(name = "a")]
+    SetToA,
+
+    /// Sets all Ns to C
+    #[clap(name = "c")]
+    SetToC,
+
+    /// Sets all Ns to G
+    #[clap(name = "g")]
+    SetToG,
+
+    /// Sets all Ns to T
+    #[clap(name = "t")]
+    SetToT,
+}
+impl From<PolicyWrapper> for Policy {
+    fn from(value: PolicyWrapper) -> Self {
+        match value {
+            PolicyWrapper::IgnoreSequence => Policy::IgnoreSequence,
+            PolicyWrapper::BreakOnInvalid => Policy::BreakOnInvalid,
+            PolicyWrapper::RandomDraw => Policy::RandomDraw,
+            PolicyWrapper::SetToA => Policy::SetToA,
+            PolicyWrapper::SetToC => Policy::SetToC,
+            PolicyWrapper::SetToG => Policy::SetToG,
+            PolicyWrapper::SetToT => Policy::SetToT,
+        }
     }
 }

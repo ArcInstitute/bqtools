@@ -1,11 +1,15 @@
 use std::io::{Read, Write};
 
 use anyhow::{bail, Result};
-use binseq::{BinseqHeader, BinseqWriter};
+use binseq::{BinseqHeader, BinseqWriter, Policy};
 use seq_io_parallel::fasta::{Reader, Record};
 
 /// Encode a single FASTA file into a binary format
-pub fn encode_single_fasta<W: Write>(in_handle: Box<dyn Read>, out_handle: W) -> Result<()> {
+pub fn encode_single_fasta<W: Write>(
+    in_handle: Box<dyn Read>,
+    out_handle: W,
+    policy: Policy,
+) -> Result<()> {
     // Open the input FASTA file
     let mut reader = Reader::new(in_handle);
     let mut num_records = 0;
@@ -24,7 +28,7 @@ pub fn encode_single_fasta<W: Write>(in_handle: Box<dyn Read>, out_handle: W) ->
     let header = BinseqHeader::new(seq.len() as u32);
 
     // Prepare the output WRITER
-    let mut writer = BinseqWriter::new(out_handle, header, false)?;
+    let mut writer = BinseqWriter::new_with_policy(out_handle, header, policy)?;
 
     // write the first sequence
     if writer.write_nucleotides(0, &seq)? {
@@ -61,6 +65,7 @@ pub fn encode_paired_fasta<W: Write>(
     r1_handle: Box<dyn Read>,
     r2_handle: Box<dyn Read>,
     out_handle: W,
+    policy: Policy,
 ) -> Result<()> {
     // Open the input FASTA files
     let mut reader_r1 = Reader::new(r1_handle);
@@ -89,7 +94,7 @@ pub fn encode_paired_fasta<W: Write>(
     let header = BinseqHeader::new_extended(seq_r1.len() as u32, seq_r2.len() as u32);
 
     // Prepare the output WRITER
-    let mut writer = BinseqWriter::new(out_handle, header, false)?;
+    let mut writer = BinseqWriter::new_with_policy(out_handle, header, policy)?;
 
     // write the first sequence pair
     if writer.write_paired(0, &seq_r1, &seq_r2)? {
