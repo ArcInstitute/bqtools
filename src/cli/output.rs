@@ -134,7 +134,12 @@ pub enum Mate {
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 pub struct OutputBinseq {
-    #[clap(short = 'o', long, help = "Output binseq file [default: stdout]")]
+    #[clap(
+        short = 'o',
+        long,
+        help = "Output binseq file [default: stdout]",
+        required_unless_present = "pipe"
+    )]
     pub output: Option<String>,
 
     /// Policy for handling Ns in sequences
@@ -158,6 +163,10 @@ pub struct OutputBinseq {
     /// Level 0 disables compression.
     #[clap(short, long, default_value = "3")]
     pub level: i32,
+
+    /// Pipe the output to stdout
+    #[clap(short = 'P', long)]
+    pub pipe: bool,
 }
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {

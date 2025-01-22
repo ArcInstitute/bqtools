@@ -13,5 +13,6 @@ fn main() -> Result<()> {
     match args.command {
         Commands::Encode(encode) => commands::encode::run(encode),
         Commands::Decode(decode) => commands::decode::run(decode),
+        Commands::Cat(cat) => commands::cat::run(cat),
     }
 }

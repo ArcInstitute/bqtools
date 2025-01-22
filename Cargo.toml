@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 
 [dependencies]
@@ -16,6 +16,7 @@ zstd = { version = "0.13.2", features = ["zstdmt"] }
 bitnuc = "0.2.9"
 parking_lot = "0.12.3"
 rand = "0.8.5"
+memmap2 = "0.9.5"
 
 [profile.release]
 lto = true
