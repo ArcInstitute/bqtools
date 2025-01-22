@@ -1,11 +1,10 @@
 [package]
 name = "bqtools"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 
 [dependencies]
-# binseq = { git = "ssh://github.com/noamteyssier/binseq" }
-binseq = { path = "../../lib/binseq" }
+binseq = { git = "ssh://github.com/noamteyssier/binseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
 seq_io_parallel = { git = "https://github.com/noamteyssier/seq_io_parallel", branch = "seq-io-patch" }
