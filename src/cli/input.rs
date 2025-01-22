@@ -100,3 +100,11 @@ impl InputBinseq {
         }
     }
 }
+
+#[derive(Parser, Debug)]
+#[clap(next_help_heading = "INPUT FILE OPTIONS")]
+pub struct MultiInputBinseq {
+    /// Input binseq files
+    #[clap(num_args = 1..)]
+    pub input: Vec<String>,
+}
