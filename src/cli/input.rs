@@ -62,7 +62,7 @@ impl InputFile {
         }
     }
 
-    pub fn as_reader_pair(&self) -> Result<(Box<dyn Read>, Box<dyn Read>)> {
+    pub fn as_reader_pair(&self) -> Result<(Box<dyn Read + Send>, Box<dyn Read + Send>)> {
         match self.input.len() {
             2 => Ok((
                 match_input(Some(&self.input[0]))?,

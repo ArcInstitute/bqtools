@@ -28,8 +28,6 @@ fn process_single<R: Read>(args: DecodeCommand, mut reader: SingleReader<R>) -> 
 fn process_paired<R: Read>(args: DecodeCommand, mut reader: PairedReader<R>) -> Result<()> {
     let format = args.output.format()?;
 
-    PairedRead::next_primary(&mut reader);
-
     match args.output.mate() {
         Mate::Both => {
             let (mut out_r1, mut out_r2) = args.output.as_paired_writer(format)?;
