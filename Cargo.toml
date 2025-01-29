@@ -7,7 +7,7 @@ edition = "2021"
 binseq = { git = "ssh://github.com/noamteyssier/binseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
-seq_io_parallel = { git = "https://github.com/noamteyssier/seq_io_parallel", branch = "seq-io-patch" }
+paraseq = { git = "ssh://github.com/noamteyssier/paraseq" }
 clap = { version = "4.5.23", features = ["derive"] }
 itoa = "1.0.14"
 gzp = "0.11.3"
@@ -17,6 +17,7 @@ bitnuc = "0.2.9"
 parking_lot = "0.12.3"
 rand = "0.8.5"
 memmap2 = "0.9.5"
+seq_io = "0.3.3"
 
 [profile.release]
 lto = true

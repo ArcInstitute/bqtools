@@ -7,7 +7,10 @@ use crate::cli::{EncodeCommand, FileFormat};
 use encodings::{
     encode_paired_fasta, encode_paired_fastq, encode_single_fasta, encode_single_fastq,
 };
-use parallel::{encode_paired_fastq_parallel, encode_single_fastq_parallel};
+use parallel::{
+    encode_paired_fasta_parallel, encode_paired_fastq_parallel, encode_single_fasta_parallel,
+    encode_single_fastq_parallel,
+};
 
 fn encode_single(args: EncodeCommand) -> Result<()> {
     // Open the IO handles
@@ -30,8 +33,16 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
             }
         }
         FileFormat::Fasta => {
-            // only single-threaded fasta is supported for now
-            encode_single_fasta(in_handle, args.output.as_writer()?, args.output.policy())
+            if args.output.threads() > 1 {
+                encode_single_fasta_parallel(
+                    in_handle,
+                    args.output.owned_path(),
+                    args.output.threads(),
+                    args.output.policy(),
+                )
+            } else {
+                encode_single_fasta(in_handle, args.output.as_writer()?, args.output.policy())
+            }
         }
     }
 }
@@ -64,13 +75,22 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
             }
         }
         FileFormat::Fasta => {
-            // only single-threaded fasta is supported for now
-            encode_paired_fasta(
-                r1_handle,
-                r2_handle,
-                args.output.as_writer()?,
-                args.output.policy(),
-            )
+            if args.output.threads() > 1 {
+                encode_paired_fasta_parallel(
+                    r1_handle,
+                    r2_handle,
+                    args.output.owned_path(),
+                    args.output.threads(),
+                    args.output.policy(),
+                )
+            } else {
+                encode_paired_fasta(
+                    r1_handle,
+                    r2_handle,
+                    args.output.as_writer()?,
+                    args.output.policy(),
+                )
+            }
         }
     }
 }

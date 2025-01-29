@@ -1,13 +1,16 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
-use anyhow::{bail, Result};
+use anyhow::anyhow;
 use binseq::{
     writer::{write_buffer, write_flag, Policy},
     BinseqHeader,
 };
+use paraseq::{
+    fastx::Record,
+    parallel::{PairedParallelProcessor, ParallelProcessor, ProcessError, Result},
+};
 use parking_lot::Mutex;
 use rand::prelude::*;
-use seq_io_parallel::{MinimalRefRecord, PairedParallelProcessor, ParallelProcessor};
 
 use crate::commands::reopen_output;
 
@@ -96,14 +99,16 @@ impl Processor {
         self.local_num_skipped = 0;
     }
 
-    fn convert_r1<'a, Rf: MinimalRefRecord<'a>>(&mut self, record: Rf) -> Result<bool> {
+    fn convert_r1<Rf: Record>(&mut self, record: Rf) -> Result<bool> {
         self.policy
-            .handle(record.ref_seq(), &mut self.ibuf_r1, &mut self.rng)
+            .handle(record.seq(), &mut self.ibuf_r1, &mut self.rng)
+            .map_err(ProcessError::from)
     }
 
-    fn convert_r2<'a, Rf: MinimalRefRecord<'a>>(&mut self, record: Rf) -> Result<bool> {
+    fn convert_r2<Rf: Record>(&mut self, record: Rf) -> Result<bool> {
         self.policy
-            .handle(record.ref_seq(), &mut self.ibuf_r2, &mut self.rng)
+            .handle(record.seq(), &mut self.ibuf_r2, &mut self.rng)
+            .map_err(ProcessError::from)
     }
 
     pub fn get_global_num_records(&self) -> usize {
@@ -117,14 +122,14 @@ impl Processor {
     }
 }
 impl ParallelProcessor for Processor {
-    fn process_record<'a, Rf: MinimalRefRecord<'a>>(&mut self, record: Rf) -> Result<()> {
+    fn process_record<Rf: Record>(&mut self, record: Rf) -> Result<()> {
         self.ebuf_r1.clear();
 
-        if record.ref_seq().len() != self.header.slen as usize {
+        if record.seq().len() != self.header.slen as usize {
             panic!("Record length mismatch");
         }
 
-        if bitnuc::encode(record.ref_seq(), &mut self.ebuf_r1).is_ok() {
+        if bitnuc::encode(record.seq(), &mut self.ebuf_r1).is_ok() {
             // Write the encoded sequence to the output
             write_flag(&mut self.wbuf, 0)?;
             write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
@@ -136,7 +141,8 @@ impl ParallelProcessor for Processor {
             self.ebuf_r1.clear();
 
             // Encode the modified sequence
-            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)?;
+            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)
+                .map_err(|e| ProcessError::Process(e.into()))?;
 
             // Write the encoded sequence to the output
             write_flag(&mut self.wbuf, 0)?;
@@ -159,27 +165,29 @@ impl ParallelProcessor for Processor {
     }
 }
 impl PairedParallelProcessor for Processor {
-    fn process_record_pair<'a, Rf: MinimalRefRecord<'a>>(&mut self, r1: Rf, r2: Rf) -> Result<()> {
+    fn process_record_pair<Rf: Record>(&mut self, r1: Rf, r2: Rf) -> Result<()> {
         self.ebuf_r1.clear();
         self.ebuf_r2.clear();
 
-        if r1.ref_seq().len() != self.header.slen as usize {
-            bail!(
+        if r1.seq().len() != self.header.slen as usize {
+            return Err(anyhow!(
                 "Record length mismatch (R1): expected ({}), observed ({})",
                 self.header.slen,
-                r1.ref_seq().len(),
+                r1.seq().len()
             )
+            .into());
         }
-        if r2.ref_seq().len() != self.header.xlen as usize {
-            bail!(
+        if r2.seq().len() != self.header.xlen as usize {
+            return Err(anyhow!(
                 "Record length mismatch (R2): expected ({}), observed ({})",
                 self.header.xlen,
-                r2.ref_seq().len()
+                r2.seq().len()
             )
+            .into());
         }
 
-        if bitnuc::encode(r1.ref_seq(), &mut self.ebuf_r1).is_ok()
-            && bitnuc::encode(r2.ref_seq(), &mut self.ebuf_r2).is_ok()
+        if bitnuc::encode(r1.seq(), &mut self.ebuf_r1).is_ok()
+            && bitnuc::encode(r2.seq(), &mut self.ebuf_r2).is_ok()
         {
             // Write the encoded sequence to the output
             write_flag(&mut self.wbuf, 0)?;
@@ -194,8 +202,10 @@ impl PairedParallelProcessor for Processor {
             self.ebuf_r2.clear();
 
             // Encode the sequences
-            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)?;
-            bitnuc::encode(&self.ibuf_r2, &mut self.ebuf_r2)?;
+            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)
+                .map_err(|e| ProcessError::Process(e.into()))?;
+            bitnuc::encode(&self.ibuf_r2, &mut self.ebuf_r2)
+                .map_err(|e| ProcessError::Process(e.into()))?;
 
             // Write the encoded sequence to the output
             write_flag(&mut self.wbuf, 0)?;

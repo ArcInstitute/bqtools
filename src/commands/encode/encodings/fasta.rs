@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use anyhow::{bail, Result};
 use binseq::{BinseqHeader, BinseqWriter, Policy};
-use seq_io_parallel::fasta::{Reader, Record};
+use seq_io::fasta::{Reader, Record};
 
 /// Encode a single FASTA file into a binary format
 pub fn encode_single_fasta<W: Write>(
