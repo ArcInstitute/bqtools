@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use anyhow::{bail, Result};
 use binseq::{BinseqHeader, BinseqWriter, Policy};
-use seq_io_parallel::fastq::{Reader, Record};
+use seq_io::fastq::{Reader, Record};
 
 /// Encode a single FASTQ file into a binary format
 pub fn encode_single_fastq<W: Write>(
