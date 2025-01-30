@@ -1,24 +1,34 @@
 use std::{fs::File, io::Write};
 
 use anyhow::{bail, Result};
-use binseq::{BinseqHeader, BinseqRead, MmapReader, SIZE_HEADER};
+use binseq::{BinseqHeader, BinseqRead, MmapReader, PairedMmapReader, SIZE_HEADER};
 use memmap2::MmapOptions;
 
 use crate::cli::CatCommand;
 
+fn strip_header(path: &str) -> Result<BinseqHeader> {
+    match MmapReader::new(path) {
+        Ok(reader) => Ok(reader.header()),
+        Err(_) => match PairedMmapReader::new(path) {
+            Ok(reader) => Ok(reader.header()),
+            Err(_) => bail!("Invalid input file : {path}"),
+        },
+    }
+}
+
 fn recover_header(paths: &[String]) -> Result<BinseqHeader> {
-    let mut header = None;
+    let mut exp_header = None;
     for path in paths {
-        let reader = MmapReader::new(path)?;
-        if let Some(h) = header {
-            if h != reader.header() {
+        let header = strip_header(path)?;
+        if let Some(exp) = exp_header {
+            if exp != header {
                 bail!("Inconsistent headers.");
             }
         } else {
-            header = Some(reader.header());
+            exp_header = Some(header);
         }
     }
-    header.ok_or_else(|| anyhow::anyhow!("No input files."))
+    exp_header.ok_or_else(|| anyhow::anyhow!("No input files."))
 }
 
 pub fn run(args: CatCommand) -> Result<()> {
