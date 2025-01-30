@@ -92,7 +92,7 @@ impl InputBinseq {
         let reader = match_input(Some(&self.input))?;
         decompress_zstd_passthrough(reader, self.decompress())
     }
-    fn decompress(&self) -> bool {
+    pub fn decompress(&self) -> bool {
         if self.input.ends_with(".zst") || self.input.ends_with(".bqz") {
             true
         } else {
