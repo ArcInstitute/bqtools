@@ -1,4 +1,5 @@
 pub mod cat;
+pub mod count;
 pub mod decode;
 pub mod encode;
 mod utils;

@@ -1,5 +1,6 @@
 mod cat;
 mod cli;
+mod count;
 mod decode;
 mod encode;
 mod formats;
@@ -8,6 +9,7 @@ mod output;
 
 pub use cat::CatCommand;
 pub use cli::{Cli, Commands};
+pub use count::CountCommand;
 pub use decode::DecodeCommand;
 pub use encode::EncodeCommand;
 pub use formats::FileFormat;

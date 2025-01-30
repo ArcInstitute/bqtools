@@ -14,5 +14,6 @@ fn main() -> Result<()> {
         Commands::Encode(encode) => commands::encode::run(encode),
         Commands::Decode(decode) => commands::decode::run(decode),
         Commands::Cat(cat) => commands::cat::run(cat),
+        Commands::Count(count) => commands::count::run(count),
     }
 }
