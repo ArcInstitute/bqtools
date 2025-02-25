@@ -1,19 +1,14 @@
 use std::{fs::File, io::Write};
 
 use anyhow::{bail, Result};
-use binseq::{BinseqHeader, BinseqRead, MmapReader, PairedMmapReader, SIZE_HEADER};
+use binseq::{BinseqHeader, MmapReader, SIZE_HEADER};
 use memmap2::MmapOptions;
 
 use crate::cli::CatCommand;
 
 fn strip_header(path: &str) -> Result<BinseqHeader> {
-    match MmapReader::new(path) {
-        Ok(reader) => Ok(reader.header()),
-        Err(_) => match PairedMmapReader::new(path) {
-            Ok(reader) => Ok(reader.header()),
-            Err(_) => bail!("Invalid input file : {path}"),
-        },
-    }
+    let reader = MmapReader::new(path)?;
+    Ok(reader.header())
 }
 
 fn recover_header(paths: &[String]) -> Result<BinseqHeader> {
