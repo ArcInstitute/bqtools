@@ -58,7 +58,7 @@ pub fn compress_gzip_passthrough(
     writer: Box<dyn Write + Send>,
     compress: bool,
     num_threads: usize,
-) -> Result<Box<dyn Write>> {
+) -> Result<Box<dyn Write + Send>> {
     if compress {
         let encoder: ParCompress<Gzip> = ParCompressBuilder::new()
             .num_threads(num_threads)?
@@ -82,17 +82,5 @@ pub fn compress_zstd_passthrough(
         Ok(Box::new(encoder))
     } else {
         Ok(writer)
-    }
-}
-
-pub fn decompress_zstd_passthrough(
-    reader: Box<dyn Read + Send>,
-    decompress: bool,
-) -> Result<Box<dyn Read + Send>> {
-    if decompress {
-        let decoder = zstd::Decoder::new(reader)?;
-        Ok(Box::new(decoder))
-    } else {
-        Ok(reader)
     }
 }

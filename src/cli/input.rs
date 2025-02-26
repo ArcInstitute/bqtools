@@ -3,7 +3,7 @@ use clap::Parser;
 use std::io::Read;
 
 use super::FileFormat;
-use crate::commands::{decompress_zstd_passthrough, match_input};
+use crate::commands::match_input;
 
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "INPUT FILE OPTIONS")]
@@ -82,22 +82,10 @@ impl InputFile {
 pub struct InputBinseq {
     #[clap(help = "Input binseq file")]
     pub input: String,
-
-    /// Decompress the input file from zstd format
-    #[clap(short, long)]
-    pub decompress: bool,
 }
 impl InputBinseq {
-    pub fn as_reader(&self) -> Result<Box<dyn Read + Send>> {
-        let reader = match_input(Some(&self.input))?;
-        decompress_zstd_passthrough(reader, self.decompress())
-    }
-    pub fn decompress(&self) -> bool {
-        if self.input.ends_with(".zst") || self.input.ends_with(".bqz") {
-            true
-        } else {
-            self.decompress
-        }
+    pub fn path(&self) -> &str {
+        &self.input
     }
 }
 
