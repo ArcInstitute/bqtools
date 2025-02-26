@@ -77,7 +77,7 @@ impl OutputFile {
                 }
                 anyhow::bail!("Could not infer file format.")
             }
-            anyhow::bail!("Can not infer file format from stdout.")
+            Ok(FileFormat::Tsv)
         }
     }
 

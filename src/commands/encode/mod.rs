@@ -44,6 +44,9 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
                 encode_single_fasta(in_handle, args.output.as_writer()?, args.output.policy())
             }
         }
+        _ => {
+            unimplemented!("Tsv import is not implemented for encoding");
+        }
     }
 }
 
@@ -91,6 +94,9 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
                     args.output.policy(),
                 )
             }
+        }
+        _ => {
+            unimplemented!()
         }
     }
 }
