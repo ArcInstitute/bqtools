@@ -35,6 +35,18 @@ pub fn write_fasta_parts<W: Write>(
     Ok(())
 }
 
+pub fn write_tsv_parts<W: Write>(
+    writer: &mut W,
+    index: &[u8],
+    sequence: &[u8],
+) -> std::io::Result<()> {
+    writer.write_all(index)?;
+    writer.write_all(b"\t")?;
+    writer.write_all(sequence)?;
+    writer.write_all(b"\n")?;
+    Ok(())
+}
+
 pub enum SplitWriter {
     Interleaved { inner: Writer },
     Split { left: Writer, right: Writer },
@@ -111,5 +123,6 @@ pub fn write_record<W: Write>(
     match format {
         FileFormat::Fasta => write_fasta_parts(writer, index, sequence),
         FileFormat::Fastq => write_fastq_parts(writer, index, sequence, qual_buf),
+        FileFormat::Tsv => write_tsv_parts(writer, index, sequence),
     }
 }
