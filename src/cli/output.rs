@@ -48,7 +48,7 @@ pub struct OutputFile {
     pub threads: usize,
 }
 impl OutputFile {
-    pub fn as_writer(&self) -> Result<Box<dyn Write>> {
+    pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
         let writer = match_output(self.output.as_ref())?;
         compress_gzip_passthrough(writer, self.compress(), self.threads())
     }
@@ -91,7 +91,10 @@ impl OutputFile {
         }
     }
 
-    pub fn as_paired_writer(&self, format: FileFormat) -> Result<(Box<dyn Write>, Box<dyn Write>)> {
+    pub fn as_paired_writer(
+        &self,
+        format: FileFormat,
+    ) -> Result<(Box<dyn Write + Send>, Box<dyn Write + Send>)> {
         // Check for prefix
         let prefix = self.prefix.as_ref().ok_or_else(|| {
             anyhow::anyhow!("Output file format prefix is required for paired BINSEQ files")
