@@ -16,7 +16,6 @@ bitnuc = "0.2.9"
 parking_lot = "0.12.3"
 rand = "0.8.5"
 memmap2 = "0.9.5"
-seq_io = "0.3.3"
 paraseq = "0.1.1"
 
 [profile.release]
