@@ -2,8 +2,8 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use anyhow::anyhow;
 use binseq::{
-    writer::{write_buffer, write_flag, Policy},
-    BinseqHeader,
+    writer::{write_buffer, write_flag},
+    BinseqHeader, Policy,
 };
 use paraseq::{
     fastx::Record,
@@ -102,13 +102,13 @@ impl Processor {
     fn convert_r1<Rf: Record>(&mut self, record: Rf) -> Result<bool> {
         self.policy
             .handle(record.seq(), &mut self.ibuf_r1, &mut self.rng)
-            .map_err(ProcessError::from)
+            .map_err(|err| ProcessError::from(anyhow!(err)))
     }
 
     fn convert_r2<Rf: Record>(&mut self, record: Rf) -> Result<bool> {
         self.policy
             .handle(record.seq(), &mut self.ibuf_r2, &mut self.rng)
-            .map_err(ProcessError::from)
+            .map_err(|err| ProcessError::from(anyhow!(err)))
     }
 
     pub fn get_global_num_records(&self) -> usize {
@@ -131,8 +131,9 @@ impl ParallelProcessor for Processor {
 
         if bitnuc::encode(record.seq(), &mut self.ebuf_r1).is_ok() {
             // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0)?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
+            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r1)
+                .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
             // Increment the number of records processed
             self.local_num_records += 1;
@@ -145,8 +146,9 @@ impl ParallelProcessor for Processor {
                 .map_err(|e| ProcessError::Process(e.into()))?;
 
             // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0)?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
+            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r1)
+                .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
             // Increment the number of records processed
             self.local_num_records += 1;
@@ -190,9 +192,11 @@ impl PairedParallelProcessor for Processor {
             && bitnuc::encode(r2.seq(), &mut self.ebuf_r2).is_ok()
         {
             // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0)?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r2)?;
+            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r1)
+                .map_err(|e| ProcessError::from(anyhow!(e)))?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r2)
+                .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
             // Increment the number of records processed
             self.local_num_records += 1;
@@ -208,9 +212,11 @@ impl PairedParallelProcessor for Processor {
                 .map_err(|e| ProcessError::Process(e.into()))?;
 
             // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0)?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r2)?;
+            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r1)
+                .map_err(|e| ProcessError::from(anyhow!(e)))?;
+            write_buffer(&mut self.wbuf, &self.ebuf_r2)
+                .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
             // Increment the number of records processed
             self.local_num_records += 1;

@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use anyhow::{bail, Result};
-use binseq::{writer::Policy, BinseqHeader, BinseqWriter};
+use binseq::{BinseqHeader, BinseqWriterBuilder, Policy};
 use paraseq::{
     fasta::{Reader, RecordSet},
     parallel::{PairedParallelReader, ParallelReader},
@@ -47,7 +47,10 @@ pub fn encode_single_fasta_parallel(
         let out_handle = match_output(out_path.as_ref())?;
 
         // Prepare the output WRITER and write the header
-        let mut writer = BinseqWriter::new_with_policy(out_handle, header, policy)?;
+        let mut writer = BinseqWriterBuilder::default()
+            .header(header)
+            .policy(policy)
+            .build(out_handle)?;
 
         // Flush the writer
         writer.flush()?;
@@ -122,7 +125,10 @@ pub fn encode_paired_fasta_parallel(
         let out_handle = match_output(out_path.as_ref())?;
 
         // Prepare the output WRITER and write the header
-        let mut writer = BinseqWriter::new_with_policy(out_handle, header, policy)?;
+        let mut writer = BinseqWriterBuilder::default()
+            .header(header)
+            .policy(policy)
+            .build(out_handle)?;
 
         // Flush the writer
         writer.flush()?;
