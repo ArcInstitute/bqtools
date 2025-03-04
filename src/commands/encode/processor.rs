@@ -1,236 +1,150 @@
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::io::Write;
+use std::sync::Arc;
 
 use anyhow::anyhow;
-use binseq::{
-    writer::{write_buffer, write_flag},
-    BinseqHeader, Policy,
-};
-use paraseq::{
-    fastx::Record,
-    parallel::{PairedParallelProcessor, ParallelProcessor, ProcessError, Result},
-};
+use binseq::{BinseqHeader, BinseqWriter, BinseqWriterBuilder, Policy};
+use paraseq::parallel::{PairedParallelProcessor, ParallelProcessor, ProcessError};
 use parking_lot::Mutex;
-use rand::prelude::*;
 
-use crate::commands::reopen_output;
+/// Default capacity for the buffer used by the processor.
+const DEFAULT_CAPACITY: usize = 128 * 1024;
 
-#[derive(Debug, Clone)]
-pub struct Processor {
-    /// Header of the global record set
-    header: BinseqHeader,
-
-    /// Optional output path
-    path: Option<String>,
-
-    /// Local buffer for encoding (used by individual threads)
-    ebuf_r1: Vec<u64>,
-
-    /// Local buffer for encoding (used by individual threads)
-    ebuf_r2: Vec<u64>,
-
-    /// Local buffer for replacing Ns (used by individual threads)
-    ibuf_r1: Vec<u8>,
-
-    /// Local buffer for replacing Ns (used by individual threads)
-    ibuf_r2: Vec<u8>,
-
-    /// Thread local RNG
-    rng: StdRng,
-
-    /// Policy for handling Ns
-    policy: Policy,
-
-    /// Local buffer for write queue
-    wbuf: Vec<u8>,
-
-    /// Lock for writing to the output
-    writing: Arc<Mutex<()>>,
-
-    /// local variables for number of records processed
-    local_num_records: usize,
-    local_num_skipped: usize,
-
-    /// global variables for number of records processed
-    global_num_records: Arc<AtomicUsize>,
-    global_num_skipped: Arc<AtomicUsize>,
+pub struct Processor<W: Write + Send> {
+    /* Thread-local fields */
+    /// Encoder for the current thread
+    writer: BinseqWriter<Vec<u8>>,
+    /// Number of records written by this thread
+    record_count: usize,
+    /// Number of records skipped by this thread
+    skipped_count: usize,
+    /* Global fields */
+    /// Global writer for the entire process
+    global_writer: Arc<Mutex<BinseqWriter<W>>>,
+    /// Global counter for records written by all threads
+    global_record_count: Arc<Mutex<usize>>,
+    /// Global counter for records skipped by all threads
+    global_skipped_count: Arc<Mutex<usize>>,
 }
-impl Processor {
-    pub fn new(header: BinseqHeader, path: Option<String>, policy: Policy) -> Self {
+
+impl<W: Write + Send> Processor<W> {
+    pub fn new(header: BinseqHeader, policy: Policy, inner: W) -> Result<Self, binseq::Error> {
+        let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
+        let writer = BinseqWriterBuilder::default()
+            .header(header)
+            .policy(policy)
+            .headless(true)
+            .build(local_inner)?;
+        let global_writer = BinseqWriterBuilder::default()
+            .header(header)
+            .policy(policy)
+            .build(inner)
+            .map(|w| Arc::new(Mutex::new(w)))?;
+        Ok(Self {
+            writer,
+            global_writer,
+            record_count: 0,
+            skipped_count: 0,
+            global_record_count: Arc::new(Mutex::new(0)),
+            global_skipped_count: Arc::new(Mutex::new(0)),
+        })
+    }
+
+    /// Writes the current batch to the global writer.
+    ///
+    /// This function acquires a lock on the global writer and ingests the local buffer.
+    fn write_batch(&mut self) -> Result<(), binseq::Error> {
+        // Aquire lock on global writer
+        let mut global = self.global_writer.lock();
+
+        // Ingestion clears the local buffer
+        global.ingest(&mut self.writer)?;
+
+        // Flush the global writer to avoid thread contention
+        global.flush()
+    }
+
+    /// Updates global counters
+    fn update_global_counters(&mut self) {
+        *self.global_record_count.lock() += self.record_count;
+        *self.global_skipped_count.lock() += self.skipped_count;
+        self.record_count = 0;
+        self.skipped_count = 0;
+    }
+
+    /// Get global number of records processed
+    pub fn get_global_record_count(&self) -> usize {
+        *self.global_record_count.lock()
+    }
+
+    /// Get global number of records skipped
+    pub fn get_global_skipped_count(&self) -> usize {
+        *self.global_skipped_count.lock()
+    }
+}
+impl<W: Write + Send> Clone for Processor<W> {
+    fn clone(&self) -> Self {
         Self {
-            header,
-            path,
-            policy,
-            ebuf_r1: Vec::new(),
-            ebuf_r2: Vec::new(),
-            ibuf_r1: Vec::new(),
-            ibuf_r2: Vec::new(),
-            rng: StdRng::from_entropy(),
-            wbuf: Vec::new(),
-            writing: Arc::new(Mutex::new(())),
-            local_num_records: 0,
-            local_num_skipped: 0,
-            global_num_records: Arc::new(AtomicUsize::new(0)),
-            global_num_skipped: Arc::new(AtomicUsize::new(0)),
+            writer: self.writer.clone(),
+            global_writer: self.global_writer.clone(),
+            record_count: self.record_count,
+            skipped_count: self.skipped_count,
+            global_record_count: self.global_record_count.clone(),
+            global_skipped_count: self.global_skipped_count.clone(),
         }
-    }
-
-    fn write_batch(&mut self) -> Result<()> {
-        // Write the buffer to the output
-        {
-            let _lock = self.writing.lock();
-            let mut out_handle = reopen_output(self.path.as_ref())?;
-            out_handle.write_all(&self.wbuf)?;
-            out_handle.flush()?;
-        }
-
-        // Clear the buffer
-        self.wbuf.clear();
-
-        Ok(())
-    }
-
-    fn update_global_counts(&mut self) {
-        self.global_num_records
-            .fetch_add(self.local_num_records, std::sync::atomic::Ordering::Relaxed);
-        self.global_num_skipped
-            .fetch_add(self.local_num_skipped, std::sync::atomic::Ordering::Relaxed);
-
-        self.local_num_records = 0;
-        self.local_num_skipped = 0;
-    }
-
-    fn convert_r1<Rf: Record>(&mut self, record: Rf) -> Result<bool> {
-        self.policy
-            .handle(record.seq(), &mut self.ibuf_r1, &mut self.rng)
-            .map_err(|err| ProcessError::from(anyhow!(err)))
-    }
-
-    fn convert_r2<Rf: Record>(&mut self, record: Rf) -> Result<bool> {
-        self.policy
-            .handle(record.seq(), &mut self.ibuf_r2, &mut self.rng)
-            .map_err(|err| ProcessError::from(anyhow!(err)))
-    }
-
-    pub fn get_global_num_records(&self) -> usize {
-        self.global_num_records
-            .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    pub fn get_global_num_skipped(&self) -> usize {
-        self.global_num_skipped
-            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
-impl ParallelProcessor for Processor {
-    fn process_record<Rf: Record>(&mut self, record: Rf) -> Result<()> {
-        self.ebuf_r1.clear();
 
-        if record.seq().len() != self.header.slen as usize {
-            panic!("Record length mismatch");
-        }
-
-        if bitnuc::encode(record.seq(), &mut self.ebuf_r1).is_ok() {
-            // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)
-                .map_err(|e| ProcessError::from(anyhow!(e)))?;
-
-            // Increment the number of records processed
-            self.local_num_records += 1;
-        } else if self.convert_r1(record)? {
-            // Clear the encoding buffer in case of partial write
-            self.ebuf_r1.clear();
-
-            // Encode the modified sequence
-            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)
-                .map_err(|e| ProcessError::Process(e.into()))?;
-
-            // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)
-                .map_err(|e| ProcessError::from(anyhow!(e)))?;
-
-            // Increment the number of records processed
-            self.local_num_records += 1;
+impl<W: Write + Send> ParallelProcessor for Processor<W> {
+    fn process_record<Rf: paraseq::fastx::Record>(
+        &mut self,
+        record: Rf,
+    ) -> paraseq::parallel::Result<()> {
+        if self
+            .writer
+            .write_nucleotides(0, record.seq())
+            .map_err(|e| ProcessError::from(anyhow!(e)))?
+        {
+            self.record_count += 1;
         } else {
-            // Increment the number of records skipped
-            self.local_num_skipped += 1;
+            self.skipped_count += 1;
         }
 
         // implicitly skip the record if encoding fails
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> Result<()> {
-        self.update_global_counts();
+    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+        self.update_global_counters();
         self.write_batch()
+            .map_err(|e| ProcessError::from(anyhow!(e)))?;
+        Ok(())
     }
 }
-impl PairedParallelProcessor for Processor {
-    fn process_record_pair<Rf: Record>(&mut self, r1: Rf, r2: Rf) -> Result<()> {
-        self.ebuf_r1.clear();
-        self.ebuf_r2.clear();
 
-        if r1.seq().len() != self.header.slen as usize {
-            return Err(anyhow!(
-                "Record length mismatch (R1): expected ({}), observed ({})",
-                self.header.slen,
-                r1.seq().len()
-            )
-            .into());
-        }
-        if r2.seq().len() != self.header.xlen as usize {
-            return Err(anyhow!(
-                "Record length mismatch (R2): expected ({}), observed ({})",
-                self.header.xlen,
-                r2.seq().len()
-            )
-            .into());
-        }
-
-        if bitnuc::encode(r1.seq(), &mut self.ebuf_r1).is_ok()
-            && bitnuc::encode(r2.seq(), &mut self.ebuf_r2).is_ok()
+impl<W: Write + Send> PairedParallelProcessor for Processor<W> {
+    fn process_record_pair<Rf: paraseq::fastx::Record>(
+        &mut self,
+        record1: Rf,
+        record2: Rf,
+    ) -> paraseq::parallel::Result<()> {
+        if self
+            .writer
+            .write_paired(0, record1.seq(), record2.seq())
+            .map_err(|e| ProcessError::from(anyhow!(e)))?
         {
-            // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)
-                .map_err(|e| ProcessError::from(anyhow!(e)))?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r2)
-                .map_err(|e| ProcessError::from(anyhow!(e)))?;
-
-            // Increment the number of records processed
-            self.local_num_records += 1;
-        } else if self.convert_r1(r1)? && self.convert_r2(r2)? {
-            // Clear the encoding buffers in case of partial write
-            self.ebuf_r1.clear();
-            self.ebuf_r2.clear();
-
-            // Encode the sequences
-            bitnuc::encode(&self.ibuf_r1, &mut self.ebuf_r1)
-                .map_err(|e| ProcessError::Process(e.into()))?;
-            bitnuc::encode(&self.ibuf_r2, &mut self.ebuf_r2)
-                .map_err(|e| ProcessError::Process(e.into()))?;
-
-            // Write the encoded sequence to the output
-            write_flag(&mut self.wbuf, 0).map_err(|e| ProcessError::from(anyhow!(e)))?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r1)
-                .map_err(|e| ProcessError::from(anyhow!(e)))?;
-            write_buffer(&mut self.wbuf, &self.ebuf_r2)
-                .map_err(|e| ProcessError::from(anyhow!(e)))?;
-
-            // Increment the number of records processed
-            self.local_num_records += 1;
+            self.record_count += 1;
         } else {
-            // Increment the number of records skipped
-            self.local_num_skipped += 1;
+            self.skipped_count += 1;
         }
 
         // implicitly skip the record if encoding fails
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> Result<()> {
-        self.update_global_counts();
+    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+        self.update_global_counters();
         self.write_batch()
+            .map_err(|e| ProcessError::from(anyhow!(e)))?;
+        Ok(())
     }
 }

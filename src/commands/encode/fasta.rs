@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use anyhow::{bail, Result};
-use binseq::{BinseqHeader, BinseqWriterBuilder, Policy};
+use binseq::{BinseqHeader, Policy};
 use paraseq::{
     fasta::{Reader, RecordSet},
     parallel::{PairedParallelReader, ParallelReader},
@@ -19,8 +19,6 @@ pub fn encode_single_fasta_parallel(
     // Open the input fasta file
     let mut reader = Reader::new(in_handle);
     let mut rset = RecordSet::new(1);
-    let mut num_records = 0;
-    let mut num_skipped = 0;
 
     // Get the first record for the expected size of the sequences
     let seq = if rset.fill(&mut reader)? {
@@ -38,31 +36,17 @@ pub fn encode_single_fasta_parallel(
     // Reload the reader with the taken record
     reader.reload(&mut rset);
 
-    // Prepare the output HEADER
+    // Prepare the processor
+    let out_handle = match_output(out_path.as_ref())?;
     let header = BinseqHeader::new(seq.len() as u32);
+    let processor = Processor::new(header, policy, out_handle)?;
 
-    // Write the header
-    {
-        // Prepare the output handle
-        let out_handle = match_output(out_path.as_ref())?;
-
-        // Prepare the output WRITER and write the header
-        let mut writer = BinseqWriterBuilder::default()
-            .header(header)
-            .policy(policy)
-            .build(out_handle)?;
-
-        // Flush the writer
-        writer.flush()?;
-    }
-
-    // Process the remaining records with parallel processing
-    let processor = Processor::new(header, out_path, policy);
+    // Process the records in parallel
     reader.process_parallel(processor.clone(), num_threads)?;
 
-    // Update the number of records
-    num_records += processor.get_global_num_records();
-    num_skipped += processor.get_global_num_skipped();
+    // Recover the number of records
+    let num_records = processor.get_global_record_count();
+    let num_skipped = processor.get_global_skipped_count();
 
     // print the summary
     eprintln!("{} records written", num_records);
@@ -85,8 +69,6 @@ pub fn encode_paired_fasta_parallel(
     let mut reader_r2 = Reader::new(r2_handle);
     let mut rset_r1 = RecordSet::new(1);
     let mut rset_r2 = RecordSet::new(1);
-    let mut num_records = 0;
-    let mut num_skipped = 0;
 
     // Get the first record for the expected size of the sequences
     let seq1 = if rset_r1.fill(&mut reader_r1)? {
@@ -116,31 +98,17 @@ pub fn encode_paired_fasta_parallel(
     reader_r1.reload(&mut rset_r1);
     reader_r2.reload(&mut rset_r2);
 
-    // Prepare the output HEADER
+    // Prepare the processor
+    let out_handle = match_output(out_path.as_ref())?;
     let header = BinseqHeader::new_extended(seq1.len() as u32, seq2.len() as u32);
+    let processor = Processor::new(header, policy, out_handle)?;
 
-    // Write the header and the first sequence pair
-    {
-        // Prepare the output handle
-        let out_handle = match_output(out_path.as_ref())?;
-
-        // Prepare the output WRITER and write the header
-        let mut writer = BinseqWriterBuilder::default()
-            .header(header)
-            .policy(policy)
-            .build(out_handle)?;
-
-        // Flush the writer
-        writer.flush()?;
-    }
-
-    // Process the remaining records with parallel processing
-    let processor = Processor::new(header, out_path, policy);
+    // Process the records in parallel
     reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
 
-    // Update the number of records
-    num_records += processor.get_global_num_records();
-    num_skipped += processor.get_global_num_skipped();
+    // Recover the number of records
+    let num_records = processor.get_global_record_count();
+    let num_skipped = processor.get_global_skipped_count();
 
     // print the summary
     eprintln!("{} record pairs written", num_records);
