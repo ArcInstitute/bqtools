@@ -9,7 +9,7 @@ use parking_lot::Mutex;
 /// Default capacity for the buffer used by the processor.
 const DEFAULT_CAPACITY: usize = 128 * 1024;
 
-pub struct Processor<W: Write + Send> {
+pub struct BinseqProcessor<W: Write + Send> {
     /* Thread-local fields */
     /// Encoder for the current thread
     writer: BinseqWriter<Vec<u8>>,
@@ -26,7 +26,7 @@ pub struct Processor<W: Write + Send> {
     global_skipped_count: Arc<Mutex<usize>>,
 }
 
-impl<W: Write + Send> Processor<W> {
+impl<W: Write + Send> BinseqProcessor<W> {
     pub fn new(header: BinseqHeader, policy: Policy, inner: W) -> Result<Self, binseq::Error> {
         let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
         let writer = BinseqWriterBuilder::default()
@@ -81,7 +81,7 @@ impl<W: Write + Send> Processor<W> {
         *self.global_skipped_count.lock()
     }
 }
-impl<W: Write + Send> Clone for Processor<W> {
+impl<W: Write + Send> Clone for BinseqProcessor<W> {
     fn clone(&self) -> Self {
         Self {
             writer: self.writer.clone(),
@@ -94,7 +94,7 @@ impl<W: Write + Send> Clone for Processor<W> {
     }
 }
 
-impl<W: Write + Send> ParallelProcessor for Processor<W> {
+impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
     fn process_record<Rf: paraseq::fastx::Record>(
         &mut self,
         record: Rf,
@@ -121,7 +121,7 @@ impl<W: Write + Send> ParallelProcessor for Processor<W> {
     }
 }
 
-impl<W: Write + Send> PairedParallelProcessor for Processor<W> {
+impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
     fn process_record_pair<Rf: paraseq::fastx::Record>(
         &mut self,
         record1: Rf,

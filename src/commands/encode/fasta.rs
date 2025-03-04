@@ -7,7 +7,7 @@ use paraseq::{
     parallel::{PairedParallelReader, ParallelReader},
 };
 
-use super::{get_sequence_len_fasta, Processor};
+use super::{get_sequence_len_fasta, BinseqProcessor};
 use crate::commands::utils::match_output;
 
 pub fn encode_single_fasta_parallel(
@@ -25,7 +25,7 @@ pub fn encode_single_fasta_parallel(
     // Prepare the processor
     let out_handle = match_output(out_path.as_ref())?;
     let header = BinseqHeader::new(slen);
-    let processor = Processor::new(header, policy, out_handle)?;
+    let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
     // Process the records in parallel
     reader.process_parallel(processor.clone(), num_threads)?;
@@ -61,7 +61,7 @@ pub fn encode_paired_fasta_parallel(
     // Prepare the processor
     let out_handle = match_output(out_path.as_ref())?;
     let header = BinseqHeader::new_extended(slen, xlen);
-    let processor = Processor::new(header, policy, out_handle)?;
+    let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
     // Process the records in parallel
     reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
