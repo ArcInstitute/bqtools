@@ -4,7 +4,7 @@ version = "0.3.1"
 edition = "2021"
 
 [dependencies]
-binseq = { git = "ssh://github.com/noamteyssier/binseq", branch = "31-setup-a-thread-safe-encoder" }
+binseq = { git = "ssh://github.com/noamteyssier/binseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
 clap = { version = "4.5.23", features = ["derive"] }
