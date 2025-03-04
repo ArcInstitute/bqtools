@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::File,
     io::{self, BufReader, BufWriter, Read, Write},
 };
 
@@ -26,23 +26,6 @@ pub fn match_input(path: Option<&String>) -> Result<Box<dyn Read + Send>> {
 pub fn match_output(path: Option<&String>) -> Result<Box<dyn Write + Send>> {
     if let Some(path) = path {
         let handle = File::create(path)?;
-        let buffer = BufWriter::new(handle);
-        let boxed = Box::new(buffer);
-        Ok(boxed)
-    } else {
-        let handle = io::stdout();
-        let buffer = BufWriter::new(handle);
-        let boxed = Box::new(buffer);
-        Ok(boxed)
-    }
-}
-
-pub fn reopen_output(path: Option<&String>) -> Result<Box<dyn Write + Send>> {
-    if let Some(path) = path {
-        let handle = OpenOptions::new()
-            .create_new(false)
-            .append(true)
-            .open(path)?;
         let buffer = BufWriter::new(handle);
         let boxed = Box::new(buffer);
         Ok(boxed)
