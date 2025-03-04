@@ -7,8 +7,8 @@ use paraseq::{
     parallel::{PairedParallelReader, ParallelReader},
 };
 
-use super::Processor;
-use crate::commands::{encode::utils::get_sequence_len_fasta, utils::match_output};
+use super::{get_sequence_len_fasta, Processor};
+use crate::commands::utils::match_output;
 
 pub fn encode_single_fasta_parallel(
     in_handle: Box<dyn Read + Send>,

@@ -10,6 +10,7 @@ mod utils;
 use fasta::{encode_paired_fasta_parallel, encode_single_fasta_parallel};
 use fastq::{encode_paired_fastq_parallel, encode_single_fastq_parallel};
 use processor::Processor;
+use utils::{get_sequence_len_fasta, get_sequence_len_fastq};
 
 fn encode_single(args: EncodeCommand) -> Result<()> {
     // Open the IO handles
