@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 binseq = { git = "ssh://github.com/noamteyssier/binseq" }
+vbinseq = { git = "ssh://github.com/noamteyssier/vbinseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
 clap = { version = "4.5.23", features = ["derive"] }
