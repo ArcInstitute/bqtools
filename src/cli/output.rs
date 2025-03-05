@@ -166,11 +166,10 @@ pub struct OutputBinseq {
     #[clap(short = 'Q', long)]
     pub skip_quality: bool,
 
-    /// Number of threads to use for parallel compression
-    /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
+    /// Number of threads to use for parallel reading and writing.
     ///
-    /// Generally you won't see much or any improvement past 2 threads.
-    #[clap(short = 'T', long, default_value = "2")]
+    /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
+    #[clap(short = 'T', long, default_value = "1")]
     pub threads: usize,
 
     /// Zstd compression level

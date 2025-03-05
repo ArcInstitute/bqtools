@@ -2,9 +2,8 @@ use std::io::Write;
 
 use anyhow::Result;
 
-use crate::cli::FileFormat;
-
 use super::Writer;
+use crate::cli::{FileFormat, Mate};
 
 pub fn write_fastq_parts<W: Write>(
     writer: &mut W,
@@ -125,4 +124,43 @@ pub fn write_record<W: Write>(
         FileFormat::Fastq => write_fastq_parts(writer, index, sequence, qual_buf),
         FileFormat::Tsv => write_tsv_parts(writer, index, sequence),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn write_record_pair<W: Write>(
+    left: &mut W,
+    right: &mut W,
+    mixed: &mut W,
+    mate: Option<Mate>,
+    split: bool,
+    index: &[u8],
+    sbuf: &[u8],
+    squal: &[u8],
+    xbuf: &[u8],
+    xqual: &[u8],
+    format: FileFormat,
+) -> Result<()> {
+    match mate {
+        Some(Mate::Both) => {
+            if split {
+                write_record(left, index, sbuf, squal, format)?;
+                if !xbuf.is_empty() {
+                    write_record(right, index, xbuf, xqual, format)?;
+                }
+            } else {
+                write_record(mixed, index, sbuf, squal, format)?;
+                if !xbuf.is_empty() {
+                    write_record(mixed, index, xbuf, xqual, format)?;
+                }
+            }
+        }
+        Some(Mate::One) | None => {
+            write_record(mixed, index, sbuf, squal, format)?;
+        }
+        Some(Mate::Two) => {
+            write_record(mixed, index, xbuf, xqual, format)?;
+        }
+    }
+
+    Ok(())
 }

@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use std::io::Read;
 
-use super::FileFormat;
+use super::{BinseqMode, FileFormat};
 use crate::commands::match_input;
 
 #[derive(Parser, Debug)]
@@ -86,6 +86,10 @@ pub struct InputBinseq {
 impl InputBinseq {
     pub fn path(&self) -> &str {
         &self.input
+    }
+
+    pub fn mode(&self) -> Result<BinseqMode> {
+        BinseqMode::determine(self.path())
     }
 }
 
