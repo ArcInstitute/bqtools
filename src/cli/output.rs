@@ -164,7 +164,7 @@ pub struct OutputBinseq {
     ///
     /// Only used by vbq.
     #[clap(short = 'Q', long)]
-    pub quality: bool,
+    pub skip_quality: bool,
 
     /// Number of threads to use for parallel compression
     /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
@@ -207,6 +207,10 @@ impl OutputBinseq {
 
     pub fn compress(&self) -> bool {
         !self.uncompressed
+    }
+
+    pub fn quality(&self) -> bool {
+        !self.skip_quality
     }
 
     pub fn threads(&self) -> usize {

@@ -27,7 +27,7 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
             args.output.policy,
             args.output.mode()?,
             args.output.compress(),
-            args.output.quality,
+            args.output.quality(),
         ),
         FileFormat::Fasta => encode_single_fasta_parallel(
             in_handle,
@@ -55,7 +55,10 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
             r2_handle,
             args.output.owned_path(),
             args.output.threads(),
-            args.output.policy(),
+            args.output.policy,
+            args.output.mode()?,
+            args.output.compress(),
+            args.output.quality(),
         ),
         FileFormat::Fasta => encode_paired_fasta_parallel(
             r1_handle,
