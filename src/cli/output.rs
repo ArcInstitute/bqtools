@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use binseq::Policy;
 use clap::{Parser, ValueEnum};
 use std::io::Write;
+use vbinseq::Policy as VPolicy;
 
 use crate::{
     cli::FileFormat,
@@ -145,13 +146,25 @@ pub struct OutputBinseq {
     )]
     pub output: Option<String>,
 
+    /// Defines the BINSEQ mode to use.
+    #[clap(short = 'm', long)]
+    pub mode: Option<BinseqMode>,
+
     /// Policy for handling Ns in sequences
     #[clap(short = 'p', long, default_value = "r")]
     pub policy: PolicyWrapper,
 
-    /// Zstd compress output file
-    #[clap(short, long)]
-    pub compress: bool,
+    /// Skip ZSTD compression of VBQ blocks (default: compressed)
+    ///
+    /// Only used by vbq.
+    #[clap(short = 'u', long)]
+    pub uncompressed: bool,
+
+    /// Skip inclusion of quality scores (default: included)
+    ///
+    /// Only used by vbq.
+    #[clap(short = 'Q', long)]
+    pub quality: bool,
 
     /// Number of threads to use for parallel compression
     /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
@@ -181,14 +194,19 @@ impl OutputBinseq {
         self.output.clone()
     }
 
-    fn compress(&self) -> bool {
-        self.output.as_ref().map_or(self.compress, |path| {
-            if path.ends_with(".bqz") {
-                true
-            } else {
-                self.compress
-            }
-        })
+    pub fn mode(&self) -> Result<BinseqMode> {
+        if let Some(mode) = self.mode {
+            Ok(mode)
+        } else if let Some(ref path) = self.output {
+            BinseqMode::determine(path)
+        } else {
+            // STDOUT
+            Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn compress(&self) -> bool {
+        !self.uncompressed
     }
 
     pub fn threads(&self) -> usize {
@@ -247,6 +265,39 @@ impl From<PolicyWrapper> for Policy {
             PolicyWrapper::SetToC => Policy::SetToC,
             PolicyWrapper::SetToG => Policy::SetToG,
             PolicyWrapper::SetToT => Policy::SetToT,
+        }
+    }
+}
+impl From<PolicyWrapper> for VPolicy {
+    fn from(value: PolicyWrapper) -> Self {
+        match value {
+            PolicyWrapper::IgnoreSequence => VPolicy::IgnoreSequence,
+            PolicyWrapper::BreakOnInvalid => VPolicy::BreakOnInvalid,
+            PolicyWrapper::RandomDraw => VPolicy::RandomDraw,
+            PolicyWrapper::SetToA => VPolicy::SetToA,
+            PolicyWrapper::SetToC => VPolicy::SetToC,
+            PolicyWrapper::SetToG => VPolicy::SetToG,
+            PolicyWrapper::SetToT => VPolicy::SetToT,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum BinseqMode {
+    #[clap(name = "bq")]
+    #[default]
+    Binseq,
+    #[clap(name = "vbq")]
+    VBinseq,
+}
+impl BinseqMode {
+    pub fn determine(path: &str) -> Result<Self> {
+        if path.ends_with(".bq") {
+            Ok(Self::Binseq)
+        } else if path.ends_with(".vbq") {
+            Ok(Self::VBinseq)
+        } else {
+            bail!("Could not determine BINSEQ output mode from path: {path}");
         }
     }
 }

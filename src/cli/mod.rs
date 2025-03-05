@@ -14,4 +14,4 @@ pub use decode::DecodeCommand;
 pub use encode::EncodeCommand;
 pub use formats::FileFormat;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
-pub use output::{Mate, OutputBinseq, OutputFile};
+pub use output::{BinseqMode, Mate, OutputBinseq, OutputFile, PolicyWrapper};

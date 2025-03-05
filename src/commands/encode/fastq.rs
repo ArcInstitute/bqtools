@@ -6,33 +6,61 @@ use paraseq::{
     fastq::Reader,
     parallel::{PairedParallelReader, ParallelReader},
 };
+use vbinseq::VBinseqHeader;
 
-use super::{get_sequence_len_fastq, BinseqProcessor};
-use crate::commands::utils::match_output;
+use super::{get_sequence_len_fastq, BinseqProcessor, VBinseqProcessor};
+use crate::{
+    cli::{BinseqMode, PolicyWrapper},
+    commands::utils::match_output,
+};
 
 pub fn encode_single_fastq_parallel(
     in_handle: Box<dyn Read + Send>,
     out_path: Option<String>,
     num_threads: usize,
-    policy: Policy,
+    policy: PolicyWrapper,
+    mode: BinseqMode,
+    compress: bool,
+    quality: bool,
 ) -> Result<()> {
     // Open the input FASTQ file
     let mut reader = Reader::new(in_handle);
 
-    // Determine the sequence length
-    let slen = get_sequence_len_fastq(&mut reader)?;
-
     // Prepare the processor
     let out_handle = match_output(out_path.as_ref())?;
-    let header = BinseqHeader::new(slen);
-    let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
-    // Process the records in parallel
-    reader.process_parallel(processor.clone(), num_threads)?;
+    let (num_records, num_skipped) = match mode {
+        BinseqMode::Binseq => {
+            // Determine the sequence length
+            let slen = get_sequence_len_fastq(&mut reader)?;
 
-    // Update the number of records
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
+            let header = BinseqHeader::new(slen);
+            let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+
+            // Process the records in parallel
+            reader.process_parallel(processor.clone(), num_threads)?;
+
+            // Update the number of records
+            let num_records = processor.get_global_record_count();
+            let num_skipped = processor.get_global_skipped_count();
+
+            (num_records, num_skipped)
+        }
+        _ => {
+            let header = VBinseqHeader::new(quality, compress, false);
+            let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+
+            // Process the records in parallel
+            reader.process_parallel(processor.clone(), num_threads)?;
+            processor.finish()?;
+
+            // Update the number of records
+            let num_records = processor.get_global_record_count();
+            let num_skipped = processor.get_global_skipped_count();
+
+            (num_records, num_skipped)
+        }
+    };
 
     // print the summary
     eprintln!("{} records written", num_records);
