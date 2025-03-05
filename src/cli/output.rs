@@ -223,10 +223,6 @@ impl OutputBinseq {
     fn level(&self) -> i32 {
         self.level.clamp(0, 22)
     }
-
-    pub fn policy(&self) -> Policy {
-        Policy::from(self.policy)
-    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

@@ -33,7 +33,9 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
             in_handle,
             args.output.owned_path(),
             args.output.threads(),
-            args.output.policy(),
+            args.output.policy,
+            args.output.mode()?,
+            args.output.compress(),
         ),
         _ => {
             unimplemented!("Tsv import is not implemented for encoding");
@@ -65,7 +67,9 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
             r2_handle,
             args.output.owned_path(),
             args.output.threads(),
-            args.output.policy(),
+            args.output.policy,
+            args.output.mode()?,
+            args.output.compress(),
         ),
         _ => {
             unimplemented!("Tsv import is not implemented for encoding")
