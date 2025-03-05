@@ -134,8 +134,7 @@ impl vbinseq::ParallelProcessor for Decoder {
 
         // decode index
         let mut ibuf = itoa::Buffer::new();
-        // let index = ibuf.format(record.id()).as_bytes();
-        let index = ibuf.format(0).as_bytes();
+        let index = ibuf.format(record.index()).as_bytes();
 
         // decode sequences
         record.decode_s(&mut self.sbuf)?;
