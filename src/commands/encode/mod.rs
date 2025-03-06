@@ -28,6 +28,7 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
             args.output.mode()?,
             args.output.compress(),
             args.output.quality(),
+            args.output.block_size,
         ),
         FileFormat::Fasta => encode_single_fasta_parallel(
             in_handle,
@@ -36,6 +37,7 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
             args.output.policy,
             args.output.mode()?,
             args.output.compress(),
+            args.output.block_size,
         ),
         _ => {
             unimplemented!("Tsv import is not implemented for encoding");
@@ -61,6 +63,7 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
             args.output.mode()?,
             args.output.compress(),
             args.output.quality(),
+            args.output.block_size,
         ),
         FileFormat::Fasta => encode_paired_fasta_parallel(
             r1_handle,
@@ -70,6 +73,7 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
             args.output.policy,
             args.output.mode()?,
             args.output.compress(),
+            args.output.block_size,
         ),
         _ => {
             unimplemented!("Tsv import is not implemented for encoding")

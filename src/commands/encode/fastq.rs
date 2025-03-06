@@ -14,6 +14,7 @@ use crate::{
     commands::utils::match_output,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn encode_single_fastq_parallel(
     in_handle: Box<dyn Read + Send>,
     out_path: Option<String>,
@@ -22,6 +23,7 @@ pub fn encode_single_fastq_parallel(
     mode: BinseqMode,
     compress: bool,
     quality: bool,
+    block_size: usize,
 ) -> Result<()> {
     // Open the input FASTQ file
     let mut reader = Reader::new(in_handle);
@@ -47,7 +49,7 @@ pub fn encode_single_fastq_parallel(
             (num_records, num_skipped)
         }
         _ => {
-            let header = VBinseqHeader::new(quality, compress, false);
+            let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
             let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
             // Process the records in parallel
@@ -81,6 +83,7 @@ pub fn encode_paired_fastq_parallel(
     mode: BinseqMode,
     compress: bool,
     quality: bool,
+    block_size: usize,
 ) -> Result<()> {
     // Open the input FASTQ files
     let mut reader_r1 = Reader::new(r1_handle);
@@ -109,7 +112,7 @@ pub fn encode_paired_fastq_parallel(
             (num_records, num_skipped)
         }
         BinseqMode::VBinseq => {
-            let header = VBinseqHeader::new(quality, compress, true);
+            let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
             let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
             // Process the records in parallel

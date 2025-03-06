@@ -14,6 +14,7 @@ use crate::{
     commands::utils::match_output,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn encode_single_fasta_parallel(
     in_handle: Box<dyn Read + Send>,
     out_path: Option<String>,
@@ -21,6 +22,7 @@ pub fn encode_single_fasta_parallel(
     policy: PolicyWrapper,
     mode: BinseqMode,
     compress: bool,
+    block_size: usize,
 ) -> Result<()> {
     // Open the input fasta file
     let mut reader = Reader::new(in_handle);
@@ -46,7 +48,7 @@ pub fn encode_single_fasta_parallel(
             (num_records, num_skipped)
         }
         _ => {
-            let header = VBinseqHeader::new(false, compress, false);
+            let header = VBinseqHeader::with_capacity(block_size as u64, false, compress, false);
             let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
             // Process the records in parallel
@@ -70,6 +72,7 @@ pub fn encode_single_fasta_parallel(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn encode_paired_fasta_parallel(
     r1_handle: Box<dyn Read + Send>,
     r2_handle: Box<dyn Read + Send>,
@@ -78,6 +81,7 @@ pub fn encode_paired_fasta_parallel(
     policy: PolicyWrapper,
     mode: BinseqMode,
     compress: bool,
+    block_size: usize,
 ) -> Result<()> {
     // Open the input fasta file
     let mut reader_r1 = Reader::new(r1_handle);
@@ -106,7 +110,7 @@ pub fn encode_paired_fasta_parallel(
             (num_records, num_skipped)
         }
         BinseqMode::VBinseq => {
-            let header = VBinseqHeader::new(false, compress, true);
+            let header = VBinseqHeader::with_capacity(block_size as u64, false, compress, true);
             let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
             // Process the records in parallel

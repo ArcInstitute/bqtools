@@ -166,6 +166,12 @@ pub struct OutputBinseq {
     #[clap(short = 'Q', long)]
     pub skip_quality: bool,
 
+    /// VBQ virtual block size (in bytes)
+    ///
+    /// Only used by vbq
+    #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
+    pub block_size: usize,
+
     /// Number of threads to use for parallel reading and writing.
     ///
     /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
@@ -298,5 +304,23 @@ impl BinseqMode {
         } else {
             bail!("Could not determine BINSEQ output mode from path: {path}");
         }
+    }
+}
+
+fn parse_memory_size(input: &str) -> Result<usize, String> {
+    let input = input.trim().to_uppercase();
+    let last_char = input.chars().last().unwrap_or('0');
+
+    let (number_str, multiplier) = match last_char {
+        'K' | 'k' => (&input[..input.len() - 1], 1024),
+        'M' | 'm' => (&input[..input.len() - 1], 1024 * 1024),
+        'G' | 'g' => (&input[..input.len() - 1], 1024 * 1024 * 1024),
+        _ if last_char.is_ascii_digit() => (input.as_str(), 1),
+        _ => return Err(format!("Invalid memory size format: {}", input)),
+    };
+
+    match number_str.parse::<usize>() {
+        Ok(number) => Ok(number * multiplier),
+        Err(_) => Err(format!("Failed to parse number: {}", number_str)),
     }
 }
