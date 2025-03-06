@@ -6,7 +6,7 @@ use clap::{
     Parser,
 };
 
-use super::{CatCommand, CountCommand, DecodeCommand, EncodeCommand};
+use super::{CatCommand, CountCommand, DecodeCommand, EncodeCommand, IndexCommand};
 
 // Configures Clap v3-style help menu colors
 const STYLES: Styles = Styles::styled()
@@ -32,4 +32,6 @@ pub enum Commands {
     Cat(CatCommand),
 
     Count(CountCommand),
+
+    Index(IndexCommand),
 }
