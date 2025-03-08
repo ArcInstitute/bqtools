@@ -135,7 +135,7 @@ pub enum Mate {
     Both,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 pub struct OutputBinseq {
     #[clap(
@@ -171,6 +171,12 @@ pub struct OutputBinseq {
     /// Only used by vbq
     #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
     pub block_size: usize,
+
+    /// Index vbq after encoding
+    ///
+    /// Only used by vbq
+    #[clap(short = 'i', long)]
+    pub index: bool,
 
     /// Number of threads to use for parallel reading and writing.
     ///
@@ -287,7 +293,7 @@ impl From<PolicyWrapper> for VPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+#[derive(Debug, Clone, Copy, ValueEnum, Default, PartialEq)]
 pub enum BinseqMode {
     #[clap(name = "bq")]
     #[default]

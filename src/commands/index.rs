@@ -2,20 +2,14 @@ use anyhow::{bail, Result};
 
 use crate::cli::{BinseqMode, IndexCommand};
 
-pub fn run(args: IndexCommand) -> Result<()> {
-    if let BinseqMode::Binseq = args.input.mode()? {
-        bail!(
-            "Only VBINSEQ files are indexable - {} is a BINSEQ file",
-            args.input.path()
-        )
-    }
-    let reader = vbinseq::MmapReader::new(args.input.path())?;
+pub fn index_path(path: &str, verbose: bool) -> Result<()> {
+    let reader = vbinseq::MmapReader::new(path)?;
     if reader.index_path().exists() {
         std::fs::remove_file(reader.index_path())?;
     }
     let index = reader.load_index()?;
 
-    if args.verbose {
+    if verbose {
         let n_blocks = index.n_blocks();
         let mut total_records = 0;
         index.ranges().iter().for_each(|r| {
@@ -30,4 +24,14 @@ pub fn run(args: IndexCommand) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn run(args: IndexCommand) -> Result<()> {
+    if let BinseqMode::Binseq = args.input.mode()? {
+        bail!(
+            "Only VBINSEQ files are indexable - {} is a BINSEQ file",
+            args.input.path()
+        )
+    }
+    index_path(args.input.path(), args.verbose)
 }

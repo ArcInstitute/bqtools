@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::{EncodeCommand, FileFormat};
+use crate::cli::{BinseqMode, EncodeCommand, FileFormat};
 
 mod fasta;
 mod fastq;
@@ -83,8 +83,17 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
 
 pub fn run(args: EncodeCommand) -> Result<()> {
     if args.input.paired() {
-        encode_paired(args)
+        encode_paired(args.clone())?;
     } else {
-        encode_single(args)
+        encode_single(args.clone())?;
     }
+
+    if args.output.index
+        && args.output.mode()? == BinseqMode::VBinseq
+        && args.output.output.is_some()
+    {
+        crate::commands::index::index_path(&args.output.output.unwrap(), true)?;
+    }
+
+    Ok(())
 }

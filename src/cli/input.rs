@@ -5,7 +5,7 @@ use std::io::Read;
 use super::{BinseqMode, FileFormat};
 use crate::commands::match_input;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "INPUT FILE OPTIONS")]
 pub struct InputFile {
     /// Input file [default: stdin]
