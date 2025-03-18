@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use binseq::Policy;
 use clap::{Parser, ValueEnum};
 use std::io::Write;
+use vbinseq::Policy as VPolicy;
 
 use crate::{
     cli::FileFormat,
@@ -134,7 +135,7 @@ pub enum Mate {
     Both,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 pub struct OutputBinseq {
     #[clap(
@@ -145,19 +146,42 @@ pub struct OutputBinseq {
     )]
     pub output: Option<String>,
 
+    /// Defines the BINSEQ mode to use.
+    #[clap(short = 'm', long)]
+    pub mode: Option<BinseqMode>,
+
     /// Policy for handling Ns in sequences
     #[clap(short = 'p', long, default_value = "r")]
     pub policy: PolicyWrapper,
 
-    /// Zstd compress output file
-    #[clap(short, long)]
-    pub compress: bool,
-
-    /// Number of threads to use for parallel compression
-    /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
+    /// Skip ZSTD compression of VBQ blocks (default: compressed)
     ///
-    /// Generally you won't see much or any improvement past 2 threads.
-    #[clap(short = 'T', long, default_value = "2")]
+    /// Only used by vbq.
+    #[clap(short = 'u', long)]
+    pub uncompressed: bool,
+
+    /// Skip inclusion of quality scores (default: included)
+    ///
+    /// Only used by vbq.
+    #[clap(short = 'Q', long)]
+    pub skip_quality: bool,
+
+    /// VBQ virtual block size (in bytes)
+    ///
+    /// Only used by vbq
+    #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
+    pub block_size: usize,
+
+    /// Index vbq after encoding
+    ///
+    /// Only used by vbq
+    #[clap(short = 'i', long)]
+    pub index: bool,
+
+    /// Number of threads to use for parallel reading and writing.
+    ///
+    /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
+    #[clap(short = 'T', long, default_value = "1")]
     pub threads: usize,
 
     /// Zstd compression level
@@ -181,14 +205,23 @@ impl OutputBinseq {
         self.output.clone()
     }
 
-    fn compress(&self) -> bool {
-        self.output.as_ref().map_or(self.compress, |path| {
-            if path.ends_with(".bqz") {
-                true
-            } else {
-                self.compress
-            }
-        })
+    pub fn mode(&self) -> Result<BinseqMode> {
+        if let Some(mode) = self.mode {
+            Ok(mode)
+        } else if let Some(ref path) = self.output {
+            BinseqMode::determine(path)
+        } else {
+            // STDOUT
+            Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn compress(&self) -> bool {
+        !self.uncompressed
+    }
+
+    pub fn quality(&self) -> bool {
+        !self.skip_quality
     }
 
     pub fn threads(&self) -> usize {
@@ -200,10 +233,6 @@ impl OutputBinseq {
 
     fn level(&self) -> i32 {
         self.level.clamp(0, 22)
-    }
-
-    pub fn policy(&self) -> Policy {
-        Policy::from(self.policy)
     }
 }
 
@@ -248,5 +277,56 @@ impl From<PolicyWrapper> for Policy {
             PolicyWrapper::SetToG => Policy::SetToG,
             PolicyWrapper::SetToT => Policy::SetToT,
         }
+    }
+}
+impl From<PolicyWrapper> for VPolicy {
+    fn from(value: PolicyWrapper) -> Self {
+        match value {
+            PolicyWrapper::IgnoreSequence => VPolicy::IgnoreSequence,
+            PolicyWrapper::BreakOnInvalid => VPolicy::BreakOnInvalid,
+            PolicyWrapper::RandomDraw => VPolicy::RandomDraw,
+            PolicyWrapper::SetToA => VPolicy::SetToA,
+            PolicyWrapper::SetToC => VPolicy::SetToC,
+            PolicyWrapper::SetToG => VPolicy::SetToG,
+            PolicyWrapper::SetToT => VPolicy::SetToT,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum, Default, PartialEq)]
+pub enum BinseqMode {
+    #[clap(name = "bq")]
+    #[default]
+    Binseq,
+    #[clap(name = "vbq")]
+    VBinseq,
+}
+impl BinseqMode {
+    pub fn determine(path: &str) -> Result<Self> {
+        if path.ends_with(".bq") {
+            Ok(Self::Binseq)
+        } else if path.ends_with(".vbq") {
+            Ok(Self::VBinseq)
+        } else {
+            bail!("Could not determine BINSEQ output mode from path: {path}");
+        }
+    }
+}
+
+fn parse_memory_size(input: &str) -> Result<usize, String> {
+    let input = input.trim().to_uppercase();
+    let last_char = input.chars().last().unwrap_or('0');
+
+    let (number_str, multiplier) = match last_char {
+        'K' | 'k' => (&input[..input.len() - 1], 1024),
+        'M' | 'm' => (&input[..input.len() - 1], 1024 * 1024),
+        'G' | 'g' => (&input[..input.len() - 1], 1024 * 1024 * 1024),
+        _ if last_char.is_ascii_digit() => (input.as_str(), 1),
+        _ => return Err(format!("Invalid memory size format: {}", input)),
+    };
+
+    match number_str.parse::<usize>() {
+        Ok(number) => Ok(number * multiplier),
+        Err(_) => Err(format!("Failed to parse number: {}", number_str)),
     }
 }
