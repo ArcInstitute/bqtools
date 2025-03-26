@@ -19,7 +19,7 @@ bqtools provides tools to encode, decode, concatenate, and analyze BINSEQ (.bq) 
 
 ```bash
 # Clone the repository
-git clone https://github.com/noamteyssier/bqtools.git
+git clone https://github.com/arcinstitute/bqtools.git
 cd bqtools
 
 # Install
