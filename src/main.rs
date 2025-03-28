@@ -8,7 +8,22 @@ use clap::Parser;
 
 use cli::{Cli, Commands};
 
+#[cfg(unix)]
+fn reset_sigpipe() {
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
+#[cfg(not(unix))]
+fn reset_sigpipe() {
+    // no-op
+}
+
 fn main() -> Result<()> {
+    // Handle Ctrl+C gracefully
+    reset_sigpipe();
+
     let args = Cli::parse();
     match args.command {
         Commands::Encode(encode) => commands::encode::run(encode),
