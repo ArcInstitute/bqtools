@@ -2,6 +2,8 @@
 name = "bqtools"
 version = "0.3.6"
 edition = "2021"
+license = "MIT"
+authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
 
 [dependencies]
 binseq = { git = "ssh://github.com/arcinstitute/binseq" }
