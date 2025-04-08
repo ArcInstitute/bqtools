@@ -4,12 +4,14 @@ A command-line utility for working with BINSEQ files.
 
 ## Overview
 
-bqtools provides tools to encode, decode, concatenate, and analyze BINSEQ (.bq) files. BINSEQ is a binary format designed for efficient storage of fixed-length DNA sequences, using 2-bit encoding for nucleotides.
+bqtools provides tools to encode, decode, concatenate, and analyze [BINSEQ](https://github.com/arcinstitute/binseq) (.bq) and [VBINSEQ](https://github.com/arcinstitute/vbinseq) (.vbq) files.
+BINSEQ is a binary format designed for efficient storage of fixed-length DNA sequences, using 2-bit encoding for nucleotides.
+VBINSEQ is a binary format designed for efficient storage of variable-length DNA sequences with optional quality score support.
 
 ## Features
 
-- **Encode**: Convert FASTA or FASTQ files to BINSEQ format
-- **Decode**: Convert BINSEQ files back to FASTA, FASTQ, or TSV format
+- **Encode**: Convert FASTA or FASTQ files to a BINSEQ format
+- **Decode**: Convert a BINSEQ file back to FASTA, FASTQ, or TSV format
 - **Cat**: Concatenate multiple BINSEQ files
 - **Count**: Count records in a BINSEQ file
 
