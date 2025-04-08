@@ -49,11 +49,17 @@ bqtools count --help
 Convert FASTA/FASTQ files to BINSEQ format:
 
 ```bash
-# Encode a single file
+# Encode a single file to binseq
 bqtools encode input.fastq -o output.bq
+
+# Encode a single file to vbinseq
+bqtools encode input.fastq -o output.vbq
 
 # Encode paired-end reads
 bqtools encode input_R1.fastq input_R2.fastq -o output.bq
+
+# Encode paired-end reads to vbinseq
+bqtools encode input_R1.fastq input_R2.fastq -o output.vbq
 
 # Specify a policy for handling non-ATCG nucleotides
 bqtools encode input.fastq -o output.bq -p r  # Randomly draw A/C/G/T for each N
