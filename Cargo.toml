@@ -6,8 +6,6 @@ license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
 
 [dependencies]
-binseq = { git = "ssh://github.com/arcinstitute/binseq" }
-vbinseq = { git = "ssh://github.com/arcinstitute/vbinseq" }
 anyhow = "1.0.94"
 niffler = "2.6.0"
 clap = { version = "4.5.23", features = ["derive"] }
@@ -21,6 +19,8 @@ rand = "0.8.5"
 memmap2 = "0.9.5"
 paraseq = "0.1.1"
 libc = "0.2.171"
+binseq = "0.5.4"
+vbinseq = "0.1.5"
 
 [profile.release]
 lto = true
