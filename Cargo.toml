@@ -4,6 +4,10 @@ version = "0.3.6"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
+description = "A command-line tool for interacting with BINSEQ file formats."
+repository = "https://github.com/arcinstitute/bqtools"
+categories = ["command-line-utilities", "science::bioinformatics", "encoding"]
+keywords = ["bioinformatics", "binseq", "vbinseq", "file-format", "sequencing"]
 
 [dependencies]
 anyhow = "1.0.94"
