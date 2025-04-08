@@ -1,5 +1,9 @@
 # bqtools
 
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE.md)
+![actions status](https://github.com/arcinstitute/bqtools/workflows/CI/badge.svg)
+[![Crates.io](https://img.shields.io/crates/d/bqtools?color=orange&label=crates.io)](https://crates.io/crates/bqtools)
+
 A command-line utility for working with BINSEQ files.
 
 ## Overview
@@ -16,6 +20,16 @@ VBINSEQ is a binary format designed for efficient storage of variable-length DNA
 - **Count**: Count records in a BINSEQ file
 
 ## Installation
+
+### From Cargo
+
+bqtools can be installed using `cargo`, the Rust package manager:
+
+```bash
+cargo install bqtools
+```
+
+To install `cargo` you can follow the instructions on the [official Rust website](https://www.rust-lang.org/tools/install).
 
 ### From Source
 
