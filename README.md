@@ -1,7 +1,6 @@
 # bqtools
 
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE.md)
-![actions status](https://github.com/arcinstitute/bqtools/workflows/CI/badge.svg)
 [![Crates.io](https://img.shields.io/crates/d/bqtools?color=orange&label=crates.io)](https://crates.io/crates/bqtools)
 
 A command-line utility for working with BINSEQ files.
