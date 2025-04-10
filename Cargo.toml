@@ -26,6 +26,7 @@ libc = "0.2.171"
 binseq = "0.5.4"
 vbinseq = "0.1.5"
 memchr = "2.7.4"
+regex = "1.11.1"
 
 [profile.release]
 lto = true

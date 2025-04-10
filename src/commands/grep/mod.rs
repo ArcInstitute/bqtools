@@ -7,15 +7,23 @@ use parking_lot::Mutex;
 
 use super::decode::{build_writer, write_record_pair, SplitWriter};
 
-type Pattern = Vec<Vec<u8>>;
+type Patterns = Vec<Vec<u8>>;
+type Expressions = Vec<regex::bytes::Regex>;
 
 #[derive(Clone)]
 struct GrepProcessor {
     /// Patterns to search for
-    mp1: Pattern, // in primary
-    mp2: Pattern, // in secondary
-    pat: Pattern, // in either
-    invert: bool, // invert match
+    mp1: Patterns, // in primary
+    mp2: Patterns, // in secondary
+    pat: Patterns, // in either
+
+    /// Regex expressions to match on
+    re1: Expressions, // in primary
+    re2: Expressions, // in secondary
+    re: Expressions,  // in either
+
+    /// Invert the pattern selection
+    invert: bool,
 
     /// Local write buffers
     mixed: Vec<u8>, // General purpose, interleaved or singlets
@@ -39,10 +47,14 @@ struct GrepProcessor {
     global_writer: Arc<Mutex<SplitWriter>>,
 }
 impl GrepProcessor {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        mp1: Pattern,
-        mp2: Pattern,
-        pat: Pattern,
+        mp1: Patterns,
+        mp2: Patterns,
+        pat: Patterns,
+        re1: Expressions,
+        re2: Expressions,
+        re: Expressions,
         invert: bool,
         writer: SplitWriter,
         format: FileFormat,
@@ -59,6 +71,9 @@ impl GrepProcessor {
             mp1,
             mp2,
             pat,
+            re1,
+            re2,
+            re,
             invert,
             format,
             mate,
@@ -98,8 +113,36 @@ impl GrepProcessor {
         })
     }
 
+    fn regex_primary(&self) -> bool {
+        if self.re1.is_empty() {
+            return true;
+        }
+        self.re1.iter().any(|re| re.find(&self.sbuf).is_some())
+    }
+
+    fn regex_secondary(&self) -> bool {
+        if self.re2.is_empty() || self.xbuf.is_empty() {
+            return true;
+        }
+        self.re2.iter().any(|re| re.find(&self.xbuf).is_some())
+    }
+
+    fn regex_either(&self) -> bool {
+        if self.re.is_empty() {
+            return true;
+        }
+        self.re
+            .iter()
+            .any(|re| re.find(&self.sbuf).is_some() || re.find(&self.xbuf).is_some())
+    }
+
     pub fn pattern_match(&self) -> bool {
-        let pred = self.search_primary() && self.search_secondary() && self.search_either();
+        let pred = self.search_primary()
+            && self.search_secondary()
+            && self.search_either()
+            && self.regex_primary()
+            && self.regex_secondary()
+            && self.regex_either();
         if self.invert {
             !pred
         } else {
@@ -184,6 +227,9 @@ pub fn run(args: GrepCommand) -> Result<()> {
                 args.grep.bytes_mp1(),
                 args.grep.bytes_mp2(),
                 args.grep.bytes_pat(),
+                args.grep.bytes_reg1(),
+                args.grep.bytes_reg2(),
+                args.grep.bytes_reg(),
                 args.grep.invert,
                 writer,
                 format,
