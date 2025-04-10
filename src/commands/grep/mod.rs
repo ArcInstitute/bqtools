@@ -210,6 +210,84 @@ impl binseq::ParallelProcessor for GrepProcessor {
         Ok(())
     }
 }
+impl vbinseq::ParallelProcessor for GrepProcessor {
+    fn process_record(&mut self, record: vbinseq::RefRecord) -> vbinseq::Result<()> {
+        self.clear_buffers();
+
+        // Decode sequences
+        record.decode_s(&mut self.sbuf)?;
+        if record.is_paired() {
+            record.decode_x(&mut self.xbuf)?;
+        }
+
+        if self.pattern_match() {
+            // decode index
+            let mut ibuf = itoa::Buffer::new();
+            let index = ibuf.format(record.index()).as_bytes();
+
+            let squal = if record.has_quality() {
+                record.squal()
+            } else {
+                if self.squal.len() < self.sbuf.len() {
+                    self.squal.resize(self.sbuf.len(), b'?');
+                }
+                &self.squal
+            };
+
+            let xqual = if record.is_paired() {
+                if record.has_quality() {
+                    record.xqual()
+                } else {
+                    if self.xqual.len() < self.xbuf.len() {
+                        self.xqual.resize(self.xbuf.len(), b'?');
+                    }
+                    &self.xqual
+                }
+            } else {
+                if self.xqual.len() < self.xbuf.len() {
+                    self.xqual.resize(self.xbuf.len(), b'?');
+                }
+                &self.xqual
+            };
+
+            write_record_pair(
+                &mut self.left,
+                &mut self.right,
+                &mut self.mixed,
+                self.mate,
+                self.is_split,
+                index,
+                &self.sbuf,
+                squal,
+                &self.xbuf,
+                xqual,
+                self.format,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
+        // Lock the mutex to write to the global buffer
+        {
+            let mut writer = self.global_writer.lock();
+            if writer.is_split() {
+                writer.write_split(&self.left, true)?;
+                writer.write_split(&self.right, false)?;
+            } else {
+                writer.write_interleaved(&self.mixed)?;
+            }
+            writer.flush()?;
+        }
+
+        // Clear the local buffer and reset the local record count
+        self.mixed.clear();
+        self.left.clear();
+        self.right.clear();
+        Ok(())
+    }
+}
 
 pub fn run(args: GrepCommand) -> Result<()> {
     args.grep.validate()?;
@@ -238,7 +316,27 @@ pub fn run(args: GrepCommand) -> Result<()> {
             reader.process_parallel(proc.clone(), args.output.threads())?;
         }
         BinseqMode::VBinseq => {
-            unimplemented!("Not implemented for vbinseq yet")
+            let reader = vbinseq::MmapReader::new(args.input.path())?;
+            let writer = build_writer(&args.output, reader.header().paired)?;
+            let format = args.output.format()?;
+            let mate = if reader.header().paired {
+                Some(args.output.mate())
+            } else {
+                None
+            };
+            let proc = GrepProcessor::new(
+                args.grep.bytes_mp1(),
+                args.grep.bytes_mp2(),
+                args.grep.bytes_pat(),
+                args.grep.bytes_reg1(),
+                args.grep.bytes_reg2(),
+                args.grep.bytes_reg(),
+                args.grep.invert,
+                writer,
+                format,
+                mate,
+            );
+            reader.process_parallel(proc.clone(), args.output.threads())?;
         }
     }
 
