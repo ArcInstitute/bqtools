@@ -28,6 +28,9 @@ pub struct GrepArgs {
     /// Pattern to search for in both mates
     #[clap(short = 'P', long)]
     pub pat: Vec<String>,
+    /// Invert pattern criteria (like grep -v)
+    #[clap(short = 'v', long)]
+    pub invert: bool,
 }
 impl GrepArgs {
     pub fn validate(&self) -> Result<()> {

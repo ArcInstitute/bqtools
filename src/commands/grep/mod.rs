@@ -15,6 +15,7 @@ struct GrepProcessor {
     mp1: Pattern, // in primary
     mp2: Pattern, // in secondary
     pat: Pattern, // in either
+    invert: bool, // invert match
 
     /// Local write buffers
     mixed: Vec<u8>, // General purpose, interleaved or singlets
@@ -42,6 +43,7 @@ impl GrepProcessor {
         mp1: Pattern,
         mp2: Pattern,
         pat: Pattern,
+        invert: bool,
         writer: SplitWriter,
         format: FileFormat,
         mate: Option<Mate>,
@@ -57,6 +59,7 @@ impl GrepProcessor {
             mp1,
             mp2,
             pat,
+            invert,
             format,
             mate,
             is_split: writer.is_split(),
@@ -96,7 +99,12 @@ impl GrepProcessor {
     }
 
     pub fn pattern_match(&self) -> bool {
-        self.search_primary() && self.search_secondary() && self.search_either()
+        let pred = self.search_primary() && self.search_secondary() && self.search_either();
+        if self.invert {
+            !pred
+        } else {
+            pred
+        }
     }
 }
 impl binseq::ParallelProcessor for GrepProcessor {
@@ -176,6 +184,7 @@ pub fn run(args: GrepCommand) -> Result<()> {
                 args.grep.bytes_mp1(),
                 args.grep.bytes_mp2(),
                 args.grep.bytes_pat(),
+                args.grep.invert,
                 writer,
                 format,
                 mate,
