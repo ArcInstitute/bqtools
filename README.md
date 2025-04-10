@@ -131,3 +131,21 @@ Count records in a BINSEQ file:
 ```bash
 bqtools count input.bq
 ```
+
+### Searching
+
+You can easily search for specific subsequences or regular expressions within BINSEQ files:
+
+```bash
+# See full options list
+bqtools grep --help
+
+# Search for a specific subsequence (in primary sequence)
+bqtools grep input.bq -p "ATCG"
+
+# Search for a regular expression (in primary)
+bqtools grep input.bq -r "AT[CG]"
+
+# Search for both a subsequence (in extended sequence) and a regular expression (in either)
+bqtools grep input.bq -E "ATCG" -P "AT[CG]"
+```
