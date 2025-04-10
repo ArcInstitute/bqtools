@@ -2,6 +2,7 @@ pub mod cat;
 pub mod count;
 pub mod decode;
 pub mod encode;
+pub mod grep;
 pub mod index;
 mod utils;
 

@@ -31,5 +31,6 @@ fn main() -> Result<()> {
         Commands::Cat(cat) => commands::cat::run(cat),
         Commands::Count(count) => commands::count::run(count),
         Commands::Index(index) => commands::index::run(index),
+        Commands::Grep(grep) => commands::grep::run(grep),
     }
 }
