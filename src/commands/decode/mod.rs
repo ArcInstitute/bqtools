@@ -6,44 +6,44 @@ mod utils;
 use anyhow::{bail, Result};
 use binseq::MmapReader;
 use decode_binseq::Decoder;
-use utils::{write_record_pair, SplitWriter};
+pub use utils::{write_record_pair, SplitWriter};
 
-use crate::cli::{BinseqMode, DecodeCommand, Mate};
+use crate::cli::{BinseqMode, DecodeCommand, Mate, OutputFile};
 
 /// Convenience type wrapper
 pub type Writer = Box<dyn Write + Send>;
 
-fn build_writer(args: &DecodeCommand, paired: bool) -> Result<SplitWriter> {
-    let format = args.output.format()?;
+pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
+    let format = args.format()?;
 
     // Split writer
-    if args.output.prefix.is_some() {
+    if args.prefix.is_some() {
         if !paired {
             bail!("Cannot split file into two. No extended sequence channel");
         }
-        match args.output.mate {
+        match args.mate {
             Mate::Both => {
-                let (r1, r2) = args.output.as_paired_writer(format)?;
+                let (r1, r2) = args.as_paired_writer(format)?;
                 let split = SplitWriter::new_split(r1, r2);
                 Ok(split)
             }
             _ => {
                 eprintln!("Warning: Ignoring prefix as mate was provided");
                 // Interleaved writer
-                let writer = args.output.as_writer()?;
+                let writer = args.as_writer()?;
                 let split = SplitWriter::new_interleaved(writer);
                 Ok(split)
             }
         }
     } else {
-        match args.output.mate {
+        match args.mate {
             Mate::One | Mate::Two => {
                 eprintln!("Warning: Ignoring mate as single channel in file");
             }
             _ => {}
         }
         // Interleaved writer
-        let writer = args.output.as_writer()?;
+        let writer = args.as_writer()?;
         let split = SplitWriter::new_interleaved(writer);
         Ok(split)
     }
@@ -53,7 +53,7 @@ pub fn run(args: DecodeCommand) -> Result<()> {
     let num_records = match args.input.mode()? {
         BinseqMode::Binseq => {
             let reader = MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args, reader.header().xlen > 0)?;
+            let writer = build_writer(&args.output, reader.header().xlen > 0)?;
             let format = args.output.format()?;
             let mate = if reader.header().xlen > 0 {
                 Some(args.output.mate())
@@ -66,7 +66,7 @@ pub fn run(args: DecodeCommand) -> Result<()> {
         }
         _ => {
             let reader = vbinseq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args, reader.header().paired)?;
+            let writer = build_writer(&args.output, reader.header().paired)?;
             let format = args.output.format()?;
             let mate = if reader.header().paired {
                 Some(args.output.mate())
