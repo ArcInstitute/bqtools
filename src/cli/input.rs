@@ -16,6 +16,9 @@ pub struct InputFile {
 
     #[clap(short, long, help = "Input file format")]
     pub format: Option<FileFormat>,
+
+    #[clap(short = 'I', long, help = "Interleaved input file format")]
+    pub interleaved: bool,
 }
 impl InputFile {
     pub fn format(&self) -> Result<FileFormat> {
