@@ -8,6 +8,7 @@ mod grep;
 mod index;
 mod input;
 mod output;
+mod sample;
 
 pub use cat::CatCommand;
 pub use cli::{Cli, Commands};
@@ -19,3 +20,4 @@ pub use grep::GrepCommand;
 pub use index::IndexCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
 pub use output::{BinseqMode, Mate, OutputBinseq, OutputFile, PolicyWrapper};
+pub use sample::SampleCommand;
