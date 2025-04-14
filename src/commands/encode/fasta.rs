@@ -94,7 +94,6 @@ pub fn encode_interleaved_fasta_parallel(
             let (slen, xlen) = get_interleaved_sequence_len_fasta(&mut reader)?;
 
             let header = BinseqHeader::new_extended(slen, xlen);
-            eprintln!("Header: {:?}", header);
             let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
 
             // Process the records in parallel
