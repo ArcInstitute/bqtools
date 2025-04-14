@@ -7,8 +7,12 @@ mod fastq;
 mod processor;
 mod utils;
 
-use fasta::{encode_paired_fasta_parallel, encode_single_fasta_parallel};
-use fastq::{encode_paired_fastq_parallel, encode_single_fastq_parallel};
+use fasta::{
+    encode_interleaved_fasta_parallel, encode_paired_fasta_parallel, encode_single_fasta_parallel,
+};
+use fastq::{
+    encode_interleaved_fastq_parallel, encode_paired_fastq_parallel, encode_single_fastq_parallel,
+};
 use processor::{BinseqProcessor, VBinseqProcessor};
 use utils::{get_sequence_len_fasta, get_sequence_len_fastq};
 
@@ -31,6 +35,39 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
             args.output.block_size,
         ),
         FileFormat::Fasta => encode_single_fasta_parallel(
+            in_handle,
+            args.output.owned_path(),
+            args.output.threads(),
+            args.output.policy,
+            args.output.mode()?,
+            args.output.compress(),
+            args.output.block_size,
+        ),
+        _ => {
+            unimplemented!("Tsv import is not implemented for encoding");
+        }
+    }
+}
+
+fn encode_interleaved(args: EncodeCommand) -> Result<()> {
+    // Open the IO handles
+    let in_handle = args.input.as_reader()?;
+
+    // Compression passthrough on input
+    let (in_handle, _comp) = niffler::send::get_reader(in_handle)?;
+
+    match args.input.format()? {
+        FileFormat::Fastq => encode_interleaved_fastq_parallel(
+            in_handle,
+            args.output.owned_path(),
+            args.output.threads(),
+            args.output.policy,
+            args.output.mode()?,
+            args.output.compress(),
+            args.output.quality(),
+            args.output.block_size,
+        ),
+        FileFormat::Fasta => encode_interleaved_fasta_parallel(
             in_handle,
             args.output.owned_path(),
             args.output.threads(),
@@ -84,6 +121,8 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
 pub fn run(args: EncodeCommand) -> Result<()> {
     if args.input.paired() {
         encode_paired(args.clone())?;
+    } else if args.input.interleaved {
+        encode_interleaved(args.clone())?;
     } else {
         encode_single(args.clone())?;
     }

@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use binseq::{BinseqHeader, BinseqWriter, BinseqWriterBuilder, Policy as BinseqPolicy};
-use paraseq::parallel::{PairedParallelProcessor, ParallelProcessor, ProcessError};
+use paraseq::parallel::{
+    InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor, ProcessError,
+};
 use parking_lot::Mutex;
 use vbinseq::{Policy as VBinseqPolicy, VBinseqHeader, VBinseqWriter, VBinseqWriterBuilder};
 
@@ -107,6 +109,34 @@ impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
         if self
             .writer
             .write_nucleotides(0, record.seq())
+            .map_err(|e| ProcessError::from(anyhow!(e)))?
+        {
+            self.record_count += 1;
+        } else {
+            self.skipped_count += 1;
+        }
+
+        // implicitly skip the record if encoding fails
+        Ok(())
+    }
+
+    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+        self.update_global_counters();
+        self.write_batch()
+            .map_err(|e| ProcessError::from(anyhow!(e)))?;
+        Ok(())
+    }
+}
+
+impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
+    fn process_interleaved_pair<Rf: paraseq::fastx::Record>(
+        &mut self,
+        record1: Rf,
+        record2: Rf,
+    ) -> paraseq::parallel::Result<()> {
+        if self
+            .writer
+            .write_paired(0, record1.seq(), record2.seq())
             .map_err(|e| ProcessError::from(anyhow!(e)))?
         {
             self.record_count += 1;
@@ -263,6 +293,50 @@ impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
                 .write_nucleotides_quality(0, record.seq(), record.qual().unwrap())
         } else {
             self.writer.write_nucleotides(0, record.seq())
+        }
+        .map_err(|e| ProcessError::from(anyhow!(e)))?;
+
+        if write_status {
+            self.record_count += 1;
+        } else {
+            self.skipped_count += 1;
+        }
+
+        // implicitly skip the record if encoding fails
+        Ok(())
+    }
+
+    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+        self.update_global_counters();
+        self.write_batch()
+            .map_err(|e| ProcessError::from(anyhow!(e)))?;
+        Ok(())
+    }
+}
+
+impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
+    fn process_interleaved_pair<Rf: paraseq::fastx::Record>(
+        &mut self,
+        record1: Rf,
+        record2: Rf,
+    ) -> paraseq::parallel::Result<()> {
+        if !self.writer.is_paired() {
+            return Err(ProcessError::from(anyhow!(
+                "Provided VBinseq Configuration does not expect paired records."
+            )));
+        }
+
+        let write_status = if self.writer.has_quality() {
+            self.writer.write_nucleotides_quality_paired(
+                0,
+                record1.seq(),
+                record2.seq(),
+                record1.qual().unwrap(),
+                record2.qual().unwrap(),
+            )
+        } else {
+            self.writer
+                .write_nucleotides_paired(0, record1.seq(), record2.seq())
         }
         .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
