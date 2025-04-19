@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use memchr::memmem::Finder;
 
 use super::{InputBinseq, OutputFile};
 
@@ -60,14 +61,26 @@ impl GrepArgs {
         }
         Ok(())
     }
-    pub fn bytes_mp1(&self) -> Vec<Vec<u8>> {
-        self.pat1.iter().map(|s| s.as_bytes().to_vec()).collect()
+    pub fn bytes_mp1(&self) -> Vec<Finder<'static>> {
+        self.pat1
+            .iter()
+            .map(|s| Finder::new(s.as_bytes()))
+            .map(|f| f.into_owned())
+            .collect()
     }
-    pub fn bytes_mp2(&self) -> Vec<Vec<u8>> {
-        self.pat2.iter().map(|s| s.as_bytes().to_vec()).collect()
+    pub fn bytes_mp2(&self) -> Vec<Finder<'static>> {
+        self.pat2
+            .iter()
+            .map(|s| Finder::new(s.as_bytes()))
+            .map(|f| f.into_owned())
+            .collect()
     }
-    pub fn bytes_pat(&self) -> Vec<Vec<u8>> {
-        self.pat.iter().map(|s| s.as_bytes().to_vec()).collect()
+    pub fn bytes_pat(&self) -> Vec<Finder<'static>> {
+        self.pat
+            .iter()
+            .map(|s| Finder::new(s.as_bytes()))
+            .map(|f| f.into_owned())
+            .collect()
     }
     pub fn bytes_reg1(&self) -> Vec<regex::bytes::Regex> {
         self.reg1

@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use crate::cli::{BinseqMode, FileFormat, GrepCommand, Mate};
 use anyhow::Result;
-use memchr::memmem;
+use memchr::memmem::Finder;
 use parking_lot::Mutex;
 
 use super::decode::{build_writer, write_record_pair, SplitWriter};
 
-type Patterns = Vec<Vec<u8>>;
+type Patterns = Vec<Finder<'static>>;
 type Expressions = Vec<regex::bytes::Regex>;
 
 #[derive(Clone)]
@@ -90,27 +90,23 @@ impl GrepProcessor {
         if self.mp1.is_empty() {
             return true;
         }
-        self.mp1
-            .iter()
-            .all(|pat| memmem::find(&self.sbuf, pat).is_some())
+        self.mp1.iter().all(|pat| pat.find(&self.sbuf).is_some())
     }
 
     fn search_secondary(&self) -> bool {
         if self.mp2.is_empty() || self.xbuf.is_empty() {
             return true;
         }
-        self.mp2
-            .iter()
-            .any(|pat| memmem::find(&self.xbuf, pat).is_some())
+        self.mp2.iter().any(|pat| pat.find(&self.xbuf).is_some())
     }
 
     fn search_either(&self) -> bool {
         if self.pat.is_empty() {
             return true;
         }
-        self.pat.iter().any(|pat| {
-            memmem::find(&self.sbuf, pat).is_some() || memmem::find(&self.xbuf, pat).is_some()
-        })
+        self.pat
+            .iter()
+            .any(|pat| pat.find(&self.sbuf).is_some() || pat.find(&self.xbuf).is_some())
     }
 
     fn regex_primary(&self) -> bool {
