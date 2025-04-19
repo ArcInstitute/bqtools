@@ -25,6 +25,12 @@ struct GrepProcessor {
     /// Invert the pattern selection
     invert: bool,
 
+    /// Only count the number of matches
+    count: bool,
+
+    /// Local count
+    local_count: usize,
+
     /// Local write buffers
     mixed: Vec<u8>, // General purpose, interleaved or singlets
     left: Vec<u8>, // Used when writing pairs of files (R1/R2)
@@ -45,6 +51,7 @@ struct GrepProcessor {
 
     /// Global values
     global_writer: Arc<Mutex<SplitWriter>>,
+    global_count: Arc<Mutex<usize>>,
 }
 impl GrepProcessor {
     #[allow(clippy::too_many_arguments)]
@@ -56,6 +63,7 @@ impl GrepProcessor {
         re2: Expressions,
         re: Expressions,
         invert: bool,
+        count: bool,
         writer: SplitWriter,
         format: FileFormat,
         mate: Option<Mate>,
@@ -75,10 +83,13 @@ impl GrepProcessor {
             re2,
             re,
             invert,
+            count,
             format,
             mate,
             is_split: writer.is_split(),
             global_writer: Arc::new(Mutex::new(writer)),
+            local_count: 0,
+            global_count: Arc::new(Mutex::new(0)),
         }
     }
     pub fn clear_buffers(&mut self) {
@@ -145,6 +156,10 @@ impl GrepProcessor {
             pred
         }
     }
+
+    pub fn pprint_counts(&self) {
+        println!("{}", self.global_count.lock())
+    }
 }
 impl binseq::ParallelProcessor for GrepProcessor {
     fn process_record(&mut self, record: binseq::RefRecord) -> binseq::Result<()> {
@@ -157,6 +172,12 @@ impl binseq::ParallelProcessor for GrepProcessor {
         }
 
         if self.pattern_match() {
+            self.local_count += 1;
+            if self.count {
+                // no further processing needed
+                return Ok(());
+            }
+
             // decode index
             let mut ibuf = itoa::Buffer::new();
             let index = ibuf.format(record.id()).as_bytes();
@@ -188,7 +209,7 @@ impl binseq::ParallelProcessor for GrepProcessor {
 
     fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
         // Lock the mutex to write to the global buffer
-        {
+        if !self.count {
             let mut writer = self.global_writer.lock();
             if writer.is_split() {
                 writer.write_split(&self.left, true)?;
@@ -198,11 +219,15 @@ impl binseq::ParallelProcessor for GrepProcessor {
             }
             writer.flush()?;
         }
-
-        // Clear the local buffer and reset the local record count
+        // Clear the local buffers
         self.mixed.clear();
         self.left.clear();
         self.right.clear();
+
+        // Increment the global count and reset local
+        *self.global_count.lock() += self.local_count;
+        self.local_count = 0;
+
         Ok(())
     }
 }
@@ -217,6 +242,12 @@ impl vbinseq::ParallelProcessor for GrepProcessor {
         }
 
         if self.pattern_match() {
+            self.local_count += 1;
+            if self.count {
+                // No further processing needed
+                return Ok(());
+            }
+
             // decode index
             let mut ibuf = itoa::Buffer::new();
             let index = ibuf.format(record.index()).as_bytes();
@@ -266,7 +297,7 @@ impl vbinseq::ParallelProcessor for GrepProcessor {
 
     fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
         // Lock the mutex to write to the global buffer
-        {
+        if !self.count {
             let mut writer = self.global_writer.lock();
             if writer.is_split() {
                 writer.write_split(&self.left, true)?;
@@ -281,6 +312,10 @@ impl vbinseq::ParallelProcessor for GrepProcessor {
         self.mixed.clear();
         self.left.clear();
         self.right.clear();
+
+        // Increment the global count and reset local
+        *self.global_count.lock() += self.local_count;
+        self.local_count = 0;
         Ok(())
     }
 }
@@ -305,11 +340,15 @@ pub fn run(args: GrepCommand) -> Result<()> {
                 args.grep.bytes_reg2(),
                 args.grep.bytes_reg(),
                 args.grep.invert,
+                args.grep.count,
                 writer,
                 format,
                 mate,
             );
             reader.process_parallel(proc.clone(), args.output.threads())?;
+            if args.grep.count {
+                proc.pprint_counts();
+            }
         }
         BinseqMode::VBinseq => {
             let reader = vbinseq::MmapReader::new(args.input.path())?;
@@ -328,11 +367,15 @@ pub fn run(args: GrepCommand) -> Result<()> {
                 args.grep.bytes_reg2(),
                 args.grep.bytes_reg(),
                 args.grep.invert,
+                args.grep.count,
                 writer,
                 format,
                 mate,
             );
             reader.process_parallel(proc.clone(), args.output.threads())?;
+            if args.grep.count {
+                proc.pprint_counts();
+            }
         }
     }
 

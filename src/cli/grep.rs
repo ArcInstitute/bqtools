@@ -47,6 +47,10 @@ pub struct GrepArgs {
     /// Invert pattern criteria (like grep -v)
     #[clap(short = 'v', long)]
     pub invert: bool,
+
+    /// Only count matches
+    #[clap(short = 'C', long)]
+    pub count: bool,
 }
 impl GrepArgs {
     pub fn validate(&self) -> Result<()> {
