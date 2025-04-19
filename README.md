@@ -141,7 +141,7 @@ You can easily search for specific subsequences or regular expressions within BI
 bqtools grep --help
 
 # Search for a specific subsequence (in primary sequence)
-bqtools grep input.bq -p "ATCG"
+bqtools grep input.bq -e "ATCG"
 
 # Search for a regular expression (in primary)
 bqtools grep input.bq -r "AT[CG]"
