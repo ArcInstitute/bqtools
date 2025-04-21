@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.3.16"
+version = "0.3.17"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
@@ -23,7 +23,7 @@ memmap2 = "0.9.5"
 paraseq = "0.1.4"
 libc = "0.2.171"
 binseq = "0.5.4"
-vbinseq = "0.1.5"
+vbinseq = "0.1.6"
 memchr = "2.7.4"
 regex = "1.11.1"
 
