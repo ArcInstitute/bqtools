@@ -17,6 +17,7 @@ VBINSEQ is a binary format designed for efficient storage of variable-length DNA
 - **Decode**: Convert a BINSEQ file back to FASTA, FASTQ, or TSV format
 - **Cat**: Concatenate multiple BINSEQ files
 - **Count**: Count records in a BINSEQ file
+- **Grep**: Search for fixed-string or regex patterns in BINSEQ files.
 
 ## Installation
 
@@ -132,7 +133,7 @@ Count records in a BINSEQ file:
 bqtools count input.bq
 ```
 
-### Searching
+### Grep
 
 You can easily search for specific subsequences or regular expressions within BINSEQ files:
 
