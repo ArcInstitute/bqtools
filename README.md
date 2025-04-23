@@ -7,9 +7,18 @@ A command-line utility for working with BINSEQ files.
 
 ## Overview
 
-bqtools provides tools to encode, decode, concatenate, and analyze [BINSEQ](https://github.com/arcinstitute/binseq) (.bq) and [VBINSEQ](https://github.com/arcinstitute/vbinseq) (.vbq) files.
-BINSEQ is a binary format designed for efficient storage of fixed-length DNA sequences, using 2-bit encoding for nucleotides.
-VBINSEQ is a binary format designed for efficient storage of variable-length DNA sequences with optional quality score support.
+bqtools provides tools to encode, decode, manipulate, and analyze [BINSEQ](https://github.com/arcinstitute/binseq) files.
+It supports both (`*.bq`) and (`*.vbq`) files and makes use of the [`binseq`](https://crates.io/crates/binseq) library.
+
+BINSEQ is a binary file format family designed for high-performance processing of DNA sequences.
+It currently has two variants: BQ and VBQ.
+
+- **BQ (\*.bq)**: Optimized for _fixed-length_ DNA sequences **without** quality scores.
+- **VBQ (\*.vbq)**: Optimized for _variable-length_ DNA sequences **with optional** quality scores.
+
+Both support single and paired sequences and make use of two-bit encoding for efficient nucleotide packing using the [`bitnuc`](https://crates.io/crates/bitnuc) library.
+
+For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/content/10.1101/2025.04.08.647863v1) where we describe the format family and its applications.
 
 ## Features
 
