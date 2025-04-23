@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::cli::{BinseqMode, FileFormat, Mate, SampleCommand};
+use crate::cli::{FileFormat, Mate, SampleCommand};
 use anyhow::Result;
-use binseq::{bq, prelude::*, vbq};
+use binseq::prelude::*;
 use parking_lot::Mutex;
 use rand::{Rng, SeedableRng};
 
@@ -148,34 +148,15 @@ impl ParallelProcessor for SampleProcessor {
 
 pub fn run(args: SampleCommand) -> Result<()> {
     args.sample.validate()?;
-    match args.input.mode()? {
-        BinseqMode::Binseq => {
-            let reader = bq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args.output, reader.header().xlen > 0)?;
-            let format = args.output.format()?;
-            let mate = if reader.header().xlen > 0 {
-                Some(args.output.mate())
-            } else {
-                None
-            };
-            let proc =
-                SampleProcessor::new(args.sample.fraction, args.sample.seed, writer, format, mate);
-            reader.process_parallel(proc.clone(), args.output.threads())?;
-        }
-        BinseqMode::VBinseq => {
-            let reader = vbq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args.output, reader.header().paired)?;
-            let format = args.output.format()?;
-            let mate = if reader.header().paired {
-                Some(args.output.mate())
-            } else {
-                None
-            };
-            let proc =
-                SampleProcessor::new(args.sample.fraction, args.sample.seed, writer, format, mate);
-            reader.process_parallel(proc.clone(), args.output.threads())?;
-        }
-    }
-
+    let reader = BinseqReader::new(args.input.path())?;
+    let writer = build_writer(&args.output, reader.is_paired())?;
+    let format = args.output.format()?;
+    let mate = if reader.is_paired() {
+        Some(args.output.mate())
+    } else {
+        None
+    };
+    let proc = SampleProcessor::new(args.sample.fraction, args.sample.seed, writer, format, mate);
+    reader.process_parallel(proc.clone(), args.output.threads())?;
     Ok(())
 }
