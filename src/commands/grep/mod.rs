@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::cli::{BinseqMode, FileFormat, GrepCommand, Mate};
+use crate::cli::{FileFormat, GrepCommand, Mate};
 use anyhow::Result;
-use binseq::{bq, prelude::*, vbq};
+use binseq::prelude::*;
 use memchr::memmem::Finder;
 use parking_lot::Mutex;
 
@@ -253,61 +253,30 @@ impl ParallelProcessor for GrepProcessor {
 
 pub fn run(args: GrepCommand) -> Result<()> {
     args.grep.validate()?;
-    match args.input.mode()? {
-        BinseqMode::Binseq => {
-            let reader = bq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args.output, reader.header().xlen > 0)?;
-            let format = args.output.format()?;
-            let mate = if reader.header().xlen > 0 {
-                Some(args.output.mate())
-            } else {
-                None
-            };
-            let proc = GrepProcessor::new(
-                args.grep.bytes_mp1(),
-                args.grep.bytes_mp2(),
-                args.grep.bytes_pat(),
-                args.grep.bytes_reg1(),
-                args.grep.bytes_reg2(),
-                args.grep.bytes_reg(),
-                args.grep.invert,
-                args.grep.count,
-                writer,
-                format,
-                mate,
-            );
-            reader.process_parallel(proc.clone(), args.output.threads())?;
-            if args.grep.count {
-                proc.pprint_counts();
-            }
-        }
-        BinseqMode::VBinseq => {
-            let reader = vbq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args.output, reader.header().paired)?;
-            let format = args.output.format()?;
-            let mate = if reader.header().paired {
-                Some(args.output.mate())
-            } else {
-                None
-            };
-            let proc = GrepProcessor::new(
-                args.grep.bytes_mp1(),
-                args.grep.bytes_mp2(),
-                args.grep.bytes_pat(),
-                args.grep.bytes_reg1(),
-                args.grep.bytes_reg2(),
-                args.grep.bytes_reg(),
-                args.grep.invert,
-                args.grep.count,
-                writer,
-                format,
-                mate,
-            );
-            reader.process_parallel(proc.clone(), args.output.threads())?;
-            if args.grep.count {
-                proc.pprint_counts();
-            }
-        }
+    let reader = BinseqReader::new(args.input.path())?;
+    let writer = build_writer(&args.output, reader.is_paired())?;
+    let format = args.output.format()?;
+    let mate = if reader.is_paired() {
+        Some(args.output.mate())
+    } else {
+        None
+    };
+    let proc = GrepProcessor::new(
+        args.grep.bytes_mp1(),
+        args.grep.bytes_mp2(),
+        args.grep.bytes_pat(),
+        args.grep.bytes_reg1(),
+        args.grep.bytes_reg2(),
+        args.grep.bytes_reg(),
+        args.grep.invert,
+        args.grep.count,
+        writer,
+        format,
+        mate,
+    );
+    reader.process_parallel(proc.clone(), args.output.threads())?;
+    if args.grep.count {
+        proc.pprint_counts();
     }
 
     Ok(())
