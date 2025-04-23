@@ -27,7 +27,7 @@ pub fn index_path(path: &str, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn run(args: IndexCommand) -> Result<()> {
+pub fn run(args: &IndexCommand) -> Result<()> {
     if let BinseqMode::Binseq = args.input.mode()? {
         bail!(
             "Only VBINSEQ files are indexable - {} is a BINSEQ file",

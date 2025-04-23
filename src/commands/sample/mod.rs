@@ -146,7 +146,7 @@ impl ParallelProcessor for SampleProcessor {
     }
 }
 
-pub fn run(args: SampleCommand) -> Result<()> {
+pub fn run(args: &SampleCommand) -> Result<()> {
     args.sample.validate()?;
     let reader = BinseqReader::new(args.input.path())?;
     let writer = build_writer(&args.output, reader.is_paired())?;

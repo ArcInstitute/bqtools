@@ -36,7 +36,7 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
             Mate::One | Mate::Two => {
                 eprintln!("Warning: Ignoring mate as single channel in file");
             }
-            _ => {}
+            Mate::Both => {}
         }
         // Interleaved writer
         let writer = args.as_writer()?;
@@ -45,7 +45,7 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
     }
 }
 
-pub fn run(args: DecodeCommand) -> Result<()> {
+pub fn run(args: &DecodeCommand) -> Result<()> {
     let reader = BinseqReader::new(args.input.path())?;
     let writer = build_writer(&args.output, reader.is_paired())?;
     let format = args.output.format()?;

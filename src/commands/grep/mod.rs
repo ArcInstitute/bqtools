@@ -251,7 +251,7 @@ impl ParallelProcessor for GrepProcessor {
     }
 }
 
-pub fn run(args: GrepCommand) -> Result<()> {
+pub fn run(args: &GrepCommand) -> Result<()> {
     args.grep.validate()?;
     let reader = BinseqReader::new(args.input.path())?;
     let writer = build_writer(&args.output, reader.is_paired())?;

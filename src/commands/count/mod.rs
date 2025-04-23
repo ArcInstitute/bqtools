@@ -14,7 +14,7 @@ fn log_reader(reader: &MmapReader) {
     println!("Number of records : {num_records}");
 }
 
-pub fn run(args: CountCommand) -> Result<()> {
+pub fn run(args: &CountCommand) -> Result<()> {
     let reader = MmapReader::new(args.input.path())?;
     log_reader(&reader);
     Ok(())
