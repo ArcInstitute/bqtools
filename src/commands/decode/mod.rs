@@ -4,11 +4,11 @@ mod decode_binseq;
 mod utils;
 
 use anyhow::{bail, Result};
-use binseq::{bq, prelude::*, vbq};
+use binseq::prelude::*;
 use decode_binseq::Decoder;
 pub use utils::{write_record_pair, SplitWriter};
 
-use crate::cli::{BinseqMode, DecodeCommand, Mate, OutputFile};
+use crate::cli::{DecodeCommand, Mate, OutputFile};
 
 /// Convenience type wrapper
 pub type Writer = Box<dyn Write + Send>;
@@ -50,35 +50,17 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
 }
 
 pub fn run(args: DecodeCommand) -> Result<()> {
-    let num_records = match args.input.mode()? {
-        BinseqMode::Binseq => {
-            let reader = bq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args.output, reader.header().xlen > 0)?;
-            let format = args.output.format()?;
-            let mate = if reader.header().xlen > 0 {
-                Some(args.output.mate())
-            } else {
-                None
-            };
-            let proc = Decoder::new(writer, format, mate);
-            reader.process_parallel(proc.clone(), args.output.threads())?;
-            proc.num_records()
-        }
-        _ => {
-            let reader = vbq::MmapReader::new(args.input.path())?;
-            let writer = build_writer(&args.output, reader.header().paired)?;
-            let format = args.output.format()?;
-            let mate = if reader.header().paired {
-                Some(args.output.mate())
-            } else {
-                None
-            };
-            let proc = Decoder::new(writer, format, mate);
-            reader.process_parallel(proc.clone(), args.output.threads())?;
-            proc.num_records()
-        }
+    let reader = BinseqReader::new(args.input.path())?;
+    let writer = build_writer(&args.output, reader.is_paired())?;
+    let format = args.output.format()?;
+    let mate = if reader.is_paired() {
+        Some(args.output.mate())
+    } else {
+        None
     };
-
+    let proc = Decoder::new(writer, format, mate);
+    reader.process_parallel(proc.clone(), args.output.threads())?;
+    let num_records = proc.num_records();
     eprintln!("Processed {} records...", num_records);
     Ok(())
 }
