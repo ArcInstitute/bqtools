@@ -33,3 +33,4 @@ codegen-units = 1
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
