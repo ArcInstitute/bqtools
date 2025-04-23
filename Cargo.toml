@@ -11,21 +11,20 @@ keywords = ["bioinformatics", "binseq", "vbinseq", "file-format", "sequencing"]
 
 [dependencies]
 anyhow = "1.0.94"
-niffler = "3.0.0"
+binseq = "0.6.1"
 clap = { version = "4.5.23", features = ["derive"] }
 itoa = "1.0.14"
 gzp = "1.0.1"
+libc = "0.2.171"
+memchr = "2.7.4"
+memmap2 = "0.9.5"
+niffler = "3.0.0"
 num_cpus = "1.16.0"
-zstd = { version = "0.13.2", features = ["zstdmt"] }
+paraseq = "0.1.4"
 parking_lot = "0.12.3"
 rand = "0.9.0"
-memmap2 = "0.9.5"
-paraseq = "0.1.4"
-libc = "0.2.171"
-binseq = "0.5.4"
-vbinseq = "0.1.6"
-memchr = "2.7.4"
 regex = "1.11.1"
+zstd = { version = "0.13.2", features = ["zstdmt"] }
 
 [profile.release]
 lto = true
