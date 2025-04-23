@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::cli::{BinseqMode, FileFormat, GrepCommand, Mate};
 use anyhow::Result;
+use binseq::{bq, prelude::*, vbq};
 use memchr::memmem::Finder;
 use parking_lot::Mutex;
 
@@ -161,78 +162,8 @@ impl GrepProcessor {
         println!("{}", self.global_count.lock())
     }
 }
-impl binseq::ParallelProcessor for GrepProcessor {
-    fn process_record(&mut self, record: binseq::RefRecord) -> binseq::Result<()> {
-        self.clear_buffers();
-
-        // Decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        if record.paired() {
-            record.decode_x(&mut self.xbuf)?;
-        }
-
-        if self.pattern_match() {
-            self.local_count += 1;
-            if self.count {
-                // no further processing needed
-                return Ok(());
-            }
-
-            // decode index
-            let mut ibuf = itoa::Buffer::new();
-            let index = ibuf.format(record.id()).as_bytes();
-
-            if self.squal.len() < self.sbuf.len() {
-                self.squal.resize(self.sbuf.len(), b'?');
-            }
-            if self.xqual.len() < self.xbuf.len() {
-                self.xqual.resize(self.xbuf.len(), b'?');
-            }
-
-            write_record_pair(
-                &mut self.left,
-                &mut self.right,
-                &mut self.mixed,
-                self.mate,
-                self.is_split,
-                index,
-                &self.sbuf,
-                &self.squal,
-                &self.xbuf,
-                &self.xqual,
-                self.format,
-            )?;
-        }
-
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
-        // Lock the mutex to write to the global buffer
-        if !self.count {
-            let mut writer = self.global_writer.lock();
-            if writer.is_split() {
-                writer.write_split(&self.left, true)?;
-                writer.write_split(&self.right, false)?;
-            } else {
-                writer.write_interleaved(&self.mixed)?;
-            }
-            writer.flush()?;
-        }
-        // Clear the local buffers
-        self.mixed.clear();
-        self.left.clear();
-        self.right.clear();
-
-        // Increment the global count and reset local
-        *self.global_count.lock() += self.local_count;
-        self.local_count = 0;
-
-        Ok(())
-    }
-}
-impl vbinseq::ParallelProcessor for GrepProcessor {
-    fn process_record(&mut self, record: vbinseq::RefRecord) -> vbinseq::Result<()> {
+impl ParallelProcessor for GrepProcessor {
+    fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
         self.clear_buffers();
 
         // Decode sequences
@@ -295,7 +226,7 @@ impl vbinseq::ParallelProcessor for GrepProcessor {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
+    fn on_batch_complete(&mut self) -> binseq::Result<()> {
         // Lock the mutex to write to the global buffer
         if !self.count {
             let mut writer = self.global_writer.lock();
@@ -324,7 +255,7 @@ pub fn run(args: GrepCommand) -> Result<()> {
     args.grep.validate()?;
     match args.input.mode()? {
         BinseqMode::Binseq => {
-            let reader = binseq::MmapReader::new(args.input.path())?;
+            let reader = bq::MmapReader::new(args.input.path())?;
             let writer = build_writer(&args.output, reader.header().xlen > 0)?;
             let format = args.output.format()?;
             let mate = if reader.header().xlen > 0 {
@@ -351,7 +282,7 @@ pub fn run(args: GrepCommand) -> Result<()> {
             }
         }
         BinseqMode::VBinseq => {
-            let reader = vbinseq::MmapReader::new(args.input.path())?;
+            let reader = vbq::MmapReader::new(args.input.path())?;
             let writer = build_writer(&args.output, reader.header().paired)?;
             let format = args.output.format()?;
             let mate = if reader.header().paired {

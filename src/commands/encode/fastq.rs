@@ -1,12 +1,11 @@
 use std::io::Read;
 
 use anyhow::Result;
-use binseq::BinseqHeader;
+use binseq::{bq::BinseqHeader, vbq::VBinseqHeader};
 use paraseq::{
     fastq::Reader,
     parallel::{InterleavedParallelReader, PairedParallelReader, ParallelReader},
 };
-use vbinseq::VBinseqHeader;
 
 use super::{get_sequence_len_fastq, BinseqProcessor, VBinseqProcessor};
 use crate::{

@@ -4,7 +4,7 @@ mod decode_binseq;
 mod utils;
 
 use anyhow::{bail, Result};
-use binseq::MmapReader;
+use binseq::{bq, prelude::*, vbq};
 use decode_binseq::Decoder;
 pub use utils::{write_record_pair, SplitWriter};
 
@@ -52,7 +52,7 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
 pub fn run(args: DecodeCommand) -> Result<()> {
     let num_records = match args.input.mode()? {
         BinseqMode::Binseq => {
-            let reader = MmapReader::new(args.input.path())?;
+            let reader = bq::MmapReader::new(args.input.path())?;
             let writer = build_writer(&args.output, reader.header().xlen > 0)?;
             let format = args.output.format()?;
             let mate = if reader.header().xlen > 0 {
@@ -65,7 +65,7 @@ pub fn run(args: DecodeCommand) -> Result<()> {
             proc.num_records()
         }
         _ => {
-            let reader = vbinseq::MmapReader::new(args.input.path())?;
+            let reader = vbq::MmapReader::new(args.input.path())?;
             let writer = build_writer(&args.output, reader.header().paired)?;
             let format = args.output.format()?;
             let mate = if reader.header().paired {

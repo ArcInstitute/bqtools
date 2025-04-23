@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
+use binseq::vbq;
 
 use crate::cli::{BinseqMode, IndexCommand};
 
 pub fn index_path(path: &str, verbose: bool) -> Result<()> {
-    let reader = vbinseq::MmapReader::new(path)?;
+    let reader = vbq::MmapReader::new(path)?;
     if reader.index_path().exists() {
         std::fs::remove_file(reader.index_path())?;
     }

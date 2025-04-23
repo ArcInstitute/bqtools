@@ -1,5 +1,5 @@
 use anyhow::Result;
-use binseq::MmapReader;
+use binseq::bq::MmapReader;
 
 use crate::cli::CountCommand;
 

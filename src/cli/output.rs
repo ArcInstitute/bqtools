@@ -2,7 +2,6 @@ use anyhow::{bail, Result};
 use binseq::Policy;
 use clap::{Parser, ValueEnum};
 use std::io::Write;
-use vbinseq::Policy as VPolicy;
 
 use crate::{
     cli::FileFormat,
@@ -276,19 +275,6 @@ impl From<PolicyWrapper> for Policy {
             PolicyWrapper::SetToC => Policy::SetToC,
             PolicyWrapper::SetToG => Policy::SetToG,
             PolicyWrapper::SetToT => Policy::SetToT,
-        }
-    }
-}
-impl From<PolicyWrapper> for VPolicy {
-    fn from(value: PolicyWrapper) -> Self {
-        match value {
-            PolicyWrapper::IgnoreSequence => VPolicy::IgnoreSequence,
-            PolicyWrapper::BreakOnInvalid => VPolicy::BreakOnInvalid,
-            PolicyWrapper::RandomDraw => VPolicy::RandomDraw,
-            PolicyWrapper::SetToA => VPolicy::SetToA,
-            PolicyWrapper::SetToC => VPolicy::SetToC,
-            PolicyWrapper::SetToG => VPolicy::SetToG,
-            PolicyWrapper::SetToT => VPolicy::SetToT,
         }
     }
 }

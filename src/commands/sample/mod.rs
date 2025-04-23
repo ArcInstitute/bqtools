@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::cli::{BinseqMode, FileFormat, Mate, SampleCommand};
 use anyhow::Result;
+use binseq::{bq, prelude::*, vbq};
 use parking_lot::Mutex;
 use rand::{Rng, SeedableRng};
 
@@ -66,68 +67,8 @@ impl SampleProcessor {
         self.rng.random_bool(self.fraction)
     }
 }
-impl binseq::ParallelProcessor for SampleProcessor {
-    fn process_record(&mut self, record: binseq::RefRecord) -> binseq::Result<()> {
-        self.clear_buffers();
-
-        // Decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        if record.paired() {
-            record.decode_x(&mut self.xbuf)?;
-        }
-
-        if self.include_record() {
-            // decode index
-            let mut ibuf = itoa::Buffer::new();
-            let index = ibuf.format(record.id()).as_bytes();
-
-            if self.squal.len() < self.sbuf.len() {
-                self.squal.resize(self.sbuf.len(), b'?');
-            }
-            if self.xqual.len() < self.xbuf.len() {
-                self.xqual.resize(self.xbuf.len(), b'?');
-            }
-
-            write_record_pair(
-                &mut self.left,
-                &mut self.right,
-                &mut self.mixed,
-                self.mate,
-                self.is_split,
-                index,
-                &self.sbuf,
-                &self.squal,
-                &self.xbuf,
-                &self.xqual,
-                self.format,
-            )?;
-        }
-
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
-        // Lock the mutex to write to the global buffer
-        {
-            let mut writer = self.global_writer.lock();
-            if writer.is_split() {
-                writer.write_split(&self.left, true)?;
-                writer.write_split(&self.right, false)?;
-            } else {
-                writer.write_interleaved(&self.mixed)?;
-            }
-            writer.flush()?;
-        }
-
-        // Clear the local buffer and reset the local record count
-        self.mixed.clear();
-        self.left.clear();
-        self.right.clear();
-        Ok(())
-    }
-}
-impl vbinseq::ParallelProcessor for SampleProcessor {
-    fn process_record(&mut self, record: vbinseq::RefRecord) -> vbinseq::Result<()> {
+impl ParallelProcessor for SampleProcessor {
+    fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
         self.clear_buffers();
 
         // Decode sequences
@@ -184,7 +125,7 @@ impl vbinseq::ParallelProcessor for SampleProcessor {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
+    fn on_batch_complete(&mut self) -> binseq::Result<()> {
         // Lock the mutex to write to the global buffer
         {
             let mut writer = self.global_writer.lock();
@@ -209,7 +150,7 @@ pub fn run(args: SampleCommand) -> Result<()> {
     args.sample.validate()?;
     match args.input.mode()? {
         BinseqMode::Binseq => {
-            let reader = binseq::MmapReader::new(args.input.path())?;
+            let reader = bq::MmapReader::new(args.input.path())?;
             let writer = build_writer(&args.output, reader.header().xlen > 0)?;
             let format = args.output.format()?;
             let mate = if reader.header().xlen > 0 {
@@ -222,7 +163,7 @@ pub fn run(args: SampleCommand) -> Result<()> {
             reader.process_parallel(proc.clone(), args.output.threads())?;
         }
         BinseqMode::VBinseq => {
-            let reader = vbinseq::MmapReader::new(args.input.path())?;
+            let reader = vbq::MmapReader::new(args.input.path())?;
             let writer = build_writer(&args.output, reader.header().paired)?;
             let format = args.output.format()?;
             let mate = if reader.header().paired {
