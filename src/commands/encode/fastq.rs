@@ -102,7 +102,7 @@ pub fn encode_interleaved_fastq_parallel(
 
         (num_records, num_skipped)
     } else {
-        let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, false);
+        let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
         let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
         // Process the records in parallel
