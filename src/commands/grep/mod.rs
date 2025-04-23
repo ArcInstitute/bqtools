@@ -159,7 +159,7 @@ impl GrepProcessor {
     }
 
     pub fn pprint_counts(&self) {
-        println!("{}", self.global_count.lock())
+        println!("{}", self.global_count.lock());
     }
 }
 impl ParallelProcessor for GrepProcessor {
