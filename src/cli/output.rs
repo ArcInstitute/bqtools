@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use binseq::Policy;
 use clap::{Parser, ValueEnum};
-use std::io::Write;
+use std::{io::Write, path::Path};
 
 use crate::{
     cli::FileFormat,
@@ -53,6 +53,7 @@ impl OutputFile {
         compress_gzip_passthrough(writer, self.compress(), self.threads())
     }
 
+    #[allow(clippy::case_sensitive_file_extension_comparisons)]
     pub fn compress(&self) -> bool {
         self.output.as_ref().map_or(self.compress, |path| {
             if path.ends_with(".gz") {
@@ -136,6 +137,7 @@ pub enum Mate {
 
 #[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct OutputBinseq {
     #[clap(
         short = 'o',
@@ -289,12 +291,15 @@ pub enum BinseqMode {
 }
 impl BinseqMode {
     pub fn determine(path: &str) -> Result<Self> {
-        if path.ends_with(".bq") {
-            Ok(Self::Binseq)
-        } else if path.ends_with(".vbq") {
-            Ok(Self::VBinseq)
+        let pathbuf = Path::new(path);
+        if let Some(ext) = pathbuf.extension() {
+            match ext.to_str() {
+                Some("bq") => Ok(Self::Binseq),
+                Some("vbq") => Ok(Self::VBinseq),
+                _ => bail!("Could not determine BINSEQ output mode from path: {path}"),
+            }
         } else {
-            bail!("Could not determine BINSEQ output mode from path: {path}");
+            bail!("Could not determine BINSEQ output mode from path: {path}")
         }
     }
 }
@@ -308,11 +313,11 @@ fn parse_memory_size(input: &str) -> Result<usize, String> {
         'M' | 'm' => (&input[..input.len() - 1], 1024 * 1024),
         'G' | 'g' => (&input[..input.len() - 1], 1024 * 1024 * 1024),
         _ if last_char.is_ascii_digit() => (input.as_str(), 1),
-        _ => return Err(format!("Invalid memory size format: {}", input)),
+        _ => return Err(format!("Invalid memory size format: {input}")),
     };
 
     match number_str.parse::<usize>() {
         Ok(number) => Ok(number * multiplier),
-        Err(_) => Err(format!("Failed to parse number: {}", number_str)),
+        Err(_) => Err(format!("Failed to parse number: {number_str}")),
     }
 }

@@ -21,19 +21,15 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
         if !paired {
             bail!("Cannot split file into two. No extended sequence channel");
         }
-        match args.mate {
-            Mate::Both => {
-                let (r1, r2) = args.as_paired_writer(format)?;
-                let split = SplitWriter::new_split(r1, r2);
-                Ok(split)
-            }
-            _ => {
-                eprintln!("Warning: Ignoring prefix as mate was provided");
-                // Interleaved writer
-                let writer = args.as_writer()?;
-                let split = SplitWriter::new_interleaved(writer);
-                Ok(split)
-            }
+        if args.mate == Mate::Both {
+            let (r1, r2) = args.as_paired_writer(format)?;
+            let split = SplitWriter::new_split(r1, r2);
+            Ok(split)
+        } else {
+            // Interleaved writer
+            let writer = args.as_writer()?;
+            let split = SplitWriter::new_interleaved(writer);
+            Ok(split)
         }
     } else {
         match args.mate {
@@ -61,6 +57,6 @@ pub fn run(args: DecodeCommand) -> Result<()> {
     let proc = Decoder::new(writer, format, mate);
     reader.process_parallel(proc.clone(), args.output.threads())?;
     let num_records = proc.num_records();
-    eprintln!("Processed {} records...", num_records);
+    eprintln!("Processed {num_records} records...");
     Ok(())
 }
