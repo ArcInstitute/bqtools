@@ -26,7 +26,7 @@ fn encode_single(args: &EncodeCommand) -> Result<()> {
     match args.input.format()? {
         FileFormat::Fastq => encode_single_fastq_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -36,7 +36,7 @@ fn encode_single(args: &EncodeCommand) -> Result<()> {
         ),
         FileFormat::Fasta => encode_single_fasta_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -59,7 +59,7 @@ fn encode_interleaved(args: &EncodeCommand) -> Result<()> {
     match args.input.format()? {
         FileFormat::Fastq => encode_interleaved_fastq_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -69,7 +69,7 @@ fn encode_interleaved(args: &EncodeCommand) -> Result<()> {
         ),
         FileFormat::Fasta => encode_interleaved_fasta_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -94,7 +94,7 @@ fn encode_paired(args: &EncodeCommand) -> Result<()> {
         FileFormat::Fastq => encode_paired_fastq_parallel(
             r1_handle,
             r2_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -105,7 +105,7 @@ fn encode_paired(args: &EncodeCommand) -> Result<()> {
         FileFormat::Fasta => encode_paired_fasta_parallel(
             r1_handle,
             r2_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -131,7 +131,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
         && args.output.mode()? == BinseqMode::VBinseq
         && args.output.output.is_some()
     {
-        crate::commands::index::index_path(args.output.output.as_ref().unwrap(), true)?;
+        crate::commands::index::index_path(args.output.borrowed_path().unwrap(), true)?;
     }
 
     Ok(())

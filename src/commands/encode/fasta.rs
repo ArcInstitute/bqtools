@@ -16,7 +16,7 @@ use crate::{
 #[allow(clippy::too_many_arguments)]
 pub fn encode_single_fasta_parallel(
     in_handle: Box<dyn Read + Send>,
-    out_path: Option<String>,
+    out_path: Option<&str>,
     num_threads: usize,
     policy: PolicyWrapper,
     mode: BinseqMode,
@@ -27,7 +27,7 @@ pub fn encode_single_fasta_parallel(
     let mut reader = Reader::new(in_handle);
 
     // Prepare the processor
-    let out_handle = match_output(out_path.as_ref())?;
+    let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
         // Determine the sequence length
@@ -71,7 +71,7 @@ pub fn encode_single_fasta_parallel(
 #[allow(clippy::too_many_arguments)]
 pub fn encode_interleaved_fasta_parallel(
     in_handle: Box<dyn Read + Send>,
-    out_path: Option<String>,
+    out_path: Option<&str>,
     num_threads: usize,
     policy: PolicyWrapper,
     mode: BinseqMode,
@@ -82,7 +82,7 @@ pub fn encode_interleaved_fasta_parallel(
     let mut reader = Reader::new(in_handle);
 
     // Prepare the processor
-    let out_handle = match_output(out_path.as_ref())?;
+    let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
         // Determine the sequence length
@@ -127,7 +127,7 @@ pub fn encode_interleaved_fasta_parallel(
 pub fn encode_paired_fasta_parallel(
     r1_handle: Box<dyn Read + Send>,
     r2_handle: Box<dyn Read + Send>,
-    out_path: Option<String>,
+    out_path: Option<&str>,
     num_threads: usize,
     policy: PolicyWrapper,
     mode: BinseqMode,
@@ -139,7 +139,7 @@ pub fn encode_paired_fasta_parallel(
     let mut reader_r2 = Reader::new(r2_handle);
 
     // Prepare the output handle
-    let out_handle = match_output(out_path.as_ref())?;
+    let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = match mode {
         BinseqMode::Binseq => {

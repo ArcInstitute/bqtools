@@ -49,7 +49,7 @@ pub struct OutputFile {
 }
 impl OutputFile {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
-        let writer = match_output(self.output.as_ref())?;
+        let writer = match_output(self.output.as_deref())?;
         compress_gzip_passthrough(writer, self.compress(), self.threads())
     }
 
@@ -198,12 +198,12 @@ pub struct OutputBinseq {
 }
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
-        let writer = match_output(self.output.as_ref())?;
+        let writer = match_output(self.output.as_deref())?;
         compress_zstd_passthrough(writer, self.compress(), self.level(), self.threads())
     }
 
-    pub fn owned_path(&self) -> Option<String> {
-        self.output.clone()
+    pub fn borrowed_path(&self) -> Option<&str> {
+        self.output.as_deref()
     }
 
     pub fn mode(&self) -> Result<BinseqMode> {
