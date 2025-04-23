@@ -1,7 +1,7 @@
 use std::{fs::File, io::Write};
 
 use anyhow::{bail, Result};
-use binseq::{BinseqHeader, MmapReader, SIZE_HEADER};
+use binseq::bq::{BinseqHeader, MmapReader, SIZE_HEADER};
 use memmap2::MmapOptions;
 
 use crate::cli::CatCommand;

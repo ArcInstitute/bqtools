@@ -26,12 +26,12 @@ fn main() -> Result<()> {
 
     let args = Cli::parse();
     match args.command {
-        Commands::Encode(encode) => commands::encode::run(encode),
-        Commands::Decode(decode) => commands::decode::run(decode),
+        Commands::Encode(ref encode) => commands::encode::run(encode),
+        Commands::Decode(ref decode) => commands::decode::run(decode),
         Commands::Cat(cat) => commands::cat::run(cat),
-        Commands::Count(count) => commands::count::run(count),
-        Commands::Index(index) => commands::index::run(index),
-        Commands::Grep(grep) => commands::grep::run(grep),
-        Commands::Sample(sample) => commands::sample::run(sample),
+        Commands::Count(ref count) => commands::count::run(count),
+        Commands::Index(ref index) => commands::index::run(index),
+        Commands::Grep(ref grep) => commands::grep::run(grep),
+        Commands::Sample(ref sample) => commands::sample::run(sample),
     }
 }

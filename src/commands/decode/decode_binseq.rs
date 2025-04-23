@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use anyhow::Result;
-use binseq::{ParallelProcessor, RefRecord};
+use binseq::prelude::*;
+use binseq::Result;
 use parking_lot::Mutex;
 
 use super::{write_record_pair, SplitWriter};
@@ -59,75 +59,9 @@ impl Decoder {
         *self.num_records.lock()
     }
 }
+
 impl ParallelProcessor for Decoder {
-    fn process_record(&mut self, record: RefRecord) -> Result<(), binseq::Error> {
-        // clear decoding buffers
-        self.sbuf.clear();
-        self.xbuf.clear();
-
-        // decode index
-        let mut ibuf = itoa::Buffer::new();
-        let index = ibuf.format(record.id()).as_bytes();
-
-        // decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        if self.squal.len() < self.sbuf.len() {
-            self.squal.resize(self.sbuf.len(), b'?');
-        }
-        if record.paired() {
-            record.decode_x(&mut self.xbuf)?;
-            if self.xqual.len() < self.xbuf.len() {
-                self.xqual.resize(self.xbuf.len(), b'?');
-            }
-        }
-
-        write_record_pair(
-            &mut self.left,
-            &mut self.right,
-            &mut self.mixed,
-            self.mate,
-            self.is_split,
-            index,
-            &self.sbuf,
-            &self.squal,
-            &self.xbuf,
-            &self.xqual,
-            self.format,
-        )?;
-
-        self.local_count += 1;
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> Result<(), binseq::Error> {
-        // Lock the mutex to write to the global buffer
-        {
-            let mut writer = self.global_writer.lock();
-            if writer.is_split() {
-                writer.write_split(&self.left, true)?;
-                writer.write_split(&self.right, false)?;
-            } else {
-                writer.write_interleaved(&self.mixed)?;
-            }
-            writer.flush()?;
-        }
-        // Lock the mutex to update the number of records
-        {
-            let mut num_records = self.num_records.lock();
-            *num_records += self.local_count;
-        }
-
-        // Clear the local buffer and reset the local record count
-        self.mixed.clear();
-        self.left.clear();
-        self.right.clear();
-        self.local_count = 0;
-        Ok(())
-    }
-}
-
-impl vbinseq::ParallelProcessor for Decoder {
-    fn process_record(&mut self, record: vbinseq::RefRecord) -> Result<(), vbinseq::Error> {
+    fn process_record<B: BinseqRecord>(&mut self, record: B) -> Result<()> {
         // clear decoding buffers
         self.sbuf.clear();
         self.xbuf.clear();
@@ -182,7 +116,7 @@ impl vbinseq::ParallelProcessor for Decoder {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> Result<(), vbinseq::Error> {
+    fn on_batch_complete(&mut self) -> Result<()> {
         // Lock the mutex to write to the global buffer
         {
             let mut writer = self.global_writer.lock();

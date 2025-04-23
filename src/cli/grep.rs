@@ -69,21 +69,21 @@ impl GrepArgs {
         self.pat1
             .iter()
             .map(|s| Finder::new(s.as_bytes()))
-            .map(|f| f.into_owned())
+            .map(Finder::into_owned)
             .collect()
     }
     pub fn bytes_mp2(&self) -> Vec<Finder<'static>> {
         self.pat2
             .iter()
             .map(|s| Finder::new(s.as_bytes()))
-            .map(|f| f.into_owned())
+            .map(Finder::into_owned)
             .collect()
     }
     pub fn bytes_pat(&self) -> Vec<Finder<'static>> {
         self.pat
             .iter()
             .map(|s| Finder::new(s.as_bytes()))
-            .map(|f| f.into_owned())
+            .map(Finder::into_owned)
             .collect()
     }
     pub fn bytes_reg1(&self) -> Vec<regex::bytes::Regex> {

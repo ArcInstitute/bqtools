@@ -1,12 +1,11 @@
 use std::io::Read;
 
 use anyhow::Result;
-use binseq::BinseqHeader;
+use binseq::{bq::BinseqHeader, vbq::VBinseqHeader};
 use paraseq::{
     fasta::Reader,
     parallel::{InterleavedParallelReader, PairedParallelReader, ParallelReader},
 };
-use vbinseq::VBinseqHeader;
 
 use super::{get_sequence_len_fasta, BinseqProcessor, VBinseqProcessor};
 use crate::{
@@ -17,7 +16,7 @@ use crate::{
 #[allow(clippy::too_many_arguments)]
 pub fn encode_single_fasta_parallel(
     in_handle: Box<dyn Read + Send>,
-    out_path: Option<String>,
+    out_path: Option<&str>,
     num_threads: usize,
     policy: PolicyWrapper,
     mode: BinseqMode,
@@ -28,45 +27,42 @@ pub fn encode_single_fasta_parallel(
     let mut reader = Reader::new(in_handle);
 
     // Prepare the processor
-    let out_handle = match_output(out_path.as_ref())?;
+    let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = match mode {
-        BinseqMode::Binseq => {
-            // Determine the sequence length
-            let slen = get_sequence_len_fasta(&mut reader)?;
+    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+        // Determine the sequence length
+        let slen = get_sequence_len_fasta(&mut reader)?;
 
-            let header = BinseqHeader::new(slen);
-            let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let header = BinseqHeader::new(slen);
+        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
 
-            // Process the records in parallel
-            reader.process_parallel(processor.clone(), num_threads)?;
+        // Process the records in parallel
+        reader.process_parallel(processor.clone(), num_threads)?;
 
-            // Update the number of records
-            let num_records = processor.get_global_record_count();
-            let num_skipped = processor.get_global_skipped_count();
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
 
-            (num_records, num_skipped)
-        }
-        _ => {
-            let header = VBinseqHeader::with_capacity(block_size as u64, false, compress, false);
-            let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+        (num_records, num_skipped)
+    } else {
+        let header = VBinseqHeader::with_capacity(block_size as u64, false, compress, false);
+        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
-            // Process the records in parallel
-            reader.process_parallel(processor.clone(), num_threads)?;
-            processor.finish()?;
+        // Process the records in parallel
+        reader.process_parallel(processor.clone(), num_threads)?;
+        processor.finish()?;
 
-            // Update the number of records
-            let num_records = processor.get_global_record_count();
-            let num_skipped = processor.get_global_skipped_count();
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
 
-            (num_records, num_skipped)
-        }
+        (num_records, num_skipped)
     };
 
     // print the summary
-    eprintln!("{} records written", num_records);
+    eprintln!("{num_records} records written");
     if num_skipped > 0 {
-        eprintln!("{} records skipped (invalid nucleotides)", num_skipped);
+        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
     }
 
     Ok(())
@@ -75,7 +71,7 @@ pub fn encode_single_fasta_parallel(
 #[allow(clippy::too_many_arguments)]
 pub fn encode_interleaved_fasta_parallel(
     in_handle: Box<dyn Read + Send>,
-    out_path: Option<String>,
+    out_path: Option<&str>,
     num_threads: usize,
     policy: PolicyWrapper,
     mode: BinseqMode,
@@ -86,45 +82,42 @@ pub fn encode_interleaved_fasta_parallel(
     let mut reader = Reader::new(in_handle);
 
     // Prepare the processor
-    let out_handle = match_output(out_path.as_ref())?;
+    let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = match mode {
-        BinseqMode::Binseq => {
-            // Determine the sequence length
-            let (slen, xlen) = get_interleaved_sequence_len_fasta(&mut reader)?;
+    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+        // Determine the sequence length
+        let (slen, xlen) = get_interleaved_sequence_len_fasta(&mut reader)?;
 
-            let header = BinseqHeader::new_extended(slen, xlen);
-            let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let header = BinseqHeader::new_extended(slen, xlen);
+        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
 
-            // Process the records in parallel
-            reader.process_parallel_interleaved(processor.clone(), num_threads)?;
+        // Process the records in parallel
+        reader.process_parallel_interleaved(processor.clone(), num_threads)?;
 
-            // Update the number of records
-            let num_records = processor.get_global_record_count();
-            let num_skipped = processor.get_global_skipped_count();
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
 
-            (num_records, num_skipped)
-        }
-        _ => {
-            let header = VBinseqHeader::with_capacity(block_size as u64, false, compress, false);
-            let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+        (num_records, num_skipped)
+    } else {
+        let header = VBinseqHeader::with_capacity(block_size as u64, false, compress, false);
+        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
 
-            // Process the records in parallel
-            reader.process_parallel_interleaved(processor.clone(), num_threads)?;
-            processor.finish()?;
+        // Process the records in parallel
+        reader.process_parallel_interleaved(processor.clone(), num_threads)?;
+        processor.finish()?;
 
-            // Update the number of records
-            let num_records = processor.get_global_record_count();
-            let num_skipped = processor.get_global_skipped_count();
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
 
-            (num_records, num_skipped)
-        }
+        (num_records, num_skipped)
     };
 
     // print the summary
-    eprintln!("{} records written", num_records);
+    eprintln!("{num_records} records written");
     if num_skipped > 0 {
-        eprintln!("{} records skipped (invalid nucleotides)", num_skipped);
+        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
     }
 
     Ok(())
@@ -134,7 +127,7 @@ pub fn encode_interleaved_fasta_parallel(
 pub fn encode_paired_fasta_parallel(
     r1_handle: Box<dyn Read + Send>,
     r2_handle: Box<dyn Read + Send>,
-    out_path: Option<String>,
+    out_path: Option<&str>,
     num_threads: usize,
     policy: PolicyWrapper,
     mode: BinseqMode,
@@ -146,7 +139,7 @@ pub fn encode_paired_fasta_parallel(
     let mut reader_r2 = Reader::new(r2_handle);
 
     // Prepare the output handle
-    let out_handle = match_output(out_path.as_ref())?;
+    let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = match mode {
         BinseqMode::Binseq => {
@@ -184,9 +177,9 @@ pub fn encode_paired_fasta_parallel(
     };
 
     // print the summary
-    eprintln!("{} record pairs written", num_records);
+    eprintln!("{num_records} record pairs written");
     if num_skipped > 0 {
-        eprintln!("{} record pairs skipped (invalid nucleotides)", num_skipped);
+        eprintln!("{num_skipped} record pairs skipped (invalid nucleotides)");
     }
 
     Ok(())

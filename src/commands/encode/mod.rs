@@ -16,7 +16,7 @@ use fastq::{
 use processor::{BinseqProcessor, VBinseqProcessor};
 use utils::{get_sequence_len_fasta, get_sequence_len_fastq};
 
-fn encode_single(args: EncodeCommand) -> Result<()> {
+fn encode_single(args: &EncodeCommand) -> Result<()> {
     // Open the IO handles
     let in_handle = args.input.as_reader()?;
 
@@ -26,7 +26,7 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
     match args.input.format()? {
         FileFormat::Fastq => encode_single_fastq_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -36,20 +36,20 @@ fn encode_single(args: EncodeCommand) -> Result<()> {
         ),
         FileFormat::Fasta => encode_single_fasta_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
             args.output.compress(),
             args.output.block_size,
         ),
-        _ => {
+        FileFormat::Tsv => {
             unimplemented!("Tsv import is not implemented for encoding");
         }
     }
 }
 
-fn encode_interleaved(args: EncodeCommand) -> Result<()> {
+fn encode_interleaved(args: &EncodeCommand) -> Result<()> {
     // Open the IO handles
     let in_handle = args.input.as_reader()?;
 
@@ -59,7 +59,7 @@ fn encode_interleaved(args: EncodeCommand) -> Result<()> {
     match args.input.format()? {
         FileFormat::Fastq => encode_interleaved_fastq_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -69,20 +69,20 @@ fn encode_interleaved(args: EncodeCommand) -> Result<()> {
         ),
         FileFormat::Fasta => encode_interleaved_fasta_parallel(
             in_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
             args.output.compress(),
             args.output.block_size,
         ),
-        _ => {
+        FileFormat::Tsv => {
             unimplemented!("Tsv import is not implemented for encoding");
         }
     }
 }
 
-fn encode_paired(args: EncodeCommand) -> Result<()> {
+fn encode_paired(args: &EncodeCommand) -> Result<()> {
     // Open the IO handles
     let (r1_handle, r2_handle) = args.input.as_reader_pair()?;
 
@@ -94,7 +94,7 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
         FileFormat::Fastq => encode_paired_fastq_parallel(
             r1_handle,
             r2_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
@@ -105,33 +105,33 @@ fn encode_paired(args: EncodeCommand) -> Result<()> {
         FileFormat::Fasta => encode_paired_fasta_parallel(
             r1_handle,
             r2_handle,
-            args.output.owned_path(),
+            args.output.borrowed_path(),
             args.output.threads(),
             args.output.policy,
             args.output.mode()?,
             args.output.compress(),
             args.output.block_size,
         ),
-        _ => {
+        FileFormat::Tsv => {
             unimplemented!("Tsv import is not implemented for encoding")
         }
     }
 }
 
-pub fn run(args: EncodeCommand) -> Result<()> {
+pub fn run(args: &EncodeCommand) -> Result<()> {
     if args.input.paired() {
-        encode_paired(args.clone())?;
+        encode_paired(args)?;
     } else if args.input.interleaved {
-        encode_interleaved(args.clone())?;
+        encode_interleaved(args)?;
     } else {
-        encode_single(args.clone())?;
+        encode_single(args)?;
     }
 
     if args.output.index
         && args.output.mode()? == BinseqMode::VBinseq
         && args.output.output.is_some()
     {
-        crate::commands::index::index_path(&args.output.output.unwrap(), true)?;
+        crate::commands::index::index_path(args.output.borrowed_path().unwrap(), true)?;
     }
 
     Ok(())

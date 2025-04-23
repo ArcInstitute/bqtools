@@ -91,7 +91,7 @@ impl SplitWriter {
                     left.write_all(buf)?;
                 } else {
                     right.write_all(buf)?;
-                };
+                }
                 Ok(())
             }
         }

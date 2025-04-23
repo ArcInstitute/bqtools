@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
+use binseq::vbq;
 
 use crate::cli::{BinseqMode, IndexCommand};
 
 pub fn index_path(path: &str, verbose: bool) -> Result<()> {
-    let reader = vbinseq::MmapReader::new(path)?;
+    let reader = vbq::MmapReader::new(path)?;
     if reader.index_path().exists() {
         std::fs::remove_file(reader.index_path())?;
     }
@@ -15,18 +16,18 @@ pub fn index_path(path: &str, verbose: bool) -> Result<()> {
         index.ranges().iter().for_each(|r| {
             total_records += r.block_records;
         });
-        let records_per_block = total_records as f64 / n_blocks as f64;
+        let records_per_block = f64::from(total_records) / n_blocks as f64;
 
         println!("Index path: {}", reader.index_path().display());
-        println!("Number of blocks: {}", n_blocks);
-        println!("Number of records: {}", total_records);
-        println!("Average records per block: {:.2}", records_per_block);
+        println!("Number of blocks: {n_blocks}");
+        println!("Number of records: {total_records}");
+        println!("Average records per block: {records_per_block:.2}");
     }
 
     Ok(())
 }
 
-pub fn run(args: IndexCommand) -> Result<()> {
+pub fn run(args: &IndexCommand) -> Result<()> {
     if let BinseqMode::Binseq = args.input.mode()? {
         bail!(
             "Only VBINSEQ files are indexable - {} is a BINSEQ file",

@@ -23,7 +23,7 @@ pub fn match_input(path: Option<&String>) -> Result<Box<dyn Read + Send>> {
     }
 }
 
-pub fn match_output(path: Option<&String>) -> Result<Box<dyn Write + Send>> {
+pub fn match_output(path: Option<&str>) -> Result<Box<dyn Write + Send>> {
     if let Some(path) = path {
         let handle = File::create(path)?;
         let buffer = BufWriter::new(handle);

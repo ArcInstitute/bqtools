@@ -26,7 +26,7 @@ impl FileFormat {
         }
     }
 
-    pub fn extension(&self) -> &'static str {
+    pub fn extension(self) -> &'static str {
         match self {
             Self::Fasta => "fa",
             Self::Fastq => "fq",

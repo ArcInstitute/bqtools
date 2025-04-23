@@ -2,12 +2,15 @@ use std::io::Write;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use binseq::{BinseqHeader, BinseqWriter, BinseqWriterBuilder, Policy as BinseqPolicy};
+use binseq::{
+    bq::{BinseqHeader, BinseqWriter, BinseqWriterBuilder},
+    vbq::{VBinseqHeader, VBinseqWriter, VBinseqWriterBuilder},
+    Policy,
+};
 use paraseq::parallel::{
     InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor, ProcessError,
 };
 use parking_lot::Mutex;
-use vbinseq::{Policy as VBinseqPolicy, VBinseqHeader, VBinseqWriter, VBinseqWriterBuilder};
 
 /// Default capacity for the buffer used by the processor.
 const DEFAULT_CAPACITY: usize = 128 * 1024;
@@ -30,11 +33,7 @@ pub struct BinseqProcessor<W: Write + Send> {
 }
 
 impl<W: Write + Send> BinseqProcessor<W> {
-    pub fn new(
-        header: BinseqHeader,
-        policy: BinseqPolicy,
-        inner: W,
-    ) -> Result<Self, binseq::Error> {
+    pub fn new(header: BinseqHeader, policy: Policy, inner: W) -> binseq::Result<Self> {
         let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
         let writer = BinseqWriterBuilder::default()
             .header(header)
@@ -59,7 +58,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
     /// Writes the current batch to the global writer.
     ///
     /// This function acquires a lock on the global writer and ingests the local buffer.
-    fn write_batch(&mut self) -> Result<(), binseq::Error> {
+    fn write_batch(&mut self) -> binseq::Result<()> {
         // Aquire lock on global writer
         let mut global = self.global_writer.lock();
 
@@ -202,11 +201,7 @@ pub struct VBinseqProcessor<W: Write + Send> {
 }
 
 impl<W: Write + Send> VBinseqProcessor<W> {
-    pub fn new(
-        header: VBinseqHeader,
-        policy: VBinseqPolicy,
-        inner: W,
-    ) -> Result<Self, vbinseq::Error> {
+    pub fn new(header: VBinseqHeader, policy: Policy, inner: W) -> binseq::Result<Self> {
         let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
         let writer = VBinseqWriterBuilder::default()
             .header(header)
@@ -231,7 +226,7 @@ impl<W: Write + Send> VBinseqProcessor<W> {
     /// Writes the current batch to the global writer.
     ///
     /// This function acquires a lock on the global writer and ingests the local buffer.
-    fn write_batch(&mut self) -> Result<(), vbinseq::Error> {
+    fn write_batch(&mut self) -> binseq::Result<()> {
         // Aquire lock on global writer
         let mut global = self.global_writer.lock();
 
@@ -260,7 +255,7 @@ impl<W: Write + Send> VBinseqProcessor<W> {
     }
 
     /// Finish the global writer
-    pub fn finish(&self) -> Result<(), vbinseq::Error> {
+    pub fn finish(&self) -> binseq::Result<()> {
         self.global_writer.lock().finish()
     }
 }

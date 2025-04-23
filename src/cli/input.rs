@@ -25,34 +25,32 @@ impl InputFile {
         if let Some(format) = self.format {
             Ok(format)
         } else {
-            match self.input.len() {
-                0 => bail!("Can not infer file format from stdin."),
-                _ => {
-                    // Identify file format for each input file
-                    let formats = self
-                        .input
-                        .iter()
-                        .map(|path| {
-                            // Infer file format for each input file
-                            if let Some(format) = FileFormat::from_path(path) {
-                                Ok(format)
+            if self.input.is_empty() {
+                bail!("Can not infer file format from stdin.");
+            }
+            // Identify file format for each input file
+            let formats = self
+                .input
+                .iter()
+                .map(|path| {
+                    // Infer file format for each input file
+                    if let Some(format) = FileFormat::from_path(path) {
+                        Ok(format)
 
-                            // Bail if file format could not be inferred
-                            } else {
-                                bail!("Could not infer file format.")
-                            }
-                        })
-                        .collect::<Result<Vec<_>>>()?;
-
-                    // Check if all formats are the same
-                    if formats.iter().all(|&f| f == formats[0]) {
-                        // Return the format
-                        Ok(formats[0])
+                    // Bail if file format could not be inferred
                     } else {
-                        // Bail if formats are inconsistent
-                        bail!("Inconsistent file formats.")
+                        bail!("Could not infer file format.")
                     }
-                }
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            // Check if all formats are the same
+            if formats.iter().all(|&f| f == formats[0]) {
+                // Return the format
+                Ok(formats[0])
+            } else {
+                // Bail if formats are inconsistent
+                bail!("Inconsistent file formats.")
             }
         }
     }
