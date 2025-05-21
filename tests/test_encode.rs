@@ -11,7 +11,14 @@ use common::{
 };
 
 #[builder]
-fn run_encode(in_path: &Path, out_path: &Path, threads: Option<usize>) -> Result<bool> {
+fn run_encode(
+    in_path: &Path,
+    out_path: &Path,
+    threads: Option<usize>,
+    #[builder(default)] vbq_index: bool,
+    #[builder(default)] vbq_vcomp: bool,
+    #[builder(default)] vbq_skip_qual: bool,
+) -> Result<bool> {
     let mut args: Vec<_> = vec![
         "encode",
         in_path.to_str().unwrap(),
@@ -24,6 +31,15 @@ fn run_encode(in_path: &Path, out_path: &Path, threads: Option<usize>) -> Result
     if let Some(t) = threads {
         args.push("-T".to_string());
         args.push(format!("{}", t));
+    }
+    if vbq_index {
+        args.push("--index".to_string());
+    }
+    if vbq_vcomp {
+        args.push("--uncompressed".to_string());
+    }
+    if vbq_skip_qual {
+        args.push("--skip-quality".to_string());
     }
     eprintln!("Args: {args:#?}");
     let cmd = Command::new(COMMAND_NAME).args(args).output()?;
@@ -40,13 +56,39 @@ fn test_encoding() -> Result<()> {
     ) {
         let in_tmp = write_fastx().format(format).comp(comp).call()?;
         let out_tmp = output_tempfile(mode)?;
-        eprintln!("Testing: {:?} {:?} {:?}", mode, comp, format);
+        eprintln!(
+            "Testing: {:?} {:?} {:?} -T {:?}",
+            mode, comp, format, threads
+        );
         let status = run_encode()
             .in_path(in_tmp.path())
             .out_path(out_tmp.path())
             .maybe_threads(threads)
             .call()?;
         assert!(status);
+    }
+    Ok(())
+}
+
+#[test]
+fn test_vbq_specialization() -> Result<()> {
+    for (comp, format, vindex, vcomp, skip_qual) in iproduct!(
+        CompressionStatus::enum_iter(),
+        FastxFormat::enum_iter(),
+        [false, true],
+        [false, true],
+        [false, true],
+    ) {
+        let in_tmp = write_fastx().format(format).comp(comp).call()?;
+        let out_tmp = output_tempfile(BinseqMode::Vbq)?;
+        let status = run_encode()
+            .in_path(in_tmp.path())
+            .out_path(out_tmp.path())
+            .vbq_index(vindex)
+            .vbq_vcomp(vcomp)
+            .vbq_skip_qual(skip_qual)
+            .call()?;
+        assert!(status)
     }
     assert!(false);
     Ok(())
