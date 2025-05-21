@@ -22,19 +22,21 @@ fn run_encode(in_path: &Path, out_path: &Path, threads: Option<usize>) -> Result
     .map(|x| x.to_string())
     .collect();
     if let Some(t) = threads {
-        args.push("-t".to_string());
+        args.push("-T".to_string());
         args.push(format!("{}", t));
     }
+    eprintln!("Args: {args:#?}");
     let cmd = Command::new(COMMAND_NAME).args(args).output()?;
     Ok(cmd.status.success())
 }
 
 #[test]
 fn test_encoding() -> Result<()> {
-    for (mode, comp, format) in iproduct!(
+    for (mode, comp, format, threads) in iproduct!(
         BinseqMode::enum_iter(),
         CompressionStatus::enum_iter(),
         FastxFormat::enum_iter(),
+        [None, Some(1), Some(0)],
     ) {
         let in_tmp = write_fastx().format(format).comp(comp).call()?;
         let out_tmp = output_tempfile(mode)?;
@@ -42,8 +44,10 @@ fn test_encoding() -> Result<()> {
         let status = run_encode()
             .in_path(in_tmp.path())
             .out_path(out_tmp.path())
+            .maybe_threads(threads)
             .call()?;
         assert!(status);
     }
+    assert!(false);
     Ok(())
 }
