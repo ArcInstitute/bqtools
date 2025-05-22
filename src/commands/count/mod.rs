@@ -3,19 +3,24 @@ use binseq::bq::MmapReader;
 
 use crate::cli::CountCommand;
 
-fn log_reader(reader: &MmapReader) {
+fn log_reader(reader: &MmapReader, only_num: bool) {
     let header = reader.header();
     let num_records = reader.num_records();
-    println!("Format Version    : {}", header.format);
-    println!("Sequence Length   : {}", header.slen);
-    if header.xlen > 0 {
-        println!("Extended Length   : {}", header.xlen);
+
+    if only_num {
+        println!("{num_records}");
+    } else {
+        println!("Format Version    : {}", header.format);
+        println!("Sequence Length   : {}", header.slen);
+        if header.xlen > 0 {
+            println!("Extended Length   : {}", header.xlen);
+        }
+        println!("Number of records : {num_records}");
     }
-    println!("Number of records : {num_records}");
 }
 
 pub fn run(args: &CountCommand) -> Result<()> {
     let reader = MmapReader::new(args.input.path())?;
-    log_reader(&reader);
+    log_reader(&reader, args.opts.num);
     Ok(())
 }
