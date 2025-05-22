@@ -1,9 +1,9 @@
 use anyhow::Result;
-use binseq::{bq::MmapReader, vbq, BinseqReader};
+use binseq::{bq, vbq, BinseqReader};
 
 use crate::cli::CountCommand;
 
-fn log_reader_bq(reader: &MmapReader, num_records: usize) {
+fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
     let header = reader.header();
     println!("Format Version    : {}", header.format);
     println!("Sequence Length   : {}", header.slen);
