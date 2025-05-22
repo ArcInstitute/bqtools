@@ -12,10 +12,15 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build
         run: cargo build --verbose
+
+  install-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: cargo install --path .
       - name: Run tests
         run: cargo test --verbose
-      - name: Run tests (release)
-        run: cargo test --verbose --release
 
   fmt_lint:
     runs-on: ubuntu-latest
