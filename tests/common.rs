@@ -132,6 +132,7 @@ pub fn output_tempfile(mode: BinseqMode) -> Result<NamedTempFile> {
     Ok(tempfile)
 }
 
+#[allow(unused)]
 pub fn count_binseq(path: &Path) -> Result<usize> {
     let reader = BinseqReader::new(path.as_os_str().to_str().unwrap())?;
     let num = reader.num_records()?;
