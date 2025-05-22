@@ -43,7 +43,7 @@ pub struct OutputFile {
         short = 'T',
         long,
         help = "Number of threads to use for parallel compression (0 for auto)",
-        default_value = "1"
+        default_value = "0"
     )]
     pub threads: usize,
 }
@@ -181,8 +181,8 @@ pub struct OutputBinseq {
 
     /// Number of threads to use for parallel reading and writing.
     ///
-    /// The number of threads is by default 1, 0 sets to maximum, and all other values are clamped to maximum.
-    #[clap(short = 'T', long, default_value = "1")]
+    /// The number of threads is by default 0 [sets to maximum], and all other values are clamped to maximum.
+    #[clap(short = 'T', long, default_value = "0")]
     pub threads: usize,
 
     /// Zstd compression level
