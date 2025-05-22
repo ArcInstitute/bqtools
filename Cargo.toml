@@ -11,7 +11,7 @@ keywords = ["bioinformatics", "binseq", "vbinseq", "file-format", "sequencing"]
 
 [dependencies]
 anyhow = "1.0.94"
-binseq = "0.6.1"
+binseq = "0.6.4"
 clap = { version = "4.5.23", features = ["derive"] }
 itoa = "1.0.14"
 gzp = "1.0.1"
