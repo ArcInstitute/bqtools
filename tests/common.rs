@@ -2,11 +2,14 @@ use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
+use binseq::BinseqReader;
 use bon::builder;
 use niffler::Level;
 use tempfile::NamedTempFile;
 
 pub const COMMAND_NAME: &str = "bqtools";
+pub const DEFAULT_NUM_RECORDS: usize = 100;
+pub const DEFAULT_SEQ_LEN: usize = 100;
 
 #[derive(Default, Clone, Copy, Debug)]
 pub enum CompressionStatus {
@@ -102,8 +105,8 @@ fn with_suffix(format: FastxFormat, comp: CompressionStatus) -> String {
 pub fn write_fastx(
     #[builder(default)] comp: CompressionStatus,
     #[builder(default)] format: FastxFormat,
-    #[builder(default = 100)] slen: usize,
-    #[builder(default = 100)] nrec: usize,
+    #[builder(default = DEFAULT_SEQ_LEN)] slen: usize,
+    #[builder(default = DEFAULT_NUM_RECORDS)] nrec: usize,
 ) -> Result<NamedTempFile> {
     let tempfile = NamedTempFile::with_suffix(with_suffix(format, comp))?;
     let mut handle = compression_passthrough(tempfile.path(), comp)?;
@@ -127,4 +130,10 @@ pub fn write_fastx(
 pub fn output_tempfile(mode: BinseqMode) -> Result<NamedTempFile> {
     let tempfile = NamedTempFile::with_suffix(mode.suffix())?;
     Ok(tempfile)
+}
+
+pub fn count_binseq(path: &Path) -> Result<usize> {
+    let reader = BinseqReader::new(path.as_os_str().to_str().unwrap())?;
+    let num = reader.num_records()?;
+    Ok(num)
 }

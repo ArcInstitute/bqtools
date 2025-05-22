@@ -7,7 +7,8 @@ use itertools::iproduct;
 
 mod common;
 use common::{
-    output_tempfile, write_fastx, BinseqMode, CompressionStatus, FastxFormat, COMMAND_NAME,
+    count_binseq, output_tempfile, write_fastx, BinseqMode, CompressionStatus, FastxFormat,
+    COMMAND_NAME, DEFAULT_NUM_RECORDS,
 };
 
 #[builder]
@@ -66,6 +67,7 @@ fn test_encoding() -> Result<()> {
             .maybe_threads(threads)
             .call()?;
         assert!(status);
+        assert_eq!(count_binseq(out_tmp.path())?, DEFAULT_NUM_RECORDS);
     }
     Ok(())
 }
@@ -88,8 +90,8 @@ fn test_vbq_specialization() -> Result<()> {
             .vbq_vcomp(vcomp)
             .vbq_skip_qual(skip_qual)
             .call()?;
-        assert!(status)
+        assert!(status);
+        assert_eq!(count_binseq(out_tmp.path())?, DEFAULT_NUM_RECORDS);
     }
-    assert!(false);
     Ok(())
 }
