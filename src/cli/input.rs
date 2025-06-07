@@ -17,6 +17,13 @@ pub struct InputFile {
     #[clap(short, long, help = "Input file format")]
     pub format: Option<FileFormat>,
 
+    /// Batch size (in records) to use in parallel processing
+    ///
+    /// Set this to a lower value for embedding genomes to better
+    /// make use of parallelism (e.g. 2-4).
+    #[clap(short, long)]
+    pub batch_size: Option<usize>,
+
     #[clap(short = 'I', long, help = "Interleaved input file format")]
     pub interleaved: bool,
 }
