@@ -107,7 +107,7 @@ impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
     ) -> paraseq::parallel::Result<()> {
         if self
             .writer
-            .write_nucleotides(0, record.seq())
+            .write_nucleotides(0, &record.seq())
             .map_err(|e| ProcessError::from(anyhow!(e)))?
         {
             self.record_count += 1;
@@ -135,7 +135,7 @@ impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
     ) -> paraseq::parallel::Result<()> {
         if self
             .writer
-            .write_paired(0, record1.seq(), record2.seq())
+            .write_paired(0, &record1.seq(), &record2.seq())
             .map_err(|e| ProcessError::from(anyhow!(e)))?
         {
             self.record_count += 1;
@@ -163,7 +163,7 @@ impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
     ) -> paraseq::parallel::Result<()> {
         if self
             .writer
-            .write_paired(0, record1.seq(), record2.seq())
+            .write_paired(0, &record1.seq(), &record2.seq())
             .map_err(|e| ProcessError::from(anyhow!(e)))?
         {
             self.record_count += 1;
@@ -285,9 +285,9 @@ impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
 
         let write_status = if self.writer.has_quality() {
             self.writer
-                .write_nucleotides_quality(0, record.seq(), record.qual().unwrap())
+                .write_nucleotides_quality(0, &record.seq(), record.qual().unwrap())
         } else {
-            self.writer.write_nucleotides(0, record.seq())
+            self.writer.write_nucleotides(0, &record.seq())
         }
         .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
@@ -324,14 +324,14 @@ impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
         let write_status = if self.writer.has_quality() {
             self.writer.write_nucleotides_quality_paired(
                 0,
-                record1.seq(),
-                record2.seq(),
+                &record1.seq(),
+                &record2.seq(),
                 record1.qual().unwrap(),
                 record2.qual().unwrap(),
             )
         } else {
             self.writer
-                .write_nucleotides_paired(0, record1.seq(), record2.seq())
+                .write_nucleotides_paired(0, &record1.seq(), &record2.seq())
         }
         .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
@@ -368,14 +368,14 @@ impl<W: Write + Send> PairedParallelProcessor for VBinseqProcessor<W> {
         let write_status = if self.writer.has_quality() {
             self.writer.write_nucleotides_quality_paired(
                 0,
-                record1.seq(),
-                record2.seq(),
+                &record1.seq(),
+                &record2.seq(),
                 record1.qual().unwrap(),
                 record2.qual().unwrap(),
             )
         } else {
             self.writer
-                .write_nucleotides_paired(0, record1.seq(), record2.seq())
+                .write_nucleotides_paired(0, &record1.seq(), &record2.seq())
         }
         .map_err(|e| ProcessError::from(anyhow!(e)))?;
 
