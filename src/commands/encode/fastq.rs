@@ -23,9 +23,14 @@ pub fn encode_single_fastq_parallel(
     compress: bool,
     quality: bool,
     block_size: usize,
+    batch_size: Option<usize>,
 ) -> Result<()> {
     // Open the input FASTQ file
-    let mut reader = Reader::new(in_handle);
+    let mut reader = if let Some(size) = batch_size {
+        Reader::with_batch_size(in_handle, size)?
+    } else {
+        Reader::new(in_handle)
+    };
 
     // Prepare the processor
     let out_handle = match_output(out_path)?;
@@ -79,9 +84,14 @@ pub fn encode_interleaved_fastq_parallel(
     compress: bool,
     quality: bool,
     block_size: usize,
+    batch_size: Option<usize>,
 ) -> Result<()> {
     // Open the input FASTQ file
-    let mut reader = Reader::new(in_handle);
+    let mut reader = if let Some(size) = batch_size {
+        Reader::with_batch_size(in_handle, size)?
+    } else {
+        Reader::new(in_handle)
+    };
 
     // Prepare the processor
     let out_handle = match_output(out_path)?;
@@ -137,10 +147,19 @@ pub fn encode_paired_fastq_parallel(
     compress: bool,
     quality: bool,
     block_size: usize,
+    batch_size: Option<usize>,
 ) -> Result<()> {
     // Open the input FASTQ files
-    let mut reader_r1 = Reader::new(r1_handle);
-    let mut reader_r2 = Reader::new(r2_handle);
+    let mut reader_r1 = if let Some(size) = batch_size {
+        Reader::with_batch_size(r1_handle, size)?
+    } else {
+        Reader::new(r1_handle)
+    };
+    let mut reader_r2 = if let Some(size) = batch_size {
+        Reader::with_batch_size(r2_handle, size)?
+    } else {
+        Reader::new(r2_handle)
+    };
 
     // Prepare the output handle
     let out_handle = match_output(out_path)?;
