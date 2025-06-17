@@ -1,13 +1,11 @@
 use std::io::Read;
 
 use anyhow::{bail, Result};
-use paraseq::fasta;
-use paraseq::fasta::Reader as FastaReaderAlias;
-use paraseq::fastq;
-use paraseq::fastq::Reader as FastqReaderAlias;
 
-type FastaReader = FastaReaderAlias<BoxReader>;
-type FastqReader = FastqReaderAlias<BoxReader>;
+use paraseq::{fasta, fastq, Record};
+
+type FastaReader = fasta::Reader<BoxReader>;
+type FastqReader = fastq::Reader<BoxReader>;
 type BoxReader = Box<dyn Read + Send>;
 
 pub fn get_sequence_len_fasta(reader: &mut FastaReader) -> Result<u32> {

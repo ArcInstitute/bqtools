@@ -101,10 +101,7 @@ impl<W: Write + Send> Clone for BinseqProcessor<W> {
 }
 
 impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
-    fn process_record<Rf: paraseq::fastx::Record>(
-        &mut self,
-        record: Rf,
-    ) -> paraseq::parallel::Result<()> {
+    fn process_record<Rf: paraseq::Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
         if self
             .writer
             .write_nucleotides(0, &record.seq())
@@ -128,7 +125,7 @@ impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
 }
 
 impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
-    fn process_interleaved_pair<Rf: paraseq::fastx::Record>(
+    fn process_interleaved_pair<Rf: paraseq::Record>(
         &mut self,
         record1: Rf,
         record2: Rf,
@@ -156,7 +153,7 @@ impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
 }
 
 impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
-    fn process_record_pair<Rf: paraseq::fastx::Record>(
+    fn process_record_pair<Rf: paraseq::Record>(
         &mut self,
         record1: Rf,
         record2: Rf,
@@ -273,10 +270,7 @@ impl<W: Write + Send> Clone for VBinseqProcessor<W> {
 }
 
 impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
-    fn process_record<Rf: paraseq::fastx::Record>(
-        &mut self,
-        record: Rf,
-    ) -> paraseq::parallel::Result<()> {
+    fn process_record<Rf: paraseq::Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
         if self.writer.is_paired() {
             return Err(ProcessError::from(anyhow!(
                 "Provided VBinseq Configuration is expecting paired records."
@@ -310,7 +304,7 @@ impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
 }
 
 impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
-    fn process_interleaved_pair<Rf: paraseq::fastx::Record>(
+    fn process_interleaved_pair<Rf: paraseq::Record>(
         &mut self,
         record1: Rf,
         record2: Rf,
@@ -354,7 +348,7 @@ impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
 }
 
 impl<W: Write + Send> PairedParallelProcessor for VBinseqProcessor<W> {
-    fn process_record_pair<Rf: paraseq::fastx::Record>(
+    fn process_record_pair<Rf: paraseq::Record>(
         &mut self,
         record1: Rf,
         record2: Rf,
