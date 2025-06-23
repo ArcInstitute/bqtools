@@ -16,7 +16,7 @@ It currently has two variants: BQ and VBQ.
 - **BQ (\*.bq)**: Optimized for _fixed-length_ DNA sequences **without** quality scores.
 - **VBQ (\*.vbq)**: Optimized for _variable-length_ DNA sequences **with optional** quality scores.
 
-Both support single and paired sequences and make use of two-bit encoding for efficient nucleotide packing using the [`bitnuc`](https://crates.io/crates/bitnuc) library.
+Both support single and paired sequences and make use of two-bit encoding for efficient nucleotide packing using [`bitnuc`](https://crates.io/crates/bitnuc) and efficient parallel FASTX processing using [`paraseq`](https://crates.io/crates/paraseq).
 
 For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/content/10.1101/2025.04.08.647863v1) where we describe the format family and its applications.
 
