@@ -1,136 +1,257 @@
 use anyhow::Result;
+use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
+use paraseq::{
+    fastx::{Format, Reader},
+    prelude::*,
+};
 
-use crate::cli::{BinseqMode, EncodeCommand, FileFormat};
+use crate::cli::{BinseqMode, EncodeCommand};
+use crate::commands::utils::match_output;
 
-mod fasta;
-mod fastq;
 mod processor;
 mod utils;
 
-use fasta::{
-    encode_interleaved_fasta_parallel, encode_paired_fasta_parallel, encode_single_fasta_parallel,
-};
-use fastq::{
-    encode_interleaved_fastq_parallel, encode_paired_fastq_parallel, encode_single_fastq_parallel,
-};
 use processor::{BinseqProcessor, VBinseqProcessor};
-use utils::{get_sequence_len_fasta, get_sequence_len_fastq};
+use utils::{get_interleaved_sequence_len, get_sequence_len};
 
-fn encode_single(args: &EncodeCommand) -> Result<()> {
-    // Open the IO handles
-    let in_handle = args.input.as_reader()?;
+fn encode_single(
+    in_path: Option<&str>,
+    out_path: Option<&str>,
+    mode: BinseqMode,
+    num_threads: usize,
+    compress: bool,
+    quality: bool,
+    block_size: usize,
+    batch_size: Option<usize>,
+    policy: Policy,
+) -> Result<()> {
+    // build reader
+    let mut reader = if let Some(size) = batch_size {
+        Reader::from_optional_path_with_batch_size(in_path, size)
+    } else {
+        Reader::from_optional_path(in_path)
+    }?;
 
-    // Compression passthrough on input
-    let (in_handle, _comp) = niffler::send::get_reader(in_handle)?;
+    // build writer
+    let out_handle = match_output(out_path)?;
 
-    match args.input.format()? {
-        FileFormat::Fastq => encode_single_fastq_parallel(
-            in_handle,
-            args.output.borrowed_path(),
-            args.output.threads(),
-            args.output.policy,
-            args.output.mode()?,
-            args.output.compress(),
-            args.output.quality(),
-            args.output.block_size,
-            args.input.batch_size,
-        ),
-        FileFormat::Fasta => encode_single_fasta_parallel(
-            in_handle,
-            args.output.borrowed_path(),
-            args.output.threads(),
-            args.output.policy,
-            args.output.mode()?,
-            args.output.compress(),
-            args.output.block_size,
-            args.input.batch_size,
-        ),
-        FileFormat::Tsv => {
-            unimplemented!("Tsv import is not implemented for encoding");
-        }
+    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+        // Determine the sequence length
+        let slen = get_sequence_len(&mut reader)?;
+
+        let header = BinseqHeader::new(slen);
+        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+
+        // Process the records in parallel
+        reader.process_parallel(processor.clone(), num_threads)?;
+
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
+
+        (num_records, num_skipped)
+    } else {
+        let quality = match reader.format() {
+            Format::Fastq => quality,
+            Format::Fasta => false, // never record fasta quality
+        };
+        let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, false);
+        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+
+        // Process the records in parallel
+        reader.process_parallel(processor.clone(), num_threads)?;
+        processor.finish()?;
+
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
+
+        (num_records, num_skipped)
+    };
+
+    // print the summary
+    eprintln!("{num_records} records written");
+    if num_skipped > 0 {
+        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
     }
+
+    Ok(())
 }
 
-fn encode_interleaved(args: &EncodeCommand) -> Result<()> {
-    // Open the IO handles
-    let in_handle = args.input.as_reader()?;
+fn encode_interleaved(
+    in_path: Option<&str>,
+    out_path: Option<&str>,
+    mode: BinseqMode,
+    num_threads: usize,
+    compress: bool,
+    quality: bool,
+    block_size: usize,
+    batch_size: Option<usize>,
+    policy: Policy,
+) -> Result<()> {
+    let mut reader = if let Some(size) = batch_size {
+        Reader::from_optional_path_with_batch_size(in_path, size)
+    } else {
+        Reader::from_optional_path(in_path)
+    }?;
 
-    // Compression passthrough on input
-    let (in_handle, _comp) = niffler::send::get_reader(in_handle)?;
+    // Prepare the processor
+    let out_handle = match_output(out_path)?;
 
-    match args.input.format()? {
-        FileFormat::Fastq => encode_interleaved_fastq_parallel(
-            in_handle,
-            args.output.borrowed_path(),
-            args.output.threads(),
-            args.output.policy,
-            args.output.mode()?,
-            args.output.compress(),
-            args.output.quality(),
-            args.output.block_size,
-            args.input.batch_size,
-        ),
-        FileFormat::Fasta => encode_interleaved_fasta_parallel(
-            in_handle,
-            args.output.borrowed_path(),
-            args.output.threads(),
-            args.output.policy,
-            args.output.mode()?,
-            args.output.compress(),
-            args.output.block_size,
-            args.input.batch_size,
-        ),
-        FileFormat::Tsv => {
-            unimplemented!("Tsv import is not implemented for encoding");
-        }
+    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+        // Determine the sequence length
+        let (slen, xlen) = get_interleaved_sequence_len(&mut reader)?;
+
+        let header = BinseqHeader::new_extended(slen, xlen);
+        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+
+        // Process the records in parallel
+        reader.process_parallel_interleaved(processor.clone(), num_threads)?;
+
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
+
+        (num_records, num_skipped)
+    } else {
+        let quality = match reader.format() {
+            Format::Fastq => quality,
+            Format::Fasta => false, // never record quality for fasta
+        };
+        let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
+        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+
+        // Process the records in parallel
+        reader.process_parallel_interleaved(processor.clone(), num_threads)?;
+        processor.finish()?;
+
+        // Update the number of records
+        let num_records = processor.get_global_record_count();
+        let num_skipped = processor.get_global_skipped_count();
+
+        (num_records, num_skipped)
+    };
+
+    // print the summary
+    eprintln!("{num_records} records written");
+    if num_skipped > 0 {
+        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
     }
+
+    Ok(())
 }
 
-fn encode_paired(args: &EncodeCommand) -> Result<()> {
-    // Open the IO handles
-    let (r1_handle, r2_handle) = args.input.as_reader_pair()?;
+fn encode_paired(
+    in_path1: &str,
+    in_path2: &str,
+    out_path: Option<&str>,
+    mode: BinseqMode,
+    num_threads: usize,
+    compress: bool,
+    quality: bool,
+    block_size: usize,
+    batch_size: Option<usize>,
+    policy: Policy,
+) -> Result<()> {
+    let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
+        (
+            Reader::from_path_with_batch_size(in_path1, size)?,
+            Reader::from_path_with_batch_size(in_path2, size)?,
+        )
+    } else {
+        (Reader::from_path(in_path1)?, Reader::from_path(in_path2)?)
+    };
 
-    // Compression passthrough on input
-    let (r1_handle, _comp) = niffler::send::get_reader(r1_handle)?;
-    let (r2_handle, _comp) = niffler::send::get_reader(r2_handle)?;
+    // Prepare the output handle
+    let out_handle = match_output(out_path)?;
 
-    match args.input.format()? {
-        FileFormat::Fastq => encode_paired_fastq_parallel(
-            r1_handle,
-            r2_handle,
-            args.output.borrowed_path(),
-            args.output.threads(),
-            args.output.policy,
-            args.output.mode()?,
-            args.output.compress(),
-            args.output.quality(),
-            args.output.block_size,
-            args.input.batch_size,
-        ),
-        FileFormat::Fasta => encode_paired_fasta_parallel(
-            r1_handle,
-            r2_handle,
-            args.output.borrowed_path(),
-            args.output.threads(),
-            args.output.policy,
-            args.output.mode()?,
-            args.output.compress(),
-            args.output.block_size,
-            args.input.batch_size,
-        ),
-        FileFormat::Tsv => {
-            unimplemented!("Tsv import is not implemented for encoding")
+    let (num_records, num_skipped) = match mode {
+        BinseqMode::Binseq => {
+            // Determine the sequence length
+            let slen = get_sequence_len(&mut reader_r1)?;
+            let xlen = get_sequence_len(&mut reader_r2)?;
+
+            // Prepare the output HEADER
+            let header = BinseqHeader::new_extended(slen, xlen);
+            let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+
+            // Process the records in parallel
+            reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
+
+            // Update the number of records
+            let num_records = processor.get_global_record_count();
+            let num_skipped = processor.get_global_skipped_count();
+
+            (num_records, num_skipped)
         }
+        BinseqMode::VBinseq => {
+            let quality = match reader_r1.format() {
+                Format::Fastq => quality,
+                Format::Fasta => false, // never record quality for fasta
+            };
+            let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
+            let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+
+            // Process the records in parallel
+            reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
+            processor.finish()?;
+
+            // Update the number of records
+            let num_records = processor.get_global_record_count();
+            let num_skipped = processor.get_global_skipped_count();
+
+            (num_records, num_skipped)
+        }
+    };
+
+    // print the summary
+    eprintln!("{num_records} record pairs written");
+    if num_skipped > 0 {
+        eprintln!("{num_skipped} record pairs skipped (invalid nucleotides)");
     }
+
+    Ok(())
 }
 
 pub fn run(args: &EncodeCommand) -> Result<()> {
     if args.input.paired() {
-        encode_paired(args)?;
+        let (in_path1, in_path2) = args.input.paired_paths()?;
+        encode_paired(
+            in_path1,
+            in_path2,
+            args.output.borrowed_path(),
+            args.output.mode()?,
+            args.output.threads(),
+            args.output.compress(),
+            args.output.quality(),
+            args.output.block_size,
+            args.input.batch_size,
+            args.output.policy.into(),
+        )?;
     } else if args.input.interleaved {
-        encode_interleaved(args)?;
+        encode_interleaved(
+            args.input.single_path()?,
+            args.output.borrowed_path(),
+            args.output.mode()?,
+            args.output.threads(),
+            args.output.compress(),
+            args.output.quality(),
+            args.output.block_size,
+            args.input.batch_size,
+            args.output.policy.into(),
+        )?;
     } else {
-        encode_single(args)?;
+        encode_single(
+            args.input.single_path()?,
+            args.output.borrowed_path(),
+            args.output.mode()?,
+            args.output.threads(),
+            args.output.compress(),
+            args.output.quality(),
+            args.output.block_size,
+            args.input.batch_size,
+            args.output.policy.into(),
+        )?;
     }
 
     if args.output.index
