@@ -69,6 +69,9 @@ bqtools count --help
 
 ### Encoding
 
+`bqtools` accepts input from stdin or from files.
+It will auto-determine the input format and compression status.
+
 Convert FASTA/FASTQ files to BINSEQ format:
 
 ```bash
@@ -77,6 +80,9 @@ bqtools encode input.fastq -o output.bq
 
 # Encode a single file to vbinseq
 bqtools encode input.fastq -o output.vbq
+
+# Encode a file stream to binseq (auto-determine input format)
+/bin/cat input.fastq | bqtools encode -o output.bq
 
 # Encode paired-end reads
 bqtools encode input_R1.fastq input_R2.fastq -o output.bq
