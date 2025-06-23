@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, BufReader, BufWriter, Read, Write},
+    io::{self, BufWriter, Write},
 };
 
 use anyhow::Result;
@@ -8,20 +8,6 @@ use gzp::{
     deflate::Gzip,
     par::compress::{ParCompress, ParCompressBuilder},
 };
-
-pub fn match_input(path: Option<&String>) -> Result<Box<dyn Read + Send>> {
-    if let Some(path) = path {
-        let handle = File::open(path)?;
-        let buffer = BufReader::new(handle);
-        let boxed = Box::new(buffer);
-        Ok(boxed)
-    } else {
-        let handle = io::stdin();
-        let buffer = BufReader::new(handle);
-        let boxed = Box::new(buffer);
-        Ok(boxed)
-    }
-}
 
 pub fn match_output(path: Option<&str>) -> Result<Box<dyn Write + Send>> {
     if let Some(path) = path {

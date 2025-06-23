@@ -1,9 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use std::io::Read;
 
 use super::{BinseqMode, FileFormat};
-use crate::commands::match_input;
 
 #[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "INPUT FILE OPTIONS")]
@@ -28,54 +26,17 @@ pub struct InputFile {
     pub interleaved: bool,
 }
 impl InputFile {
-    pub fn format(&self) -> Result<FileFormat> {
-        if let Some(format) = self.format {
-            Ok(format)
-        } else {
-            if self.input.is_empty() {
-                bail!("Can not infer file format from stdin.");
-            }
-            // Identify file format for each input file
-            let formats = self
-                .input
-                .iter()
-                .map(|path| {
-                    // Infer file format for each input file
-                    if let Some(format) = FileFormat::from_path(path) {
-                        Ok(format)
-
-                    // Bail if file format could not be inferred
-                    } else {
-                        bail!("Could not infer file format.")
-                    }
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            // Check if all formats are the same
-            if formats.iter().all(|&f| f == formats[0]) {
-                // Return the format
-                Ok(formats[0])
-            } else {
-                // Bail if formats are inconsistent
-                bail!("Inconsistent file formats.")
-            }
+    pub fn single_path(&self) -> Result<Option<&str>> {
+        match self.input.len() {
+            0 => Ok(None),
+            1 => Ok(Some(&self.input[0])),
+            _ => bail!("Requested single input file, but multiple files were provided."),
         }
     }
 
-    pub fn as_reader(&self) -> Result<Box<dyn Read + Send>> {
+    pub fn paired_paths(&self) -> Result<(&str, &str)> {
         match self.input.len() {
-            0 => match_input(None),
-            1 => match_input(Some(&self.input[0])),
-            _ => bail!("Multiple input files are not supported."),
-        }
-    }
-
-    pub fn as_reader_pair(&self) -> Result<(Box<dyn Read + Send>, Box<dyn Read + Send>)> {
-        match self.input.len() {
-            2 => Ok((
-                match_input(Some(&self.input[0]))?,
-                match_input(Some(&self.input[1]))?,
-            )),
+            2 => Ok((&self.input[0], &self.input[1])),
             _ => bail!("Two input files are required."),
         }
     }
