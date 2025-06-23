@@ -69,7 +69,8 @@ bqtools count --help
 
 ### Encoding
 
-`bqtools` accepts input from stdin or from files.
+`bqtools` accepts input from stdin or from file paths.
+
 It will auto-determine the input format and compression status.
 
 Convert FASTA/FASTQ files to BINSEQ format:
@@ -106,8 +107,6 @@ Available policies for handling non-ATCG nucleotides:
 - `c`: Set all Ns to C
 - `g`: Set all Ns to G
 - `t`: Set all Ns to T
-
-_Note:_ Input FASTQ files may be compressed.
 
 ### Decoding
 
