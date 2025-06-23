@@ -73,29 +73,29 @@ bqtools count --help
 
 It will auto-determine the input format and compression status.
 
-Convert FASTA/FASTQ files to BINSEQ format:
+Convert FASTA/FASTQ files to BINSEQ:
 
 ```bash
-# Encode a single file to binseq
+# Encode a single file to bq
 bqtools encode input.fastq -o output.bq
 
-# Encode a single file to vbinseq
+# Encode a single file to vbq
 bqtools encode input.fastq -o output.vbq
 
-# Encode a file stream to binseq (auto-determine input format)
-/bin/cat input.fastq | bqtools encode -o output.bq
+# Encode a file stream to bq (auto-determine input format and compression status)
+/bin/cat input.fastq.zst | bqtools encode -o output.bq
 
 # Encode paired-end reads
 bqtools encode input_R1.fastq input_R2.fastq -o output.bq
 
-# Encode paired-end reads to vbinseq
+# Encode paired-end reads to vbq
 bqtools encode input_R1.fastq input_R2.fastq -o output.vbq
 
 # Specify a policy for handling non-ATCG nucleotides
 bqtools encode input.fastq -o output.bq -p r  # Randomly draw A/C/G/T for each N
 
-# Use multiple threads for parallel processing
-bqtools encode input.fastq -o output.bq -T 8
+# Set threads for parallel processing
+bqtools encode input.fastq -o output.bq -T 4
 ```
 
 Available policies for handling non-ATCG nucleotides:
