@@ -13,6 +13,8 @@ use paraseq::parallel::{
 };
 use parking_lot::Mutex;
 
+use crate::cli::{TruncateConfig, TruncateMate, TruncateMode};
+
 /// Default capacity for the buffer used by the processor.
 const DEFAULT_CAPACITY: usize = 128 * 1024;
 
@@ -20,6 +22,8 @@ pub struct BinseqProcessor<W: Write + Send> {
     /* Thread-local fields */
     /// Encoder for the current thread
     writer: BinseqWriter<Vec<u8>>,
+    /// Truncation mode
+    truncate: Option<TruncateConfig>,
     /// Number of records written by this thread
     record_count: usize,
     /// Number of records skipped by this thread
@@ -34,7 +38,12 @@ pub struct BinseqProcessor<W: Write + Send> {
 }
 
 impl<W: Write + Send> BinseqProcessor<W> {
-    pub fn new(header: BinseqHeader, policy: Policy, inner: W) -> binseq::Result<Self> {
+    pub fn new(
+        header: BinseqHeader,
+        policy: Policy,
+        truncate: Option<TruncateConfig>,
+        inner: W,
+    ) -> binseq::Result<Self> {
         let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
         let writer = BinseqWriterBuilder::default()
             .header(header)
@@ -49,6 +58,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
         Ok(Self {
             writer,
             global_writer,
+            truncate,
             record_count: 0,
             skipped_count: 0,
             global_record_count: Arc::new(Mutex::new(0)),
@@ -87,11 +97,31 @@ impl<W: Write + Send> BinseqProcessor<W> {
     pub fn get_global_skipped_count(&self) -> usize {
         *self.global_skipped_count.lock()
     }
+
+    /// Apply any sequence transformations
+    fn xform_seq<'a>(&self, seq: &'a [u8], primary: bool) -> &'a [u8] {
+        if let Some(conf) = self.truncate {
+            match (conf.mate, primary) {
+                (TruncateMate::Both | TruncateMate::Primary, true) => match conf.mode {
+                    TruncateMode::Prefix(size) => &seq[..size.min(seq.len())],
+                    TruncateMode::Suffix(size) => &seq[seq.len().saturating_sub(size)..],
+                },
+                (TruncateMate::Both | TruncateMate::Extended, false) => match conf.mode {
+                    TruncateMode::Prefix(size) => &seq[..size.min(seq.len())],
+                    TruncateMode::Suffix(size) => &seq[seq.len().saturating_sub(size)..],
+                },
+                _ => seq,
+            }
+        } else {
+            seq
+        }
+    }
 }
 impl<W: Write + Send> Clone for BinseqProcessor<W> {
     fn clone(&self) -> Self {
         Self {
             writer: self.writer.clone(),
+            truncate: self.truncate,
             global_writer: self.global_writer.clone(),
             record_count: self.record_count,
             skipped_count: self.skipped_count,
@@ -105,7 +135,7 @@ impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
     fn process_record<Rf: paraseq::Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
         if self
             .writer
-            .write_nucleotides(0, &record.seq())
+            .write_nucleotides(0, self.xform_seq(&record.seq(), true))
             .map_err(|e| e.into_process_error())?
         {
             self.record_count += 1;
@@ -132,7 +162,11 @@ impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
     ) -> paraseq::parallel::Result<()> {
         if self
             .writer
-            .write_paired(0, &record1.seq(), &record2.seq())
+            .write_paired(
+                0,
+                self.xform_seq(&record1.seq(), true),
+                self.xform_seq(&record2.seq(), false),
+            )
             .map_err(|e| e.into_process_error())?
         {
             self.record_count += 1;
@@ -159,7 +193,11 @@ impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
     ) -> paraseq::parallel::Result<()> {
         if self
             .writer
-            .write_paired(0, &record1.seq(), &record2.seq())
+            .write_paired(
+                0,
+                self.xform_seq(&record1.seq(), true),
+                self.xform_seq(&record2.seq(), false),
+            )
             .map_err(|e| e.into_process_error())?
         {
             self.record_count += 1;

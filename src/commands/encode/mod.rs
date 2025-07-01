@@ -5,8 +5,10 @@ use paraseq::{
     prelude::*,
 };
 
-use crate::cli::{BinseqMode, EncodeCommand};
-use crate::commands::utils::match_output;
+use crate::{
+    cli::{BinseqMode, EncodeCommand, TruncateConfig},
+    commands::utils::match_output,
+};
 
 mod processor;
 mod utils;
@@ -24,6 +26,7 @@ fn encode_single(
     block_size: usize,
     batch_size: Option<usize>,
     policy: Policy,
+    truncate: Option<TruncateConfig>,
 ) -> Result<()> {
     // build reader
     let mut reader = if let Some(size) = batch_size {
@@ -37,10 +40,10 @@ fn encode_single(
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
         // Determine the sequence length
-        let slen = get_sequence_len(&mut reader)?;
+        let slen = get_sequence_len(&mut reader, truncate, true)?;
 
         let header = BinseqHeader::new(slen);
-        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = BinseqProcessor::new(header, policy.into(), truncate, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel(processor.clone(), num_threads)?;
@@ -88,6 +91,7 @@ fn encode_interleaved(
     block_size: usize,
     batch_size: Option<usize>,
     policy: Policy,
+    truncate: Option<TruncateConfig>,
 ) -> Result<()> {
     let mut reader = if let Some(size) = batch_size {
         Reader::from_optional_path_with_batch_size(in_path, size)
@@ -100,10 +104,10 @@ fn encode_interleaved(
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
         // Determine the sequence length
-        let (slen, xlen) = get_interleaved_sequence_len(&mut reader)?;
+        let (slen, xlen) = get_interleaved_sequence_len(&mut reader, truncate)?;
 
         let header = BinseqHeader::new_extended(slen, xlen);
-        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = BinseqProcessor::new(header, policy.into(), truncate, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
@@ -152,6 +156,7 @@ fn encode_paired(
     block_size: usize,
     batch_size: Option<usize>,
     policy: Policy,
+    truncate: Option<TruncateConfig>,
 ) -> Result<()> {
     let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
         (
@@ -168,12 +173,12 @@ fn encode_paired(
     let (num_records, num_skipped) = match mode {
         BinseqMode::Binseq => {
             // Determine the sequence length
-            let slen = get_sequence_len(&mut reader_r1)?;
-            let xlen = get_sequence_len(&mut reader_r2)?;
+            let slen = get_sequence_len(&mut reader_r1, truncate, true)?;
+            let xlen = get_sequence_len(&mut reader_r2, truncate, false)?;
 
             // Prepare the output HEADER
             let header = BinseqHeader::new_extended(slen, xlen);
-            let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+            let processor = BinseqProcessor::new(header, policy.into(), truncate, out_handle)?;
 
             // Process the records in parallel
             reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
@@ -227,6 +232,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.output.block_size,
             args.input.batch_size,
             args.output.policy.into(),
+            args.output.truncate_config(),
         )?;
     } else if args.input.interleaved {
         encode_interleaved(
@@ -239,6 +245,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.output.block_size,
             args.input.batch_size,
             args.output.policy.into(),
+            args.output.truncate_config(),
         )?;
     } else {
         encode_single(
@@ -251,6 +258,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.output.block_size,
             args.input.batch_size,
             args.output.policy.into(),
+            args.output.truncate_config(),
         )?;
     }
 
