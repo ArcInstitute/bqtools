@@ -6,7 +6,7 @@ use paraseq::{
 };
 
 use crate::{
-    cli::{BinseqMode, EncodeCommand, PadMode, TruncateConfig},
+    cli::{BinseqMode, EncodeCommand, PadConfig, TruncateConfig},
     commands::utils::match_output,
 };
 
@@ -27,7 +27,7 @@ fn encode_single(
     batch_size: Option<usize>,
     policy: Policy,
     truncate: Option<TruncateConfig>,
-    padding: Option<PadMode>,
+    padding: Option<PadConfig>,
 ) -> Result<()> {
     // build reader
     let mut reader = if let Some(size) = batch_size {
@@ -93,7 +93,7 @@ fn encode_interleaved(
     batch_size: Option<usize>,
     policy: Policy,
     truncate: Option<TruncateConfig>,
-    padding: Option<PadMode>,
+    padding: Option<PadConfig>,
 ) -> Result<()> {
     let mut reader = if let Some(size) = batch_size {
         Reader::from_optional_path_with_batch_size(in_path, size)
@@ -159,7 +159,7 @@ fn encode_paired(
     batch_size: Option<usize>,
     policy: Policy,
     truncate: Option<TruncateConfig>,
-    padding: Option<PadMode>,
+    padding: Option<PadConfig>,
 ) -> Result<()> {
     let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
         (
@@ -237,7 +237,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.input.batch_size,
             args.output.policy.into(),
             args.output.truncate_config(),
-            args.output.pad,
+            args.output.pad_config(),
         )?;
     } else if args.input.interleaved {
         encode_interleaved(
@@ -251,7 +251,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.input.batch_size,
             args.output.policy.into(),
             args.output.truncate_config(),
-            args.output.pad,
+            args.output.pad_config(),
         )?;
     } else {
         encode_single(
@@ -265,7 +265,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.input.batch_size,
             args.output.policy.into(),
             args.output.truncate_config(),
-            args.output.pad,
+            args.output.pad_config(),
         )?;
     }
 

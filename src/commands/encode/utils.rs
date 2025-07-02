@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 use binseq::bq::BinseqHeader;
 use paraseq::{fastx, Record};
 
-use crate::cli::{PadMode, TruncateConfig, TruncateMate, TruncateMode};
+use crate::cli::{PadConfig, PadMode, TransformMate, TruncateConfig, TruncateMode};
 
 type BoxReader = Box<dyn Read + Send>;
 
@@ -33,15 +33,15 @@ pub fn get_sequence_len(
 
     if let Some(conf) = truncate_conf {
         match conf.mate {
-            TruncateMate::Both => Ok(conf.mode.inner() as u32),
-            TruncateMate::Primary => {
+            TransformMate::Both => Ok(conf.mode.inner() as u32),
+            TransformMate::Primary => {
                 if primary {
                     Ok(conf.mode.inner() as u32)
                 } else {
                     Ok(slen as u32)
                 }
             }
-            TruncateMate::Extended => {
+            TransformMate::Extended => {
                 if primary {
                     Ok(slen as u32)
                 } else {
@@ -79,9 +79,9 @@ pub fn get_interleaved_sequence_len(
 
     if let Some(conf) = truncate {
         match conf.mate {
-            TruncateMate::Both => Ok((conf.mode.inner() as u32, conf.mode.inner() as u32)),
-            TruncateMate::Primary => Ok((conf.mode.inner() as u32, xlen as u32)),
-            TruncateMate::Extended => Ok((slen as u32, conf.mode.inner() as u32)),
+            TransformMate::Both => Ok((conf.mode.inner() as u32, conf.mode.inner() as u32)),
+            TransformMate::Primary => Ok((conf.mode.inner() as u32, xlen as u32)),
+            TransformMate::Extended => Ok((slen as u32, conf.mode.inner() as u32)),
         }
     } else {
         Ok((slen as u32, xlen as u32))
@@ -92,11 +92,11 @@ pub fn get_interleaved_sequence_len(
 pub fn truncate_sequence(seq: &[u8], primary: bool, conf: Option<TruncateConfig>) -> &[u8] {
     if let Some(conf) = conf {
         match (conf.mate, primary) {
-            (TruncateMate::Both | TruncateMate::Primary, true) => match conf.mode {
+            (TransformMate::Both | TransformMate::Primary, true) => match conf.mode {
                 TruncateMode::Prefix(size) => &seq[..size.min(seq.len())],
                 TruncateMode::Suffix(size) => &seq[seq.len().saturating_sub(size)..],
             },
-            (TruncateMate::Both | TruncateMate::Extended, false) => match conf.mode {
+            (TransformMate::Both | TransformMate::Extended, false) => match conf.mode {
                 TruncateMode::Prefix(size) => &seq[..size.min(seq.len())],
                 TruncateMode::Suffix(size) => &seq[seq.len().saturating_sub(size)..],
             },
@@ -116,18 +116,21 @@ pub fn pad_sequence<'a>(
     pad: &'a mut Vec<u8>,
     seq: &'a [u8],
     primary: bool,
-    padmode: Option<PadMode>,
+    conf: Option<PadConfig>,
     header: BinseqHeader,
 ) {
     // Clear the padding vector
     pad.clear();
 
-    let Some(mode) = padmode else { return };
+    let Some(conf) = conf else { return };
 
-    let comp_size = if primary {
-        header.slen as usize
-    } else {
-        header.xlen as usize
+    let comp_size = match (conf.mate, primary) {
+        (TransformMate::Both | TransformMate::Primary, true) => header.slen as usize,
+        (TransformMate::Both | TransformMate::Extended, false) => header.xlen as usize,
+        _ => {
+            // no padding needed
+            return;
+        }
     };
 
     // Define a closure for padding
@@ -141,7 +144,7 @@ pub fn pad_sequence<'a>(
     match comp_size.saturating_sub(seq.len()) {
         n if n > 0 => {
             // Handle padding based on prefix status
-            match mode {
+            match conf.mode {
                 PadMode::Prefix => {
                     add_to_pad(pad, n);
                     pad.extend_from_slice(&seq);

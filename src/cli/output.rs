@@ -168,8 +168,12 @@ pub struct OutputBinseq {
     pub truncate: Option<TruncateMode>,
 
     /// Defines which record mate to truncate
-    #[clap(short = 'M', long, default_value = "b")]
-    pub truncate_mate: TruncateMate,
+    #[clap(long, default_value = "b")]
+    pub truncate_mate: TransformMate,
+
+    /// Defines which record mate to pad
+    #[clap(long, default_value = "b")]
+    pub padding_mate: TransformMate,
 
     /// Defines whether to pad sequences to a fixed length
     ///
@@ -243,6 +247,17 @@ impl OutputBinseq {
         if let Some(mode) = self.truncate {
             Some(TruncateConfig {
                 mate: self.truncate_mate,
+                mode,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn pad_config(&self) -> Option<PadConfig> {
+        if let Some(mode) = self.pad {
+            Some(PadConfig {
+                mate: self.padding_mate,
                 mode,
             })
         } else {
@@ -356,7 +371,7 @@ fn parse_memory_size(input: &str) -> Result<usize, String> {
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
-pub enum TruncateMate {
+pub enum TransformMate {
     #[clap(name = "p")]
     Primary,
     #[clap(name = "x")]
@@ -417,6 +432,12 @@ impl TruncateMode {
 
 #[derive(Clone, Copy, Debug)]
 pub struct TruncateConfig {
-    pub mate: TruncateMate,
+    pub mate: TransformMate,
     pub mode: TruncateMode,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PadConfig {
+    pub mate: TransformMate,
+    pub mode: PadMode,
 }

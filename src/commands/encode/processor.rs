@@ -14,7 +14,7 @@ use paraseq::parallel::{
 use parking_lot::Mutex;
 
 use super::utils::{pad_sequence, truncate_sequence};
-use crate::cli::{PadMode, TruncateConfig};
+use crate::cli::{PadConfig, TruncateConfig};
 
 /// Default capacity for the buffer used by the processor.
 const DEFAULT_CAPACITY: usize = 128 * 1024;
@@ -26,7 +26,7 @@ pub struct BinseqProcessor<W: Write + Send> {
     /// Truncation mode
     truncate: Option<TruncateConfig>,
     /// Padding mode
-    padding: Option<PadMode>,
+    padding: Option<PadConfig>,
     /// Number of records written by this thread
     record_count: usize,
     /// Number of records skipped by this thread
@@ -50,7 +50,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
         header: BinseqHeader,
         policy: Policy,
         truncate: Option<TruncateConfig>,
-        padding: Option<PadMode>,
+        padding: Option<PadConfig>,
         inner: W,
     ) -> binseq::Result<Self> {
         let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
