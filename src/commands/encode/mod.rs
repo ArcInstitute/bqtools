@@ -6,7 +6,7 @@ use paraseq::{
 };
 
 use crate::{
-    cli::{BinseqMode, EncodeCommand, TruncateConfig},
+    cli::{BinseqMode, EncodeCommand, PadMode, TruncateConfig},
     commands::utils::match_output,
 };
 
@@ -27,6 +27,7 @@ fn encode_single(
     batch_size: Option<usize>,
     policy: Policy,
     truncate: Option<TruncateConfig>,
+    padding: Option<PadMode>,
 ) -> Result<()> {
     // build reader
     let mut reader = if let Some(size) = batch_size {
@@ -43,7 +44,7 @@ fn encode_single(
         let slen = get_sequence_len(&mut reader, truncate, true)?;
 
         let header = BinseqHeader::new(slen);
-        let processor = BinseqProcessor::new(header, policy.into(), truncate, out_handle)?;
+        let processor = BinseqProcessor::new(header, policy.into(), truncate, padding, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel(processor.clone(), num_threads)?;
@@ -92,6 +93,7 @@ fn encode_interleaved(
     batch_size: Option<usize>,
     policy: Policy,
     truncate: Option<TruncateConfig>,
+    padding: Option<PadMode>,
 ) -> Result<()> {
     let mut reader = if let Some(size) = batch_size {
         Reader::from_optional_path_with_batch_size(in_path, size)
@@ -107,7 +109,7 @@ fn encode_interleaved(
         let (slen, xlen) = get_interleaved_sequence_len(&mut reader, truncate)?;
 
         let header = BinseqHeader::new_extended(slen, xlen);
-        let processor = BinseqProcessor::new(header, policy.into(), truncate, out_handle)?;
+        let processor = BinseqProcessor::new(header, policy.into(), truncate, padding, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
@@ -157,6 +159,7 @@ fn encode_paired(
     batch_size: Option<usize>,
     policy: Policy,
     truncate: Option<TruncateConfig>,
+    padding: Option<PadMode>,
 ) -> Result<()> {
     let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
         (
@@ -178,7 +181,8 @@ fn encode_paired(
 
             // Prepare the output HEADER
             let header = BinseqHeader::new_extended(slen, xlen);
-            let processor = BinseqProcessor::new(header, policy.into(), truncate, out_handle)?;
+            let processor =
+                BinseqProcessor::new(header, policy.into(), truncate, padding, out_handle)?;
 
             // Process the records in parallel
             reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
@@ -233,6 +237,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.input.batch_size,
             args.output.policy.into(),
             args.output.truncate_config(),
+            args.output.pad,
         )?;
     } else if args.input.interleaved {
         encode_interleaved(
@@ -246,6 +251,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.input.batch_size,
             args.output.policy.into(),
             args.output.truncate_config(),
+            args.output.pad,
         )?;
     } else {
         encode_single(
@@ -259,6 +265,7 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
             args.input.batch_size,
             args.output.policy.into(),
             args.output.truncate_config(),
+            args.output.pad,
         )?;
     }
 

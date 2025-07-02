@@ -25,10 +25,17 @@ pub struct BinseqProcessor<W: Write + Send> {
     writer: BinseqWriter<Vec<u8>>,
     /// Truncation mode
     truncate: Option<TruncateConfig>,
+    /// Padding mode
+    padding: Option<PadMode>,
     /// Number of records written by this thread
     record_count: usize,
     /// Number of records skipped by this thread
     skipped_count: usize,
+    /// Padding vector for the current thread (only used when padding is enabled)
+    smod: Vec<u8>,
+    xmod: Vec<u8>,
+    /// Header for the binseq writers
+    header: BinseqHeader,
     /* Global fields */
     /// Global writer for the entire process
     global_writer: Arc<Mutex<BinseqWriter<W>>>,
@@ -43,6 +50,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
         header: BinseqHeader,
         policy: Policy,
         truncate: Option<TruncateConfig>,
+        padding: Option<PadMode>,
         inner: W,
     ) -> binseq::Result<Self> {
         let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
@@ -57,11 +65,15 @@ impl<W: Write + Send> BinseqProcessor<W> {
             .build(inner)
             .map(|w| Arc::new(Mutex::new(w)))?;
         Ok(Self {
+            header,
             writer,
             global_writer,
             truncate,
+            padding,
             record_count: 0,
             skipped_count: 0,
+            smod: Vec::default(),
+            xmod: Vec::default(),
             global_record_count: Arc::new(Mutex::new(0)),
             global_skipped_count: Arc::new(Mutex::new(0)),
         })
@@ -98,31 +110,16 @@ impl<W: Write + Send> BinseqProcessor<W> {
     pub fn get_global_skipped_count(&self) -> usize {
         *self.global_skipped_count.lock()
     }
-
-    /// Apply any sequence transformations
-    fn xform_seq<'a>(&self, seq: &'a [u8], primary: bool) -> &'a [u8] {
-        if let Some(conf) = self.truncate {
-            match (conf.mate, primary) {
-                (TruncateMate::Both | TruncateMate::Primary, true) => match conf.mode {
-                    TruncateMode::Prefix(size) => &seq[..size.min(seq.len())],
-                    TruncateMode::Suffix(size) => &seq[seq.len().saturating_sub(size)..],
-                },
-                (TruncateMate::Both | TruncateMate::Extended, false) => match conf.mode {
-                    TruncateMode::Prefix(size) => &seq[..size.min(seq.len())],
-                    TruncateMode::Suffix(size) => &seq[seq.len().saturating_sub(size)..],
-                },
-                _ => seq,
-            }
-        } else {
-            seq
-        }
-    }
 }
 impl<W: Write + Send> Clone for BinseqProcessor<W> {
     fn clone(&self) -> Self {
         Self {
             writer: self.writer.clone(),
+            header: self.header.clone(),
             truncate: self.truncate,
+            padding: self.padding,
+            smod: self.smod.clone(),
+            xmod: self.xmod.clone(),
             global_writer: self.global_writer.clone(),
             record_count: self.record_count,
             skipped_count: self.skipped_count,
@@ -134,9 +131,24 @@ impl<W: Write + Send> Clone for BinseqProcessor<W> {
 
 impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
     fn process_record<Rf: paraseq::Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
+        // Pull the reference sequence from the record
+        let ref_seq = &record.seq();
+
+        // Apply sequence transformations (if required by config)
+        let seq = {
+            let trunc_seq = truncate_sequence(ref_seq, true, self.truncate);
+            pad_sequence(&mut self.smod, trunc_seq, true, self.padding, self.header);
+            if self.smod.is_empty() {
+                trunc_seq
+            } else {
+                &self.smod
+            }
+        };
+
+        // Encode and write the sequence
         if self
             .writer
-            .write_nucleotides(0, self.xform_seq(&record.seq(), true))
+            .write_nucleotides(0, seq)
             .map_err(|e| e.into_process_error())?
         {
             self.record_count += 1;
@@ -161,13 +173,35 @@ impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
         record1: Rf,
         record2: Rf,
     ) -> paraseq::parallel::Result<()> {
+        // Pull the sequence data from the records
+        let s_ref_seq = &record1.seq();
+        let x_ref_seq = &record2.seq();
+
+        // Apply sequence transformations to primary
+        let s_seq = {
+            let trunc_seq = truncate_sequence(s_ref_seq, true, self.truncate);
+            pad_sequence(&mut self.smod, trunc_seq, true, self.padding, self.header);
+            if self.smod.is_empty() {
+                trunc_seq
+            } else {
+                &self.smod
+            }
+        };
+
+        // Apply sequence transformations to extended
+        let x_seq = {
+            let trunc_seq = truncate_sequence(x_ref_seq, false, self.truncate);
+            pad_sequence(&mut self.xmod, trunc_seq, false, self.padding, self.header);
+            if self.xmod.is_empty() {
+                trunc_seq
+            } else {
+                &self.xmod
+            }
+        };
+
         if self
             .writer
-            .write_paired(
-                0,
-                self.xform_seq(&record1.seq(), true),
-                self.xform_seq(&record2.seq(), false),
-            )
+            .write_paired(0, s_seq, x_seq)
             .map_err(|e| e.into_process_error())?
         {
             self.record_count += 1;
@@ -192,13 +226,35 @@ impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
         record1: Rf,
         record2: Rf,
     ) -> paraseq::parallel::Result<()> {
+        // Pull the sequence data from the records
+        let s_ref_seq = &record1.seq();
+        let x_ref_seq = &record2.seq();
+
+        // Apply sequence transformations to primary
+        let s_seq = {
+            let trunc_seq = truncate_sequence(s_ref_seq, true, self.truncate);
+            pad_sequence(&mut self.smod, trunc_seq, true, self.padding, self.header);
+            if self.smod.is_empty() {
+                trunc_seq
+            } else {
+                &self.smod
+            }
+        };
+
+        // Apply sequence transformations to extended
+        let x_seq = {
+            let trunc_seq = truncate_sequence(x_ref_seq, false, self.truncate);
+            pad_sequence(&mut self.xmod, trunc_seq, false, self.padding, self.header);
+            if self.xmod.is_empty() {
+                trunc_seq
+            } else {
+                &self.xmod
+            }
+        };
+
         if self
             .writer
-            .write_paired(
-                0,
-                self.xform_seq(&record1.seq(), true),
-                self.xform_seq(&record2.seq(), false),
-            )
+            .write_paired(0, s_seq, x_seq)
             .map_err(|e| e.into_process_error())?
         {
             self.record_count += 1;
