@@ -171,6 +171,12 @@ pub struct OutputBinseq {
     #[clap(short = 'M', long, default_value = "b")]
     pub truncate_mate: TruncateMate,
 
+    /// Defines whether to pad sequences to a fixed length
+    ///
+    /// Default is no padding.
+    #[clap(long)]
+    pub pad: Option<PadMode>,
+
     /// Skip ZSTD compression of VBQ blocks (default: compressed)
     ///
     /// Only used by vbq.
@@ -360,9 +366,23 @@ pub enum TruncateMate {
     Both,
 }
 
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum PadMode {
+    #[clap(name = "p")]
+    /// Pads the prefix with `N` characters
+    Prefix,
+
+    #[clap(name = "s")]
+    #[default]
+    /// Pads the suffix with `N` characters
+    Suffix,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum TruncateMode {
+    /// Truncates so the prefix is at most <usize> characters
     Prefix(usize),
+    /// Truncates so the suffix is at most <usize> characters
     Suffix(usize),
 }
 impl FromStr for TruncateMode {
