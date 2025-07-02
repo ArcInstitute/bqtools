@@ -13,7 +13,8 @@ use paraseq::parallel::{
 };
 use parking_lot::Mutex;
 
-use crate::cli::{TruncateConfig, TruncateMate, TruncateMode};
+use super::utils::{pad_sequence, truncate_sequence};
+use crate::cli::{PadMode, TruncateConfig};
 
 /// Default capacity for the buffer used by the processor.
 const DEFAULT_CAPACITY: usize = 128 * 1024;
