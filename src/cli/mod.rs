@@ -19,5 +19,8 @@ pub use formats::FileFormat;
 pub use grep::GrepCommand;
 pub use index::IndexCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
-pub use output::{BinseqMode, Mate, OutputBinseq, OutputFile};
+pub use output::{
+    BinseqMode, Mate, OutputBinseq, OutputFile, PadConfig, PadMode, TransformMate, TruncateConfig,
+    TruncateMode,
+};
 pub use sample::SampleCommand;

@@ -1,7 +1,10 @@
+use std::io::Write;
+use std::path::Path;
+use std::str::FromStr;
+
 use anyhow::{bail, Result};
 use binseq::Policy;
 use clap::{Parser, ValueEnum};
-use std::{io::Write, path::Path};
 
 use crate::{
     cli::FileFormat,
@@ -155,6 +158,29 @@ pub struct OutputBinseq {
     #[clap(short = 'p', long, default_value = "r")]
     pub policy: PolicyWrapper,
 
+    /// Truncate sequences to this length (default: no truncation)
+    ///
+    /// prefix will take the first <num> bases per sequence
+    /// suffix will take the last <num> bases per sequence
+    ///
+    /// Use [ps]<num> to specify prefix/suffix truncation and the length of the final sequence.
+    #[clap(short = 't', long)]
+    pub truncate: Option<TruncateMode>,
+
+    /// Defines which record mate to truncate
+    #[clap(long, default_value = "b")]
+    pub truncate_mate: TransformMate,
+
+    /// Defines which record mate to pad
+    #[clap(long, default_value = "b")]
+    pub padding_mate: TransformMate,
+
+    /// Defines whether to pad sequences to a fixed length
+    ///
+    /// Default is no padding.
+    #[clap(long)]
+    pub pad: Option<PadMode>,
+
     /// Skip ZSTD compression of VBQ blocks (default: compressed)
     ///
     /// Only used by vbq.
@@ -214,6 +240,28 @@ impl OutputBinseq {
         } else {
             // STDOUT
             Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn truncate_config(&self) -> Option<TruncateConfig> {
+        if let Some(mode) = self.truncate {
+            Some(TruncateConfig {
+                mate: self.truncate_mate,
+                mode,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn pad_config(&self) -> Option<PadConfig> {
+        if let Some(mode) = self.pad {
+            Some(PadConfig {
+                mate: self.padding_mate,
+                mode,
+            })
+        } else {
+            None
         }
     }
 
@@ -320,4 +368,76 @@ fn parse_memory_size(input: &str) -> Result<usize, String> {
         Ok(number) => Ok(number * multiplier),
         Err(_) => Err(format!("Failed to parse number: {number_str}")),
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum TransformMate {
+    #[clap(name = "p")]
+    Primary,
+    #[clap(name = "x")]
+    Extended,
+    #[clap(name = "b")]
+    #[default]
+    Both,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum PadMode {
+    #[clap(name = "p")]
+    /// Pads the prefix with `N` characters
+    Prefix,
+
+    #[clap(name = "s")]
+    #[default]
+    /// Pads the suffix with `N` characters
+    Suffix,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum TruncateMode {
+    /// Truncates so the prefix is at most <usize> characters
+    Prefix(usize),
+    /// Truncates so the suffix is at most <usize> characters
+    Suffix(usize),
+}
+impl FromStr for TruncateMode {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(prefix_str) = s.strip_prefix("p") {
+            let num = prefix_str
+                .parse::<usize>()
+                .map_err(|_| format!("Invalid number for prefix: {}", prefix_str))?;
+            Ok(TruncateMode::Prefix(num))
+        } else if let Some(suffix_str) = s.strip_prefix("s") {
+            let num = suffix_str
+                .parse::<usize>()
+                .map_err(|_| format!("Invalid number for suffix: {}", suffix_str))?;
+            Ok(TruncateMode::Suffix(num))
+        } else {
+            Err(format!(
+                "Invalid truncate mode: '{}'. Expected 'p<num>' or 's<num>'",
+                s
+            ))
+        }
+    }
+}
+impl TruncateMode {
+    pub fn inner(&self) -> usize {
+        match self {
+            TruncateMode::Prefix(num) => *num,
+            TruncateMode::Suffix(num) => *num,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TruncateConfig {
+    pub mate: TransformMate,
+    pub mode: TruncateMode,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PadConfig {
+    pub mate: TransformMate,
+    pub mode: PadMode,
 }
