@@ -123,6 +123,7 @@ pub fn write_record<W: Write>(
         FileFormat::Fasta => write_fasta_parts(writer, index, sequence),
         FileFormat::Fastq => write_fastq_parts(writer, index, sequence, qual_buf),
         FileFormat::Tsv => write_tsv_parts(writer, index, sequence),
+        FileFormat::Bam => unimplemented!("Cannot write BAM record from here"),
     }
 }
 
