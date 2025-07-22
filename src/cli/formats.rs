@@ -8,6 +8,9 @@ pub enum FileFormat {
     /// FASTQ file format
     #[clap(name = "q")]
     Fastq,
+    /// BAM file format
+    #[clap(name = "b")]
+    Bam,
     /// TSV file format (decode only)
     #[clap(name = "t")]
     Tsv,
@@ -22,6 +25,7 @@ impl FileFormat {
         match ext {
             "fasta" | "fa" => Some(Self::Fasta),
             "fastq" | "fq" => Some(Self::Fastq),
+            "sam" | "bam" | "cram" => Some(Self::Bam),
             _ => None,
         }
     }
@@ -31,6 +35,7 @@ impl FileFormat {
             Self::Fasta => "fa",
             Self::Fastq => "fq",
             Self::Tsv => "tsv",
+            Self::Bam => "bam",
         }
     }
 }

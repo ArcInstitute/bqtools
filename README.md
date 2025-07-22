@@ -91,6 +91,12 @@ bqtools encode input_R1.fastq input_R2.fastq -o output.bq
 # Encode paired-end reads to vbq
 bqtools encode input_R1.fastq input_R2.fastq -o output.vbq
 
+# Encode a SAM/BAM/CRAM file to BINSEQ
+bqtools encode input.bam -fb -o output.bq
+
+# Encode an paired-end CRAM file to BINSEQ (sorted by read name)
+bqtools encode input.paired.cram -I -fb -o output.vbq
+
 # Specify a policy for handling non-ATCG nucleotides
 bqtools encode input.fastq -o output.bq -p r  # Randomly draw A/C/G/T for each N
 
