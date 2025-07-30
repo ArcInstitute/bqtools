@@ -335,7 +335,7 @@ fn test_decode_compressed_output() -> Result<()> {
                 binseq_tmp.path().to_str().unwrap(),
                 "-o",
                 decode_tmp.path().to_str().unwrap(),
-                "--compress",
+                "-cg",
             ])
             .output()?
             .status
@@ -343,7 +343,43 @@ fn test_decode_compressed_output() -> Result<()> {
 
         assert!(
             decode_status,
-            "Decode with compression failed for {:?}",
+            "Decode with compression failed for {:?} GZIP",
+            mode
+        );
+
+        let decode_status = Command::new(COMMAND_NAME)
+            .args([
+                "decode",
+                binseq_tmp.path().to_str().unwrap(),
+                "-o",
+                decode_tmp.path().to_str().unwrap(),
+                "-cz",
+            ])
+            .output()?
+            .status
+            .success();
+
+        assert!(
+            decode_status,
+            "Decode with compression failed for {:?} ZSTD",
+            mode
+        );
+
+        let decode_status = Command::new(COMMAND_NAME)
+            .args([
+                "decode",
+                binseq_tmp.path().to_str().unwrap(),
+                "-o",
+                decode_tmp.path().to_str().unwrap(),
+                "-cu",
+            ])
+            .output()?
+            .status
+            .success();
+
+        assert!(
+            decode_status,
+            "Decode with compression failed for {:?} uncompressed",
             mode
         );
     }
