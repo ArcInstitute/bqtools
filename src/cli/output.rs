@@ -5,7 +5,7 @@ use std::{io::Write, path::Path};
 
 use crate::{
     cli::FileFormat,
-    commands::{compress_gzip_passthrough, compress_zstd_passthrough, match_output},
+    commands::{compress_gzip_passthrough, match_output},
 };
 
 #[derive(Parser, Debug)]
@@ -199,7 +199,7 @@ pub struct OutputBinseq {
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
         let writer = match_output(self.output.as_deref())?;
-        compress_zstd_passthrough(writer, self.compress(), self.level(), self.threads())
+        Ok(writer)
     }
 
     pub fn borrowed_path(&self) -> Option<&str> {
