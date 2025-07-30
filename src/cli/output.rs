@@ -5,7 +5,7 @@ use std::{io::Write, path::Path};
 
 use crate::{
     cli::FileFormat,
-    commands::{compress_gzip_passthrough, compress_zstd_passthrough, match_output},
+    commands::{compress_passthrough, match_output, CompressionType},
 };
 
 #[derive(Parser, Debug)]
@@ -31,13 +31,8 @@ pub struct OutputFile {
     #[clap(short, long, help = "Output file format")]
     pub format: Option<FileFormat>,
 
-    #[clap(
-        short,
-        long,
-        help = "Gzip compress output file",
-        default_value = "false"
-    )]
-    pub compress: bool,
+    #[clap(short, long, help = "Compress output file", default_value = "u")]
+    pub compress: CompressionType,
 
     #[clap(
         short = 'T',
@@ -50,18 +45,22 @@ pub struct OutputFile {
 impl OutputFile {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
         let writer = match_output(self.output.as_deref())?;
-        compress_gzip_passthrough(writer, self.compress(), self.threads())
+        compress_passthrough(writer, self.compress(), self.threads())
     }
 
     #[allow(clippy::case_sensitive_file_extension_comparisons)]
-    pub fn compress(&self) -> bool {
-        self.output.as_ref().map_or(self.compress, |path| {
-            if path.ends_with(".gz") {
-                true
-            } else {
-                self.compress
-            }
-        })
+    pub fn compress(&self) -> CompressionType {
+        self.output
+            .as_ref()
+            .map_or(CompressionType::Uncompressed, |path| {
+                if path.ends_with(".gz") {
+                    CompressionType::Gzip
+                } else if path.ends_with(".zst") {
+                    CompressionType::Zstd
+                } else {
+                    CompressionType::Uncompressed
+                }
+            })
     }
 
     pub fn mate(&self) -> Mate {
@@ -102,12 +101,12 @@ impl OutputFile {
         })?;
 
         // Construct the output file names
-        let r1_name = if self.compress {
+        let r1_name = if self.compress.is_compressed() {
             format!("{}_R1.{}.gz", prefix, format.extension())
         } else {
             format!("{}_R1.{}", prefix, format.extension())
         };
-        let r2_name = if self.compress {
+        let r2_name = if self.compress.is_compressed() {
             format!("{}_R2.{}.gz", prefix, format.extension())
         } else {
             format!("{}_R2.{}", prefix, format.extension())
@@ -118,8 +117,8 @@ impl OutputFile {
         let r2 = match_output(Some(&r2_name))?;
 
         // Compress the output files (if necessary)
-        let r1 = compress_gzip_passthrough(r1, self.compress, self.threads())?;
-        let r2 = compress_gzip_passthrough(r2, self.compress, self.threads())?;
+        let r1 = compress_passthrough(r1, self.compress, self.threads())?;
+        let r2 = compress_passthrough(r2, self.compress, self.threads())?;
 
         Ok((r1, r2))
     }
@@ -199,7 +198,7 @@ pub struct OutputBinseq {
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
         let writer = match_output(self.output.as_deref())?;
-        compress_zstd_passthrough(writer, self.compress(), self.level(), self.threads())
+        Ok(writer)
     }
 
     pub fn borrowed_path(&self) -> Option<&str> {
@@ -230,10 +229,6 @@ impl OutputBinseq {
             0 => num_cpus::get(),
             n => n.min(num_cpus::get()),
         }
-    }
-
-    fn level(&self) -> i32 {
-        self.level.clamp(0, 22)
     }
 }
 
