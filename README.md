@@ -122,6 +122,10 @@ Convert BINSEQ files back to FASTA/FASTQ/TSV:
 # Decode to FASTQ (default)
 bqtools decode input.bq -o output.fastq
 
+# Decode to compressed FASTQ (gzip/zstd)
+bqtools decode input.bq -o output.fastq.gz
+bqtools decode input.bq -o output.fastq.zst
+
 # Decode to FASTA
 bqtools decode input.bq -o output.fa -f a
 
