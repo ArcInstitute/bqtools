@@ -141,7 +141,7 @@ pub struct OutputBinseq {
     #[clap(
         short = 'o',
         long,
-        help = "Output binseq file [default: stdout]",
+        help = "Output binseq file",
         required_unless_present = "pipe"
     )]
     pub output: Option<String>,
