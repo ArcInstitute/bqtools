@@ -138,12 +138,10 @@ pub enum Mate {
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 #[allow(clippy::struct_excessive_bools)]
 pub struct OutputBinseq {
-    #[clap(
-        short = 'o',
-        long,
-        help = "Output binseq file [default: stdout]",
-        required_unless_present = "pipe"
-    )]
+    #[clap(short = 'o', long, required_unless_present = "pipe")]
+    /// Output binseq file
+    ///
+    /// To output to stdout, use the `-P/--pipe` flag.
     pub output: Option<String>,
 
     /// Defines the BINSEQ mode to use.
