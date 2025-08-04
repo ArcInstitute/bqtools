@@ -142,7 +142,7 @@ pub struct OutputBinseq {
         short = 'o',
         long,
         help = "Output binseq file [default: stdout]",
-        required_unless_present = "pipe"
+        required = false,
     )]
     pub output: Option<String>,
 
