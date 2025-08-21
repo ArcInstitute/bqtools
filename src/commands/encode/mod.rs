@@ -413,7 +413,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
     Ok(())
 }
 
-fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) -> Result<()> {
+fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) -> Result<()> {
     let num_threads = args.output.threads();
 
     // Case where there are more threads than files
@@ -477,8 +477,6 @@ fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) ->
                     }
                 }
 
-                pair.len();1;
-
                 run_atomic(&file_args)?;
                 Ok(())
             });
@@ -501,7 +499,7 @@ fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) ->
             }
             let subqueue = queue[num_processed..rbound].to_vec();
             num_processed += subqueue.len();
-            process_queue(args.clone(), subqueue, regex.clone())?;
+            process_queue(args, subqueue, regex)?;
         }
     }
 
@@ -586,7 +584,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         // eprintln!("Files: {:?}", pqueue);
     }
 
-    process_queue(args.clone(), pqueue, regex.clone())?;
+    process_queue(&args, pqueue, &regex)?;
 
     Ok(())
 }
