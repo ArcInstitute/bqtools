@@ -76,6 +76,10 @@ pub struct RecursiveOptions {
     /// Encode *{_R1,_R2}* record pairs. Requires `--recursive`.
     #[clap(short = 'R', long = "paired", requires = "recursive")]
     pub paired: bool,
+
+    /// Maximum depth in the directory tree to process. Leaving this option empty will set no limit.
+    #[clap(long, requires = "recursive")]
+    pub depth: Option<usize>,
 }
 
 #[derive(Parser, Debug)]

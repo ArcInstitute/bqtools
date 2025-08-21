@@ -525,13 +525,22 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
 
     let mut fqueue = vec![];
     eprintln!("Processing files in directory: {}", dir.display());
-    for entry in WalkDir::new(dir).into_iter() {
+
+    let dir_walker = if let Some(max_depth) = args.input.recursion.depth {
+        WalkDir::new(dir).max_depth(max_depth)
+    } else {
+        WalkDir::new(dir)
+    };
+    for entry in dir_walker.into_iter() {
         let entry = entry?;
         let path = entry.path();
         let path_str = path.as_os_str().to_str().unwrap();
         if path.is_file() && regex.is_match(path_str) {
             fqueue.push(path.to_owned());
         }
+    }
+    if fqueue.is_empty() {
+        bail!("No files found");
     }
     fqueue.sort_unstable();
 
