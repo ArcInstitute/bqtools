@@ -47,7 +47,7 @@ fn encode_single(
         let slen = get_sequence_len(&mut reader)?;
 
         let header = BinseqHeader::new(slen);
-        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel(processor.clone(), num_threads)?;
@@ -63,7 +63,7 @@ fn encode_single(
             Format::Fasta => false, // never record fasta quality
         };
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, false);
-        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel(processor.clone(), num_threads)?;
@@ -107,7 +107,7 @@ fn encode_single_htslib(
         let (slen, _) = get_sequence_len_htslib(in_path, false)?;
 
         let header = BinseqHeader::new(slen);
-        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel(processor.clone(), num_threads)?;
@@ -119,7 +119,7 @@ fn encode_single_htslib(
         (num_records, num_skipped)
     } else {
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, false);
-        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel(processor.clone(), num_threads)?;
@@ -166,7 +166,7 @@ fn encode_interleaved(
         let (slen, xlen) = get_interleaved_sequence_len(&mut reader)?;
 
         let header = BinseqHeader::new_extended(slen, xlen);
-        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
@@ -182,7 +182,7 @@ fn encode_interleaved(
             Format::Fasta => false, // never record quality for fasta
         };
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
-        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
@@ -225,7 +225,7 @@ fn encode_interleaved_htslib(
         let (slen, xlen) = get_sequence_len_htslib(in_path, true)?;
 
         let header = BinseqHeader::new_extended(slen, xlen);
-        let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
@@ -237,7 +237,7 @@ fn encode_interleaved_htslib(
         (num_records, num_skipped)
     } else {
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
-        let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+        let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
@@ -291,7 +291,7 @@ fn encode_paired(
 
             // Prepare the output HEADER
             let header = BinseqHeader::new_extended(slen, xlen);
-            let processor = BinseqProcessor::new(header, policy.into(), out_handle)?;
+            let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
             // Process the records in parallel
             reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
@@ -308,7 +308,7 @@ fn encode_paired(
                 Format::Fasta => false, // never record quality for fasta
             };
             let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
-            let processor = VBinseqProcessor::new(header, policy.into(), out_handle)?;
+            let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
             // Process the records in parallel
             reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
@@ -375,34 +375,32 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.policy.into(),
             )?;
         }
+    } else if let Some(FileFormat::Bam) = args.input.format {
+        encode_single_htslib(
+            args.input
+                .single_path()?
+                .context("Must provide an input path for HTSlib")?,
+            args.output.borrowed_path(),
+            args.output.mode()?,
+            args.output.threads(),
+            args.output.compress(),
+            args.output.quality(),
+            args.output.block_size,
+            args.input.batch_size,
+            args.output.policy.into(),
+        )?;
     } else {
-        if let Some(FileFormat::Bam) = args.input.format {
-            encode_single_htslib(
-                args.input
-                    .single_path()?
-                    .context("Must provide an input path for HTSlib")?,
-                args.output.borrowed_path(),
-                args.output.mode()?,
-                args.output.threads(),
-                args.output.compress(),
-                args.output.quality(),
-                args.output.block_size,
-                args.input.batch_size,
-                args.output.policy.into(),
-            )?;
-        } else {
-            encode_single(
-                args.input.single_path()?,
-                args.output.borrowed_path(),
-                args.output.mode()?,
-                args.output.threads(),
-                args.output.compress(),
-                args.output.quality(),
-                args.output.block_size,
-                args.input.batch_size,
-                args.output.policy.into(),
-            )?;
-        }
+        encode_single(
+            args.input.single_path()?,
+            args.output.borrowed_path(),
+            args.output.mode()?,
+            args.output.threads(),
+            args.output.compress(),
+            args.output.quality(),
+            args.output.block_size,
+            args.input.batch_size,
+            args.output.policy.into(),
+        )?;
     }
 
     if args.output.index
@@ -430,11 +428,10 @@ fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) ->
         );
         if leftover_threads > 0 {
             eprintln!(
-                "Base threads per file: {}, extra threads for first {} file(s)",
-                base_threads_per_file, leftover_threads
+                "Base threads per file: {base_threads_per_file}, extra threads for first {leftover_threads} file(s)"
             );
         } else {
-            eprintln!("Threads per file: {}", base_threads_per_file);
+            eprintln!("Threads per file: {base_threads_per_file}");
         }
 
         let mut handles = vec![];
@@ -480,7 +477,7 @@ fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) ->
                     }
                 }
 
-                if pair.len() == 1 {}
+                pair.len();1;
 
                 run_atomic(&file_args)?;
                 Ok(())
@@ -488,11 +485,11 @@ fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) ->
             handles.push(handle);
         }
 
-        handles.into_iter().for_each(|handle| {
+        for handle in handles.into_iter() {
             if let Err(err) = handle.join() {
-                eprintln!("Error in thread: {:?}", err);
+                eprintln!("Error in thread: {err:?}");
             }
-        });
+        }
 
     // Case where there are more files than threads (batching)
     } else {
@@ -531,7 +528,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     } else {
         WalkDir::new(dir)
     };
-    for entry in dir_walker.into_iter() {
+    for entry in dir_walker {
         let entry = entry?;
         let path = entry.path();
         let path_str = path.as_os_str().to_str().unwrap();
@@ -555,7 +552,9 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
             let r1_sub = regex.replace(r1.to_str().unwrap(), "");
             let r2_sub = regex.replace(r2.to_str().unwrap(), "");
 
-            if r1_sub != r2_sub {
+            if r1_sub == r2_sub {
+                idx += 2;
+            } else {
                 // eprintln!(
                 //     "Found a mismatched pair: {} and {}",
                 //     r1.display(),
@@ -564,8 +563,6 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
                 // eprintln!("Skipping pair");
                 idx += 1;
                 continue;
-            } else {
-                idx += 2;
             }
 
             // println!("Processing pair: {} and {}", r1.display(), r2.display());
@@ -589,7 +586,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         // eprintln!("Files: {:?}", pqueue);
     }
 
-    process_queue(args.to_owned(), pqueue, regex.to_owned())?;
+    process_queue(args.clone(), pqueue, regex.clone())?;
 
     Ok(())
 }

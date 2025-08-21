@@ -30,17 +30,17 @@ pub fn get_sequence_len_htslib(path: &str, paired: bool) -> Result<(u32, u32)> {
     let mut slen = 0;
     let mut xlen = 0;
 
-    let mut rc_records = reader.rc_records().into_iter();
+    let mut rc_records = reader.rc_records();
 
     if let Some(res) = rc_records.next() {
         let rec = res?;
-        slen = rec.seq_len()
+        slen = rec.seq_len();
     }
 
     if paired {
         if let Some(res) = rc_records.next() {
             let rec = res?;
-            xlen = rec.seq_len()
+            xlen = rec.seq_len();
         }
     }
     Ok((slen as u32, xlen as u32))
