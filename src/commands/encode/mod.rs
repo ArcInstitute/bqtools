@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
 use paraseq::{
@@ -413,7 +415,59 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
     Ok(())
 }
 
+fn process_queue(args: EncodeCommand, queue: Vec<PathBuf>, regex: Regex) -> Result<()> {
+    let num_threads = args.output.threads();
+
+    // Case where there are more threads than files
+    if queue.len() <= num_threads {
+        let threads_per_file = (num_threads / queue.len()).max(1);
+        eprintln!("Using {} threads per file", threads_per_file);
+
+        let mut handles = vec![];
+        for file in queue {
+            let thread_args = args.clone();
+            let thread_regex = regex.clone();
+            let mode = args.output.mode()?;
+            let handle = std::thread::spawn(move || -> Result<()> {
+                let mut file_args = thread_args.clone();
+                let inpath = file.to_str().unwrap().to_string();
+                let outpath = thread_regex
+                    .replace_all(&inpath, mode.extension())
+                    .to_string();
+                file_args.input.input = vec![inpath];
+                file_args.output.output = Some(outpath);
+                file_args.output.threads = threads_per_file;
+                run_atomic(&file_args)?;
+                Ok(())
+            });
+            handles.push(handle);
+        }
+
+        handles.into_iter().for_each(|handle| {
+            if let Err(err) = handle.join() {
+                eprintln!("Error in thread: {:?}", err);
+            }
+        });
+
+    // Case where there are more files than threads (batching)
+    } else {
+        let mut num_processed = 0;
+        loop {
+            let rbound = (num_processed + num_threads).min(queue.len());
+            if num_processed == rbound {
+                break;
+            }
+            let subqueue = queue[num_processed..rbound].to_vec();
+            num_processed += subqueue.len();
+            process_queue(args.clone(), subqueue, regex.clone())?;
+        }
+    }
+
+    Ok(())
+}
+
 fn run_recursive(args: &EncodeCommand) -> Result<()> {
+    let args = args.to_owned();
     let dir = args.input.as_directory()?;
 
     let restr = r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$";
@@ -432,17 +486,8 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
 
     eprintln!("Total files found: {}", queue.len());
     eprintln!("Files: {:?}", queue);
+    process_queue(args.to_owned(), queue, regex.to_owned())?;
 
-    for file in queue {
-        let mut file_args = args.clone();
-        let inpath = file.to_str().unwrap().to_string();
-        let outpath = regex
-            .replace_all(&inpath, args.output.mode()?.extension())
-            .to_string();
-        file_args.input.input = vec![inpath];
-        file_args.output.output = Some(outpath);
-        run_atomic(&file_args)?;
-    }
     Ok(())
 }
 
