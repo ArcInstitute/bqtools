@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
 use paraseq::{
     fastx::{Format, Reader},
@@ -415,7 +415,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
     Ok(())
 }
 
-fn process_queue(args: EncodeCommand, queue: Vec<PathBuf>, regex: Regex) -> Result<()> {
+fn process_queue(args: EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: Regex) -> Result<()> {
     let num_threads = args.output.threads();
 
     // Case where there are more threads than files
@@ -438,7 +438,7 @@ fn process_queue(args: EncodeCommand, queue: Vec<PathBuf>, regex: Regex) -> Resu
         }
 
         let mut handles = vec![];
-        for (i, file) in queue.into_iter().enumerate() {
+        for (i, pair) in queue.into_iter().enumerate() {
             let thread_args = args.clone();
             let thread_regex = regex.clone();
             let mode = args.output.mode()?;
@@ -452,13 +452,36 @@ fn process_queue(args: EncodeCommand, queue: Vec<PathBuf>, regex: Regex) -> Resu
 
             let handle = std::thread::spawn(move || -> Result<()> {
                 let mut file_args = thread_args.clone();
-                let inpath = file.to_str().unwrap().to_string();
-                let outpath = thread_regex
-                    .replace_all(&inpath, mode.extension())
-                    .to_string();
-                file_args.input.input = vec![inpath];
-                file_args.output.output = Some(outpath);
-                file_args.output.threads = threads_for_this_file;
+
+                match pair.len() {
+                    1 => {
+                        let inpath = pair[0].to_str().unwrap().to_string();
+                        let outpath = thread_regex
+                            .replace_all(&inpath, mode.extension())
+                            .to_string();
+                        file_args.input.input = vec![inpath];
+                        file_args.output.output = Some(outpath);
+                        file_args.output.threads = threads_for_this_file;
+                    }
+                    2 => {
+                        let inpaths: Vec<String> = pair
+                            .iter()
+                            .map(|path| path.to_str().unwrap().to_string())
+                            .collect();
+                        let outpath = thread_regex
+                            .replace_all(&inpaths[0], mode.extension())
+                            .to_string();
+                        file_args.input.input = inpaths;
+                        file_args.output.output = Some(outpath);
+                        file_args.output.threads = threads_for_this_file;
+                    }
+                    _ => {
+                        bail!("Invalid number of input files found: {}", pair.len())
+                    }
+                }
+
+                if pair.len() == 1 {}
+
                 run_atomic(&file_args)?;
                 Ok(())
             });
@@ -492,23 +515,72 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     let args = args.to_owned();
     let dir = args.input.as_directory()?;
 
-    let restr = r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$";
-    let regex = Regex::new(restr)?;
+    let regex_str = if args.input.recursion.paired {
+        r".R[12].?\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
+    } else {
+        r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
+    };
 
-    let mut queue = vec![];
+    let regex = Regex::new(regex_str)?;
+
+    let mut fqueue = vec![];
     eprintln!("Processing files in directory: {}", dir.display());
     for entry in WalkDir::new(dir).into_iter() {
         let entry = entry?;
         let path = entry.path();
         let path_str = path.as_os_str().to_str().unwrap();
         if path.is_file() && regex.is_match(path_str) {
-            queue.push(path.to_owned());
+            fqueue.push(path.to_owned());
+        }
+    }
+    fqueue.sort_unstable();
+
+    let mut pqueue = Vec::new();
+    if args.input.recursion.paired {
+        let mut idx = 0;
+        while idx < fqueue.len() - 1 {
+            let r1 = &fqueue[idx];
+            let r2 = &fqueue[idx + 1];
+
+            // validate that the R1/R2 filenames match
+            let r1_sub = regex.replace(r1.to_str().unwrap(), "");
+            let r2_sub = regex.replace(r2.to_str().unwrap(), "");
+
+            if r1_sub != r2_sub {
+                // eprintln!(
+                //     "Found a mismatched pair: {} and {}",
+                //     r1.display(),
+                //     r2.display()
+                // );
+                // eprintln!("Skipping pair");
+                idx += 1;
+                continue;
+            } else {
+                idx += 2;
+            }
+
+            // println!("Processing pair: {} and {}", r1.display(), r2.display());
+            pqueue.push(vec![r1.to_owned(), r2.to_owned()]);
+        }
+    } else {
+        for f in fqueue {
+            pqueue.push(vec![f.clone()]);
         }
     }
 
-    eprintln!("Total files found: {}", queue.len());
-    eprintln!("Files: {:?}", queue);
-    process_queue(args.to_owned(), queue, regex.to_owned())?;
+    if pqueue.is_empty() {
+        bail!("No files found matching the expected pattern.");
+    }
+
+    if args.input.recursion.paired {
+        eprintln!("Total file pairs found: {}", pqueue.len());
+        // eprintln!("Pairs: {:?}", pqueue);
+    } else {
+        eprintln!("Total files found: {}", pqueue.len());
+        // eprintln!("Files: {:?}", pqueue);
+    }
+
+    process_queue(args.to_owned(), pqueue, regex.to_owned())?;
 
     Ok(())
 }

@@ -34,6 +34,9 @@ pub struct InputFile {
     /// Options used will be applied to all in the directory.
     #[clap(short = 'r', long, requires = "mode")]
     pub recursive: bool,
+
+    #[clap(flatten)]
+    pub recursion: RecursiveOptions,
 }
 impl InputFile {
     pub fn single_path(&self) -> Result<Option<&str>> {
@@ -65,6 +68,14 @@ impl InputFile {
         }
         Ok(path)
     }
+}
+
+#[derive(Parser, Debug, Clone, PartialEq, Eq)]
+#[clap(next_help_heading = "RECURSION OPTIONS")]
+pub struct RecursiveOptions {
+    /// Encode *{_R1,_R2}* record pairs. Requires `--recursive`.
+    #[clap(short = 'R', long = "paired", requires = "recursive")]
+    pub paired: bool,
 }
 
 #[derive(Parser, Debug)]
