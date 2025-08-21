@@ -24,6 +24,14 @@ pub struct InputFile {
 
     #[clap(short = 'I', long, help = "Interleaved input file format")]
     pub interleaved: bool,
+
+    /// Apply encoding to all fasta/fastq files in the provided directory input.
+    ///
+    /// For R1/R2 encodings pair this with the `--paired` option.
+    ///
+    /// Options used will be applied to all in the directory.
+    #[clap(short = 'r', long)]
+    pub recursive: bool,
 }
 impl InputFile {
     pub fn single_path(&self) -> Result<Option<&str>> {
