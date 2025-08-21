@@ -483,7 +483,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
             handles.push(handle);
         }
 
-        for handle in handles.into_iter() {
+        for handle in handles {
             if let Err(err) = handle.join() {
                 eprintln!("Error in thread: {err:?}");
             }
