@@ -8,8 +8,7 @@ use binseq::{
     Policy,
 };
 use paraseq::parallel::{
-    InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor,
-    ProcessError,
+    InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor, ProcessError,
 };
 use parking_lot::Mutex;
 
@@ -119,7 +118,8 @@ impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.update_global_counters();
-        self.write_batch().map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        self.write_batch()
+            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
@@ -146,7 +146,8 @@ impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.update_global_counters();
-        self.write_batch().map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        self.write_batch()
+            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
@@ -173,7 +174,8 @@ impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.update_global_counters();
-        self.write_batch().map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        self.write_batch()
+            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
@@ -295,7 +297,8 @@ impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.update_global_counters();
-        self.write_batch().map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        self.write_batch()
+            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
@@ -338,7 +341,8 @@ impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.update_global_counters();
-        self.write_batch().map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        self.write_batch()
+            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
@@ -381,7 +385,8 @@ impl<W: Write + Send> PairedParallelProcessor for VBinseqProcessor<W> {
 
     fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
         self.update_global_counters();
-        self.write_batch().map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        self.write_batch()
+            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
