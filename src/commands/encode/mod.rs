@@ -34,7 +34,7 @@ fn encode_single(
     block_size: usize,
     batch_size: Option<usize>,
     policy: Policy,
-) -> Result<()> {
+) -> Result<(usize, usize)> {
     // build reader
     let mut reader = if let Some(size) = batch_size {
         Reader::from_optional_path_with_batch_size(in_path, size)
@@ -79,13 +79,7 @@ fn encode_single(
         (num_records, num_skipped)
     };
 
-    // print the summary
-    eprintln!("{num_records} records written");
-    if num_skipped > 0 {
-        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
-    }
-
-    Ok(())
+    Ok((num_records, num_skipped))
 }
 
 fn encode_single_htslib(
@@ -98,7 +92,7 @@ fn encode_single_htslib(
     block_size: usize,
     _batch_size: Option<usize>,
     policy: Policy,
-) -> Result<()> {
+) -> Result<(usize, usize)> {
     // build reader
     let reader = htslib::Reader::from_path(in_path)?;
 
@@ -135,13 +129,7 @@ fn encode_single_htslib(
         (num_records, num_skipped)
     };
 
-    // print the summary
-    eprintln!("{num_records} records written");
-    if num_skipped > 0 {
-        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
-    }
-
-    Ok(())
+    Ok((num_records, num_skipped))
 }
 
 fn encode_interleaved(
@@ -154,7 +142,7 @@ fn encode_interleaved(
     block_size: usize,
     batch_size: Option<usize>,
     policy: Policy,
-) -> Result<()> {
+) -> Result<(usize, usize)> {
     let mut reader = if let Some(size) = batch_size {
         Reader::from_optional_path_with_batch_size(in_path, size)
     } else {
@@ -198,13 +186,7 @@ fn encode_interleaved(
         (num_records, num_skipped)
     };
 
-    // print the summary
-    eprintln!("{num_records} records written");
-    if num_skipped > 0 {
-        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
-    }
-
-    Ok(())
+    Ok((num_records, num_skipped))
 }
 
 fn encode_interleaved_htslib(
@@ -217,7 +199,7 @@ fn encode_interleaved_htslib(
     block_size: usize,
     _batch_size: Option<usize>,
     policy: Policy,
-) -> Result<()> {
+) -> Result<(usize, usize)> {
     let reader = htslib::Reader::from_path(in_path)?;
 
     // Prepare the processor
@@ -253,13 +235,7 @@ fn encode_interleaved_htslib(
         (num_records, num_skipped)
     };
 
-    // print the summary
-    eprintln!("{num_records} records written");
-    if num_skipped > 0 {
-        eprintln!("{num_skipped} records skipped (invalid nucleotides)");
-    }
-
-    Ok(())
+    Ok((num_records, num_skipped))
 }
 
 fn encode_paired(
@@ -273,7 +249,7 @@ fn encode_paired(
     block_size: usize,
     batch_size: Option<usize>,
     policy: Policy,
-) -> Result<()> {
+) -> Result<(usize, usize)> {
     let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
         (
             Reader::from_path_with_batch_size(in_path1, size)?,
@@ -325,18 +301,12 @@ fn encode_paired(
         }
     };
 
-    // print the summary
-    eprintln!("{num_records} record pairs written");
-    if num_skipped > 0 {
-        eprintln!("{num_skipped} record pairs skipped (invalid nucleotides)");
-    }
-
-    Ok(())
+    Ok((num_records, num_skipped))
 }
 
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
-    if args.input.paired() {
+    let (num_records, num_skipped) = if args.input.paired() {
         let (in_path1, in_path2) = args.input.paired_paths()?;
         encode_paired(
             in_path1,
@@ -349,7 +319,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.block_size,
             args.input.batch_size,
             args.output.policy.into(),
-        )?;
+        )
     } else if args.input.interleaved {
         if let Some(FileFormat::Bam) = args.input.format {
             encode_interleaved_htslib(
@@ -364,7 +334,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.block_size,
                 args.input.batch_size,
                 args.output.policy.into(),
-            )?;
+            )
         } else {
             encode_interleaved(
                 args.input.single_path()?,
@@ -376,7 +346,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.block_size,
                 args.input.batch_size,
                 args.output.policy.into(),
-            )?;
+            )
         }
     } else if let Some(FileFormat::Bam) = args.input.format {
         encode_single_htslib(
@@ -391,7 +361,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.block_size,
             args.input.batch_size,
             args.output.policy.into(),
-        )?;
+        )
     } else {
         encode_single(
             args.input.single_path()?,
@@ -403,7 +373,16 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.block_size,
             args.input.batch_size,
             args.output.policy.into(),
-        )?;
+        )
+    }?;
+
+    if let Some(opath) = args.output.borrowed_path() {
+        eprintln!("Wrote {} records to {}", num_records, opath)
+    } else {
+        eprintln!("Wrote {} records", num_records)
+    }
+    if num_skipped > 0 {
+        eprintln!("Skipped {} records", num_skipped)
     }
 
     if args.output.index
