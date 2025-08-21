@@ -12,7 +12,10 @@ use walkdir::WalkDir;
 
 use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
-    commands::{encode::utils::get_sequence_len_htslib, utils::match_output},
+    commands::{
+        encode::utils::{get_sequence_len_htslib, pair_r1_r2_files},
+        utils::match_output,
+    },
 };
 
 mod processor;
@@ -539,38 +542,11 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     }
     fqueue.sort_unstable();
 
-    let mut pqueue = Vec::new();
-    if args.input.recursion.paired {
-        let mut idx = 0;
-        while idx < fqueue.len() - 1 {
-            let r1 = &fqueue[idx];
-            let r2 = &fqueue[idx + 1];
-
-            // validate that the R1/R2 filenames match
-            let r1_sub = regex.replace(r1.to_str().unwrap(), "");
-            let r2_sub = regex.replace(r2.to_str().unwrap(), "");
-
-            if r1_sub == r2_sub {
-                idx += 2;
-            } else {
-                // eprintln!(
-                //     "Found a mismatched pair: {} and {}",
-                //     r1.display(),
-                //     r2.display()
-                // );
-                // eprintln!("Skipping pair");
-                idx += 1;
-                continue;
-            }
-
-            // println!("Processing pair: {} and {}", r1.display(), r2.display());
-            pqueue.push(vec![r1.to_owned(), r2.to_owned()]);
-        }
+    let pqueue = if args.input.recursion.paired {
+        pair_r1_r2_files(&fqueue)?
     } else {
-        for f in fqueue {
-            pqueue.push(vec![f.clone()]);
-        }
-    }
+        fqueue.into_iter().map(|f| vec![f]).collect()
+    };
 
     if pqueue.is_empty() {
         bail!("No files found matching the expected pattern.");

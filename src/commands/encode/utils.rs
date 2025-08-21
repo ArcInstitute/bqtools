@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{collections::HashMap, io::Read, path::PathBuf};
 
 use anyhow::{bail, Result};
 use paraseq::{
@@ -6,6 +6,7 @@ use paraseq::{
     rust_htslib::{self, bam::Read as BamRead},
     Record,
 };
+use regex::Regex;
 
 type BoxReader = Box<dyn Read + Send>;
 
@@ -66,4 +67,60 @@ pub fn get_interleaved_sequence_len(reader: &mut fastx::Reader<BoxReader>) -> Re
     };
     reader.reload(&mut rset)?;
     Ok((slen as u32, xlen as u32))
+}
+
+/// Pairs R1/R2 files from a list of file paths efficiently using a HashMap
+/// Returns a vector of pairs, where each pair is [R1_file, R2_file]
+pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
+    let pair_regex = Regex::new(r"^(.+)_R([12])(_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$")?;
+
+    // HashMap to store files by their pairing key (base + suffix)
+    let mut r1_files: HashMap<String, PathBuf> = HashMap::new();
+    let mut r2_files: HashMap<String, PathBuf> = HashMap::new();
+
+    // Single pass through files to categorize them
+    for file in files {
+        let file_str = file.to_str().unwrap();
+
+        if let Some(caps) = pair_regex.captures(file_str) {
+            let base = &caps[1];
+            let read_num = &caps[2];
+            let suffix = caps.get(3).map_or("", |m| m.as_str());
+
+            // Create a unique key for pairing: base + suffix
+            let pair_key = format!("{}{}", base, suffix);
+
+            match read_num {
+                "1" => {
+                    r1_files.insert(pair_key, file.clone());
+                }
+                "2" => {
+                    r2_files.insert(pair_key, file.clone());
+                }
+                _ => unreachable!(), // regex only matches 1 or 2
+            }
+        }
+    }
+
+    // Create pairs by finding matching keys
+    let mut pairs = Vec::new();
+    for (pair_key, r1_file) in &r1_files {
+        if let Some(r2_file) = r2_files.get(pair_key) {
+            pairs.push(vec![r1_file.to_owned(), r2_file.to_owned()]);
+        } else {
+            eprintln!("Warning: No R2 pair found for {}", r1_file.display());
+        }
+    }
+
+    // Check for orphaned R2 files
+    for (pair_key, r2_file) in &r2_files {
+        if !r1_files.contains_key(pair_key) {
+            eprintln!("Warning: No R1 pair found for {}", r2_file.display());
+        }
+    }
+
+    // Sort pairs by R1 filename for consistent output
+    pairs.sort_by(|a, b| a[0].cmp(&b[0]));
+
+    Ok(pairs)
 }
