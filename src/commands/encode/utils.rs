@@ -69,8 +69,8 @@ pub fn get_interleaved_sequence_len(reader: &mut fastx::Reader<BoxReader>) -> Re
     Ok((slen as u32, xlen as u32))
 }
 
-/// Pairs R1/R2 files from a list of file paths efficiently using a HashMap
-/// Returns a vector of pairs, where each pair is [R1_file, R2_file]
+/// Pairs R1/R2 files from a list of file paths efficiently using a `HashMap`
+/// Returns a vector of pairs, where each pair is [`R1_file`, `R2_file`]
 pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
     let pair_regex = Regex::new(r"^(.+)_R([12])(_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$")?;
 
@@ -88,7 +88,7 @@ pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
             let suffix = caps.get(3).map_or("", |m| m.as_str());
 
             // Create a unique key for pairing: base + suffix
-            let pair_key = format!("{}{}", base, suffix);
+            let pair_key = format!("{base}{suffix}");
 
             match read_num {
                 "1" => {
@@ -148,7 +148,7 @@ pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Res
             if let Some(caps) = pair_regex.captures(input_path) {
                 let base = &caps[1];
                 let suffix = caps.get(2).map_or("", |m| m.as_str());
-                let output_name = format!("{}{}{}", base, suffix, new_extension);
+                let output_name = format!("{base}{suffix}{new_extension}");
                 Ok(output_name)
             } else {
                 // Fallback: use the first file's name with extension replaced
