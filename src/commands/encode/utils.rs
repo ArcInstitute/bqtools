@@ -125,6 +125,44 @@ pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
     Ok(pairs)
 }
 
+/// Generates a unique output filename based on the input file(s)
+/// For single files: removes the original extension and replaces with new extension
+/// For paired files: extracts the base name + suffix (everything except _R[12]) and adds new extension
+pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Result<String> {
+    match input_files.len() {
+        1 => {
+            // Single file: just replace the extension
+            let input_path = input_files[0].to_str().unwrap();
+            let extension_regex = Regex::new(r"\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$")?;
+            let output_name = extension_regex
+                .replace(input_path, new_extension)
+                .to_string();
+            Ok(output_name)
+        }
+        2 => {
+            // Paired files: extract base name + suffix, excluding _R[12]
+            let input_path = input_files[0].to_str().unwrap();
+            let pair_regex =
+                Regex::new(r"^(.+)_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$")?;
+
+            if let Some(caps) = pair_regex.captures(input_path) {
+                let base = &caps[1];
+                let suffix = caps.get(2).map_or("", |m| m.as_str());
+                let output_name = format!("{}{}{}", base, suffix, new_extension);
+                Ok(output_name)
+            } else {
+                // Fallback: use the first file's name with extension replaced
+                let extension_regex = Regex::new(r"\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$")?;
+                let output_name = extension_regex
+                    .replace(input_path, new_extension)
+                    .to_string();
+                Ok(output_name)
+            }
+        }
+        _ => bail!("Invalid number of input files: {}", input_files.len()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,5 +231,69 @@ mod tests {
 
         let pairs = pair_r1_r2_files(&files).unwrap();
         assert_eq!(pairs.len(), 10000);
+    }
+
+    #[test]
+    fn test_generate_output_name_single_file() {
+        let files = vec![PathBuf::from("sample_001.fastq")];
+        let output = generate_output_name(&files, ".encoded").unwrap();
+        assert_eq!(output, "sample_001.encoded");
+    }
+
+    #[test]
+    fn test_generate_output_name_single_file_compressed() {
+        let files = vec![PathBuf::from("sample_001.fastq.gz")];
+        let output = generate_output_name(&files, ".encoded").unwrap();
+        assert_eq!(output, "sample_001.encoded");
+    }
+
+    #[test]
+    fn test_generate_output_name_paired_files() {
+        let files = vec![
+            PathBuf::from("sample_001_R1.fastq"),
+            PathBuf::from("sample_001_R2.fastq"),
+        ];
+        let output = generate_output_name(&files, ".encoded").unwrap();
+        assert_eq!(output, "sample_001.encoded");
+    }
+
+    #[test]
+    fn test_generate_output_name_paired_files_with_suffix() {
+        let files = vec![
+            PathBuf::from("library_A_R1_lane1.fastq"),
+            PathBuf::from("library_A_R2_lane1.fastq"),
+        ];
+        let output = generate_output_name(&files, ".encoded").unwrap();
+        assert_eq!(output, "library_A_lane1.encoded");
+    }
+
+    #[test]
+    fn test_generate_output_name_paired_files_complex_suffix() {
+        let files = vec![
+            PathBuf::from("sample_0_R1_001.fq.gz"),
+            PathBuf::from("sample_0_R2_001.fq.gz"),
+        ];
+        let output = generate_output_name(&files, ".encoded").unwrap();
+        assert_eq!(output, "sample_0_001.encoded");
+    }
+
+    #[test]
+    fn test_generate_output_name_different_lane_numbers() {
+        // This test shows that different lanes get different output names
+        let files1 = vec![
+            PathBuf::from("library_A_R1_lane1.fastq"),
+            PathBuf::from("library_A_R2_lane1.fastq"),
+        ];
+        let files2 = vec![
+            PathBuf::from("library_A_R1_lane2.fastq"),
+            PathBuf::from("library_A_R2_lane2.fastq"),
+        ];
+
+        let output1 = generate_output_name(&files1, ".encoded").unwrap();
+        let output2 = generate_output_name(&files2, ".encoded").unwrap();
+
+        assert_eq!(output1, "library_A_lane1.encoded");
+        assert_eq!(output2, "library_A_lane2.encoded");
+        assert_ne!(output1, output2); // Ensure they're different
     }
 }

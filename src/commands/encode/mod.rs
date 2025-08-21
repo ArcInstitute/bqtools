@@ -13,7 +13,7 @@ use walkdir::WalkDir;
 use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
     commands::{
-        encode::utils::{get_sequence_len_htslib, pair_r1_r2_files},
+        encode::utils::{generate_output_name, get_sequence_len_htslib, pair_r1_r2_files},
         utils::match_output,
     },
 };
@@ -468,9 +468,8 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                             .iter()
                             .map(|path| path.to_str().unwrap().to_string())
                             .collect();
-                        let outpath = thread_regex
-                            .replace_all(&inpaths[0], mode.extension())
-                            .to_string();
+                        let outpath = generate_output_name(&pair, mode.extension())?;
+
                         file_args.input.input = inpaths;
                         file_args.output.output = Some(outpath);
                         file_args.output.threads = threads_for_this_file;
@@ -554,7 +553,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
 
     if args.input.recursion.paired {
         eprintln!("Total file pairs found: {}", pqueue.len());
-        // eprintln!("Pairs: {:?}", pqueue);
+        eprintln!("Pairs: {:#?}", pqueue);
     } else {
         eprintln!("Total files found: {}", pqueue.len());
         // eprintln!("Files: {:?}", pqueue);
