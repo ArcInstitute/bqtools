@@ -511,7 +511,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     let dir = args.input.as_directory()?;
 
     let regex_str = if args.input.recursion.paired {
-        r".R[12].?\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
+        r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
     } else {
         r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
     };
