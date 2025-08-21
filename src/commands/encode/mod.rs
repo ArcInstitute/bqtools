@@ -553,7 +553,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
 
     if args.input.recursion.paired {
         eprintln!("Total file pairs found: {}", pqueue.len());
-        eprintln!("Pairs: {:#?}", pqueue);
+        // eprintln!("Pairs: {:#?}", pqueue);
     } else {
         eprintln!("Total files found: {}", pqueue.len());
         // eprintln!("Files: {:?}", pqueue);
