@@ -420,14 +420,36 @@ fn process_queue(args: EncodeCommand, queue: Vec<PathBuf>, regex: Regex) -> Resu
 
     // Case where there are more threads than files
     if queue.len() <= num_threads {
-        let threads_per_file = (num_threads / queue.len()).max(1);
-        eprintln!("Using {} threads per file", threads_per_file);
+        let base_threads_per_file = num_threads / queue.len();
+        let leftover_threads = num_threads % queue.len();
+
+        eprintln!(
+            "Distributing {} threads across {} files",
+            num_threads,
+            queue.len()
+        );
+        if leftover_threads > 0 {
+            eprintln!(
+                "Base threads per file: {}, extra threads for first {} file(s)",
+                base_threads_per_file, leftover_threads
+            );
+        } else {
+            eprintln!("Threads per file: {}", base_threads_per_file);
+        }
 
         let mut handles = vec![];
-        for file in queue {
+        for (i, file) in queue.into_iter().enumerate() {
             let thread_args = args.clone();
             let thread_regex = regex.clone();
             let mode = args.output.mode()?;
+
+            // First `leftover_threads` files get one extra thread
+            let threads_for_this_file = if i < leftover_threads {
+                base_threads_per_file + 1
+            } else {
+                base_threads_per_file
+            };
+
             let handle = std::thread::spawn(move || -> Result<()> {
                 let mut file_args = thread_args.clone();
                 let inpath = file.to_str().unwrap().to_string();
@@ -436,7 +458,7 @@ fn process_queue(args: EncodeCommand, queue: Vec<PathBuf>, regex: Regex) -> Resu
                     .to_string();
                 file_args.input.input = vec![inpath];
                 file_args.output.output = Some(outpath);
-                file_args.output.threads = threads_per_file;
+                file_args.output.threads = threads_for_this_file;
                 run_atomic(&file_args)?;
                 Ok(())
             });
