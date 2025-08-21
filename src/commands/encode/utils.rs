@@ -124,3 +124,74 @@ pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
 
     Ok(pairs)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_pair_r1_r2_files_sequential() {
+        let files = vec![
+            PathBuf::from("sample_0_R1_001.fq"),
+            PathBuf::from("sample_0_R2_001.fq"),
+            PathBuf::from("sample_1_R1.fastq"),
+            PathBuf::from("sample_1_R2.fastq"),
+        ];
+
+        let pairs = pair_r1_r2_files(&files).unwrap();
+        assert_eq!(pairs.len(), 2);
+
+        assert_eq!(pairs[0][0], PathBuf::from("sample_0_R1_001.fq"));
+        assert_eq!(pairs[0][1], PathBuf::from("sample_0_R2_001.fq"));
+
+        assert_eq!(pairs[1][0], PathBuf::from("sample_1_R1.fastq"));
+        assert_eq!(pairs[1][1], PathBuf::from("sample_1_R2.fastq"));
+    }
+
+    #[test]
+    fn test_pair_r1_r2_files_non_sequential() {
+        // This is the key test case you mentioned
+        let files = vec![
+            PathBuf::from("library_A_R1_lane1.fastq"),
+            PathBuf::from("library_A_R1_lane2.fastq"),
+            PathBuf::from("library_A_R2_lane1.fastq"),
+            PathBuf::from("library_A_R2_lane2.fastq"),
+        ];
+
+        let pairs = pair_r1_r2_files(&files).unwrap();
+        assert_eq!(pairs.len(), 2);
+
+        // Should pair lane1 with lane1, lane2 with lane2
+        assert_eq!(pairs[0][0], PathBuf::from("library_A_R1_lane1.fastq"));
+        assert_eq!(pairs[0][1], PathBuf::from("library_A_R2_lane1.fastq"));
+
+        assert_eq!(pairs[1][0], PathBuf::from("library_A_R1_lane2.fastq"));
+        assert_eq!(pairs[1][1], PathBuf::from("library_A_R2_lane2.fastq"));
+    }
+
+    #[test]
+    fn test_pair_r1_r2_files_missing_pairs() {
+        let files = vec![
+            PathBuf::from("sample_1_R1.fastq"),
+            PathBuf::from("sample_2_R2.fastq"), // Missing R1
+            PathBuf::from("sample_3_R1.fastq"), // Missing R2
+        ];
+
+        let pairs = pair_r1_r2_files(&files).unwrap();
+        assert_eq!(pairs.len(), 0); // No complete pairs
+    }
+
+    #[test]
+    fn test_large_file_list_performance() {
+        // Generate a large list to ensure O(n) performance
+        let mut files = Vec::new();
+        for i in 0..10000 {
+            files.push(PathBuf::from(format!("sample_{:04}_R1_lane1.fastq", i)));
+            files.push(PathBuf::from(format!("sample_{:04}_R2_lane1.fastq", i)));
+        }
+
+        let pairs = pair_r1_r2_files(&files).unwrap();
+        assert_eq!(pairs.len(), 10000);
+    }
+}
