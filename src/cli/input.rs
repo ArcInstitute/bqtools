@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{bail, Result};
 use clap::Parser;
 
@@ -24,6 +26,17 @@ pub struct InputFile {
 
     #[clap(short = 'I', long, help = "Interleaved input file format")]
     pub interleaved: bool,
+
+    /// Apply encoding to all fasta/fastq files in the provided directory input.
+    ///
+    /// For R1/R2 encodings pair this with the `--paired` option.
+    ///
+    /// Options used will be applied to all in the directory.
+    #[clap(short = 'r', long, requires = "mode")]
+    pub recursive: bool,
+
+    #[clap(flatten)]
+    pub recursion: RecursiveOptions,
 }
 impl InputFile {
     pub fn single_path(&self) -> Result<Option<&str>> {
@@ -44,6 +57,29 @@ impl InputFile {
     pub fn paired(&self) -> bool {
         self.input.len() == 2
     }
+
+    pub fn as_directory(&self) -> Result<PathBuf> {
+        if !self.recursive {
+            bail!("Recursive mode is required to process a directory.");
+        }
+        let path = PathBuf::from(&self.input[0]);
+        if !path.is_dir() {
+            bail!("Input path is not a directory: {}", path.display());
+        }
+        Ok(path)
+    }
+}
+
+#[derive(Parser, Debug, Clone, PartialEq, Eq)]
+#[clap(next_help_heading = "RECURSION OPTIONS")]
+pub struct RecursiveOptions {
+    /// Encode *{_R1,_R2}* record pairs. Requires `--recursive`.
+    #[clap(short = 'R', long = "paired", requires = "recursive")]
+    pub paired: bool,
+
+    /// Maximum depth in the directory tree to process. Leaving this option empty will set no limit.
+    #[clap(long, requires = "recursive")]
+    pub depth: Option<usize>,
 }
 
 #[derive(Parser, Debug)]

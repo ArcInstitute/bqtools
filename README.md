@@ -114,6 +114,26 @@ Available policies for handling non-ATCG nucleotides:
 - `g`: Set all Ns to G
 - `t`: Set all Ns to T
 
+#### Recursive Encoding
+
+You might have a directory or nested subdirectories with multiple FASTX files or FASTX file pairs.
+
+`bqtools` makes use of the efficient [`walkdir`](https://crates.io/crates/walkdir) crate to recursively identify all FASTX files with various compression formats.
+It will then balance the provided file/file pairs among the thread pool to ensure efficient parallel encoding.
+
+All options provided by `bqtools encode` will be passed through to the sub-encoders.
+
+```bash
+# Encode all FASTX files as BQ
+bqtools encode --recursive --mode bq ./
+
+# Encode all paired FASTX files as VBQ and index their output
+bqtools encode --recursive --paired --mode vbq --index ./
+
+# Encode recursively with a max-subdirectory depth of 2
+bqtools encode --recursive --mode bq --depth 2 ./
+```
+
 ### Decoding
 
 Convert BINSEQ files back to FASTA/FASTQ/TSV:
