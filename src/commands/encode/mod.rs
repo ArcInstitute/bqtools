@@ -327,7 +327,8 @@ fn encode_paired(
     Ok(())
 }
 
-pub fn run(args: &EncodeCommand) -> Result<()> {
+/// Run the encoding process for an atomic single/paired input
+fn run_atomic(args: &EncodeCommand) -> Result<()> {
     if args.input.paired() {
         let (in_path1, in_path2) = args.input.paired_paths()?;
         encode_paired(
@@ -408,4 +409,12 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn run(args: &EncodeCommand) -> Result<()> {
+    if args.input.recursive {
+        unimplemented!("Recursive encoding is not implemented yet!");
+    } else {
+        run_atomic(args)
+    }
 }
