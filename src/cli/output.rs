@@ -8,7 +8,7 @@ use crate::{
     commands::{compress_passthrough, match_output, CompressionType},
 };
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "OUTPUT FILE OPTIONS")]
 pub struct OutputFile {
     #[clap(short = 'o', long, help = "Output file [default: stdout]")]
@@ -138,7 +138,12 @@ pub enum Mate {
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 #[allow(clippy::struct_excessive_bools)]
 pub struct OutputBinseq {
-    #[clap(short = 'o', long, required_unless_present = "pipe")]
+    #[clap(
+        short = 'o',
+        long,
+        required_unless_present = "pipe",
+        required_unless_present = "recursive"
+    )]
     /// Output binseq file
     ///
     /// To output to stdout, use the `-P/--pipe` flag.
@@ -293,6 +298,12 @@ impl BinseqMode {
             }
         } else {
             bail!("Could not determine BINSEQ output mode from path: {path}")
+        }
+    }
+    pub fn extension(&self) -> &str {
+        match self {
+            Self::Binseq => ".bq",
+            Self::VBinseq => ".vbq",
         }
     }
 }
