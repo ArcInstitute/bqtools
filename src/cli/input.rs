@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{bail, Result};
 use clap::Parser;
 
@@ -30,7 +32,7 @@ pub struct InputFile {
     /// For R1/R2 encodings pair this with the `--paired` option.
     ///
     /// Options used will be applied to all in the directory.
-    #[clap(short = 'r', long)]
+    #[clap(short = 'r', long, requires = "mode")]
     pub recursive: bool,
 }
 impl InputFile {
@@ -51,6 +53,17 @@ impl InputFile {
 
     pub fn paired(&self) -> bool {
         self.input.len() == 2
+    }
+
+    pub fn as_directory(&self) -> Result<PathBuf> {
+        if !self.recursive {
+            bail!("Recursive mode is required to process a directory.");
+        }
+        let path = PathBuf::from(&self.input[0]);
+        if !path.is_dir() {
+            bail!("Input path is not a directory: {}", path.display());
+        }
+        Ok(path)
     }
 }
 

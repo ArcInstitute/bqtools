@@ -5,6 +5,8 @@ use paraseq::{
     htslib,
     prelude::*,
 };
+use regex::Regex;
+use walkdir::WalkDir;
 
 use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
@@ -411,9 +413,42 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
     Ok(())
 }
 
+fn run_recursive(args: &EncodeCommand) -> Result<()> {
+    let dir = args.input.as_directory()?;
+
+    let restr = r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$";
+    let regex = Regex::new(restr)?;
+
+    let mut queue = vec![];
+    eprintln!("Processing files in directory: {}", dir.display());
+    for entry in WalkDir::new(dir).into_iter() {
+        let entry = entry?;
+        let path = entry.path();
+        let path_str = path.as_os_str().to_str().unwrap();
+        if path.is_file() && regex.is_match(path_str) {
+            queue.push(path.to_owned());
+        }
+    }
+
+    eprintln!("Total files found: {}", queue.len());
+    eprintln!("Files: {:?}", queue);
+
+    for file in queue {
+        let mut file_args = args.clone();
+        let inpath = file.to_str().unwrap().to_string();
+        let outpath = regex
+            .replace_all(&inpath, args.output.mode()?.extension())
+            .to_string();
+        file_args.input.input = vec![inpath];
+        file_args.output.output = Some(outpath);
+        run_atomic(&file_args)?;
+    }
+    Ok(())
+}
+
 pub fn run(args: &EncodeCommand) -> Result<()> {
     if args.input.recursive {
-        unimplemented!("Recursive encoding is not implemented yet!");
+        run_recursive(args)
     } else {
         run_atomic(args)
     }
