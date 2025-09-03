@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.3.28"
+version = "0.3.29"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
@@ -26,6 +26,8 @@ rand = "0.9.0"
 regex = "1.11.1"
 zstd = { version = "0.13.2", features = ["zstdmt"] }
 walkdir = "2.5.0"
+env_logger = "0.11.8"
+log = "0.4.28"
 
 [dev-dependencies]
 bon = "3.6.3"

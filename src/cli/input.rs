@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Parser;
+use log::debug;
 use paraseq::fastx;
 
 use crate::types::BoxedReader;
@@ -107,9 +108,19 @@ fn load_simple_reader(
     path: Option<&str>,
     batch_size: Option<usize>,
 ) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    let path_display = if let Some(path) = path {
+        path.to_string()
+    } else {
+        "stdin".to_string()
+    };
     if let Some(size) = batch_size {
+        debug!(
+            "building on-disk fastx reader with batch size {} from: {}",
+            size, path_display
+        );
         fastx::Reader::from_optional_path_with_batch_size(path, size)
     } else {
+        debug!("building on-disk fastx reader from: {}", path_display);
         fastx::Reader::from_optional_path(path)
     }
 }
@@ -119,8 +130,13 @@ fn load_gcs_reader(
     batch_size: Option<usize>,
 ) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
     if let Some(size) = batch_size {
+        debug!(
+            "building GCS fastx reader with batch size {} from: {}",
+            size, path
+        );
         fastx::Reader::from_gcs_with_batch_size(path, size)
     } else {
+        debug!("building GCS fastx reader from: {}", path);
         fastx::Reader::from_gcs(path)
     }
 }

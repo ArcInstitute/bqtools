@@ -1,6 +1,7 @@
 use std::{collections::HashMap, io::Read, path::PathBuf};
 
 use anyhow::{bail, Result};
+use log::warn;
 use paraseq::{
     fastx,
     rust_htslib::{self, bam::Read as BamRead},
@@ -108,14 +109,14 @@ pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
         if let Some(r2_file) = r2_files.get(pair_key) {
             pairs.push(vec![r1_file.to_owned(), r2_file.to_owned()]);
         } else {
-            eprintln!("Warning: No R2 pair found for {}", r1_file.display());
+            warn!("No R2 pair found for {} (skipping)", r1_file.display());
         }
     }
 
     // Check for orphaned R2 files
     for (pair_key, r2_file) in &r2_files {
         if !r1_files.contains_key(pair_key) {
-            eprintln!("Warning: No R1 pair found for {}", r2_file.display());
+            warn!("No R1 pair found for {} (skipping)", r2_file.display());
         }
     }
 
@@ -161,6 +162,26 @@ pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Res
         }
         _ => bail!("Invalid number of input files: {}", input_files.len()),
     }
+}
+
+pub fn pull_single_files(input_files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
+    let mut num_suspect = 0;
+    let pair_regex = Regex::new(r".+_R[12].+")?;
+    let mut pqueue = Vec::new();
+    for file in input_files {
+        let file_str = file.to_str().unwrap();
+        if pair_regex.is_match(file_str) {
+            num_suspect += 1;
+        }
+        pqueue.push(vec![file.to_owned()])
+    }
+    if num_suspect > 0 {
+        warn!(
+            "Found {} files that may be paired but are not. If this is not intentional, consider adding the `--paired` flag.",
+            num_suspect
+        );
+    }
+    Ok(pqueue)
 }
 
 #[cfg(test)]

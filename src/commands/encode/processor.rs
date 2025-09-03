@@ -7,6 +7,7 @@ use binseq::{
     vbq::{VBinseqHeader, VBinseqWriter, VBinseqWriterBuilder},
     Policy,
 };
+use log::trace;
 use paraseq::parallel::{
     InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor, ProcessError,
 };
@@ -14,6 +15,9 @@ use parking_lot::Mutex;
 
 /// Default capacity for the buffer used by the processor.
 const DEFAULT_CAPACITY: usize = 128 * 1024;
+
+/// Default debug interval for logging progress
+const DEBUG_INTERVAL: usize = 1024;
 
 pub struct BinseqProcessor<W: Write + Send> {
     /* Thread-local fields */
@@ -30,6 +34,8 @@ pub struct BinseqProcessor<W: Write + Send> {
     global_record_count: Arc<Mutex<usize>>,
     /// Global counter for records skipped by all threads
     global_skipped_count: Arc<Mutex<usize>>,
+    /// Debug interval for logging progress
+    debug_interval: Arc<Mutex<usize>>,
 }
 
 impl<W: Write + Send> BinseqProcessor<W> {
@@ -52,6 +58,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
             skipped_count: 0,
             global_record_count: Arc::new(Mutex::new(0)),
             global_skipped_count: Arc::new(Mutex::new(0)),
+            debug_interval: Arc::new(Mutex::new(0)),
         })
     }
 
@@ -73,8 +80,12 @@ impl<W: Write + Send> BinseqProcessor<W> {
     fn update_global_counters(&mut self) {
         *self.global_record_count.lock() += self.record_count;
         *self.global_skipped_count.lock() += self.skipped_count;
+        *self.debug_interval.lock() += 1;
         self.record_count = 0;
         self.skipped_count = 0;
+        if *self.debug_interval.lock() % DEBUG_INTERVAL == 0 {
+            trace!("Processed {} records", self.global_record_count.lock());
+        }
     }
 
     /// Get global number of records processed
@@ -96,6 +107,7 @@ impl<W: Write + Send> Clone for BinseqProcessor<W> {
             skipped_count: self.skipped_count,
             global_record_count: self.global_record_count.clone(),
             global_skipped_count: self.global_skipped_count.clone(),
+            debug_interval: self.debug_interval.clone(),
         }
     }
 }
