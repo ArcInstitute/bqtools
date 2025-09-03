@@ -51,7 +51,37 @@ pub struct GrepArgs {
     /// Only count matches
     #[clap(short = 'C', long)]
     pub count: bool,
+
+    /// Colorize output (auto, always, never)
+    #[clap(
+        long,
+        value_name = "WHEN",
+        default_value = "auto",
+        conflicts_with = "format"
+    )]
+    pub color: ColorWhen,
 }
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+pub enum ColorWhen {
+    Auto,
+    Always,
+    Never,
+}
+
+impl ColorWhen {
+    pub fn should_color(&self) -> bool {
+        match self {
+            ColorWhen::Always => true,
+            ColorWhen::Never => false,
+            ColorWhen::Auto => {
+                use is_terminal::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
+        }
+    }
+}
+
 impl GrepArgs {
     pub fn validate(&self) -> Result<()> {
         if self.pat1.is_empty()
