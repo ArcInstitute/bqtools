@@ -74,28 +74,45 @@ impl InputFile {
 
     pub fn build_single_reader(&self) -> Result<fastx::Reader<BoxedReader>> {
         let path = self.single_path()?;
-        let reader = if let Some(path) = path {
-            if path.starts_with("gs://") {
-                if let Some(size) = self.batch_size {
-                    fastx::Reader::from_gcs_with_batch_size(path, size)
-                } else {
-                    fastx::Reader::from_gcs(path)
-                }
-            } else {
-                if let Some(size) = self.batch_size {
-                    fastx::Reader::from_path_with_batch_size(path, size)
-                } else {
-                    fastx::Reader::from_path(path)
-                }
-            }
-        } else {
-            if let Some(size) = self.batch_size {
-                fastx::Reader::from_optional_path_with_batch_size(path, size)
-            } else {
-                fastx::Reader::from_optional_path(path)
-            }
-        }?;
+        let reader = load_reader(path, self.batch_size)?;
         Ok(reader)
+    }
+}
+
+fn load_reader(
+    path: Option<&str>,
+    batch_size: Option<usize>,
+) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    if let Some(path) = path {
+        if path.starts_with("gs://") {
+            load_gcs_reader(path, batch_size)
+        } else {
+            load_simple_reader(Some(path), batch_size)
+        }
+    } else {
+        load_simple_reader(None, batch_size)
+    }
+}
+
+fn load_simple_reader(
+    path: Option<&str>,
+    batch_size: Option<usize>,
+) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    if let Some(size) = batch_size {
+        fastx::Reader::from_optional_path_with_batch_size(path, size)
+    } else {
+        fastx::Reader::from_optional_path(path)
+    }
+}
+
+fn load_gcs_reader(
+    path: &str,
+    batch_size: Option<usize>,
+) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    if let Some(size) = batch_size {
+        fastx::Reader::from_gcs_with_batch_size(path, size)
+    } else {
+        fastx::Reader::from_gcs(path)
     }
 }
 
