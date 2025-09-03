@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
 use paraseq::{
-    fastx::{self, Format, Reader},
+    fastx::{self, Format},
     htslib,
     prelude::*,
 };
@@ -224,26 +224,16 @@ fn encode_interleaved_htslib(
 }
 
 fn encode_paired(
-    in_path1: &str,
-    in_path2: &str,
+    mut reader_r1: fastx::Reader<BoxedReader>,
+    mut reader_r2: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
     mode: BinseqMode,
     num_threads: usize,
     compress: bool,
     quality: bool,
     block_size: usize,
-    batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
-    let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
-        (
-            Reader::from_path_with_batch_size(in_path1, size)?,
-            Reader::from_path_with_batch_size(in_path2, size)?,
-        )
-    } else {
-        (Reader::from_path(in_path1)?, Reader::from_path(in_path2)?)
-    };
-
     // Prepare the output handle
     let out_handle = match_output(out_path)?;
 
@@ -292,17 +282,16 @@ fn encode_paired(
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
     let (num_records, num_skipped) = if args.input.paired() {
-        let (in_path1, in_path2) = args.input.paired_paths()?;
+        let (rdr1, rdr2) = args.input.build_paired_readers()?;
         encode_paired(
-            in_path1,
-            in_path2,
+            rdr1,
+            rdr2,
             args.output.borrowed_path(),
             args.output.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
             args.output.block_size,
-            args.input.batch_size,
             args.output.policy.into(),
         )
     } else if args.input.interleaved {

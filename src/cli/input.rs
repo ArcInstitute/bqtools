@@ -77,6 +77,15 @@ impl InputFile {
         let reader = load_reader(path, self.batch_size)?;
         Ok(reader)
     }
+
+    pub fn build_paired_readers(
+        &self,
+    ) -> Result<(fastx::Reader<BoxedReader>, fastx::Reader<BoxedReader>)> {
+        let (path1, path2) = self.paired_paths()?;
+        let reader1 = load_reader(Some(path1), self.batch_size)?;
+        let reader2 = load_reader(Some(path2), self.batch_size)?;
+        Ok((reader1, reader2))
+    }
 }
 
 fn load_reader(
