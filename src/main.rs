@@ -4,10 +4,11 @@ mod cli;
 mod commands;
 mod types;
 
+use cli::{Cli, Commands};
+
 use anyhow::Result;
 use clap::Parser;
-
-use cli::{Cli, Commands};
+use log::debug;
 
 #[cfg(unix)]
 fn reset_sigpipe() {
@@ -25,7 +26,15 @@ fn main() -> Result<()> {
     // Handle Ctrl+C gracefully
     reset_sigpipe();
 
+    env_logger::builder()
+        .format_timestamp_millis()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_env("BQTOOLS_LOG")
+        .init();
+
     let args = Cli::parse();
+
+    debug!("init");
     match args.command {
         Commands::Encode(ref encode) => commands::encode::run(encode),
         Commands::Decode(ref decode) => commands::decode::run(decode),
@@ -34,5 +43,7 @@ fn main() -> Result<()> {
         Commands::Index(ref index) => commands::index::run(index),
         Commands::Grep(ref grep) => commands::grep::run(grep),
         Commands::Sample(ref sample) => commands::sample::run(sample),
-    }
+    }?;
+    debug!("done");
+    Ok(())
 }
