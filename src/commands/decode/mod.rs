@@ -33,12 +33,15 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
             Ok(split)
         }
     } else {
-        match args.mate {
-            Mate::One | Mate::Two => {
-                warn!("Ignoring mate as single channel in file");
+        if !paired {
+            match args.mate {
+                Mate::One | Mate::Two => {
+                    warn!("Ignoring `--mate/-m` flag as only single channel found in file");
+                }
+                Mate::Both => {}
             }
-            Mate::Both => {}
         }
+
         // Interleaved writer
         let writer = args.as_writer()?;
         let split = SplitWriter::new_interleaved(writer);
