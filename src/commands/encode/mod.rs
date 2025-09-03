@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
 use paraseq::{
-    fastx::{Format, Reader},
+    fastx::{self, Format},
     htslib,
     prelude::*,
 };
@@ -16,6 +16,7 @@ use crate::{
         encode::utils::{generate_output_name, get_sequence_len_htslib, pair_r1_r2_files},
         utils::match_output,
     },
+    types::BoxedReader,
 };
 
 mod processor;
@@ -25,23 +26,15 @@ use processor::{BinseqProcessor, VBinseqProcessor};
 use utils::{get_interleaved_sequence_len, get_sequence_len};
 
 fn encode_single(
-    in_path: Option<&str>,
+    mut reader: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
     mode: BinseqMode,
     num_threads: usize,
     compress: bool,
     quality: bool,
     block_size: usize,
-    batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
-    // build reader
-    let mut reader = if let Some(size) = batch_size {
-        Reader::from_optional_path_with_batch_size(in_path, size)
-    } else {
-        Reader::from_optional_path(in_path)
-    }?;
-
     // build writer
     let out_handle = match_output(out_path)?;
 
@@ -90,7 +83,6 @@ fn encode_single_htslib(
     compress: bool,
     quality: bool,
     block_size: usize,
-    _batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
     // build reader
@@ -133,22 +125,15 @@ fn encode_single_htslib(
 }
 
 fn encode_interleaved(
-    in_path: Option<&str>,
+    mut reader: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
     mode: BinseqMode,
     num_threads: usize,
     compress: bool,
     quality: bool,
     block_size: usize,
-    batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
-    let mut reader = if let Some(size) = batch_size {
-        Reader::from_optional_path_with_batch_size(in_path, size)
-    } else {
-        Reader::from_optional_path(in_path)
-    }?;
-
     // Prepare the processor
     let out_handle = match_output(out_path)?;
 
@@ -239,26 +224,16 @@ fn encode_interleaved_htslib(
 }
 
 fn encode_paired(
-    in_path1: &str,
-    in_path2: &str,
+    mut reader_r1: fastx::Reader<BoxedReader>,
+    mut reader_r2: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
     mode: BinseqMode,
     num_threads: usize,
     compress: bool,
     quality: bool,
     block_size: usize,
-    batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
-    let (mut reader_r1, mut reader_r2) = if let Some(size) = batch_size {
-        (
-            Reader::from_path_with_batch_size(in_path1, size)?,
-            Reader::from_path_with_batch_size(in_path2, size)?,
-        )
-    } else {
-        (Reader::from_path(in_path1)?, Reader::from_path(in_path2)?)
-    };
-
     // Prepare the output handle
     let out_handle = match_output(out_path)?;
 
@@ -307,17 +282,16 @@ fn encode_paired(
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
     let (num_records, num_skipped) = if args.input.paired() {
-        let (in_path1, in_path2) = args.input.paired_paths()?;
+        let (rdr1, rdr2) = args.input.build_paired_readers()?;
         encode_paired(
-            in_path1,
-            in_path2,
+            rdr1,
+            rdr2,
             args.output.borrowed_path(),
             args.output.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
             args.output.block_size,
-            args.input.batch_size,
             args.output.policy.into(),
         )
     } else if args.input.interleaved {
@@ -337,14 +311,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             )
         } else {
             encode_interleaved(
-                args.input.single_path()?,
+                args.input.build_single_reader()?,
                 args.output.borrowed_path(),
                 args.output.mode()?,
                 args.output.threads(),
                 args.output.compress(),
                 args.output.quality(),
                 args.output.block_size,
-                args.input.batch_size,
                 args.output.policy.into(),
             )
         }
@@ -359,19 +332,17 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.compress(),
             args.output.quality(),
             args.output.block_size,
-            args.input.batch_size,
             args.output.policy.into(),
         )
     } else {
         encode_single(
-            args.input.single_path()?,
+            args.input.build_single_reader()?,
             args.output.borrowed_path(),
             args.output.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
             args.output.block_size,
-            args.input.batch_size,
             args.output.policy.into(),
         )
     }?;

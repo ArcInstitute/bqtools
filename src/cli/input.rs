@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Parser;
+use paraseq::fastx;
+
+use crate::types::BoxedReader;
 
 use super::{BinseqMode, FileFormat};
 
@@ -67,6 +70,58 @@ impl InputFile {
             bail!("Input path is not a directory: {}", path.display());
         }
         Ok(path)
+    }
+
+    pub fn build_single_reader(&self) -> Result<fastx::Reader<BoxedReader>> {
+        let path = self.single_path()?;
+        let reader = load_reader(path, self.batch_size)?;
+        Ok(reader)
+    }
+
+    pub fn build_paired_readers(
+        &self,
+    ) -> Result<(fastx::Reader<BoxedReader>, fastx::Reader<BoxedReader>)> {
+        let (path1, path2) = self.paired_paths()?;
+        let reader1 = load_reader(Some(path1), self.batch_size)?;
+        let reader2 = load_reader(Some(path2), self.batch_size)?;
+        Ok((reader1, reader2))
+    }
+}
+
+fn load_reader(
+    path: Option<&str>,
+    batch_size: Option<usize>,
+) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    if let Some(path) = path {
+        if path.starts_with("gs://") {
+            load_gcs_reader(path, batch_size)
+        } else {
+            load_simple_reader(Some(path), batch_size)
+        }
+    } else {
+        load_simple_reader(None, batch_size)
+    }
+}
+
+fn load_simple_reader(
+    path: Option<&str>,
+    batch_size: Option<usize>,
+) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    if let Some(size) = batch_size {
+        fastx::Reader::from_optional_path_with_batch_size(path, size)
+    } else {
+        fastx::Reader::from_optional_path(path)
+    }
+}
+
+fn load_gcs_reader(
+    path: &str,
+    batch_size: Option<usize>,
+) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+    if let Some(size) = batch_size {
+        fastx::Reader::from_gcs_with_batch_size(path, size)
+    } else {
+        fastx::Reader::from_gcs(path)
     }
 }
 
