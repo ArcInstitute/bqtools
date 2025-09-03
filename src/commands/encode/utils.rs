@@ -109,14 +109,14 @@ pub fn pair_r1_r2_files(files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
         if let Some(r2_file) = r2_files.get(pair_key) {
             pairs.push(vec![r1_file.to_owned(), r2_file.to_owned()]);
         } else {
-            warn!("No R2 pair found for {}", r1_file.display());
+            warn!("No R2 pair found for {} (skipping)", r1_file.display());
         }
     }
 
     // Check for orphaned R2 files
     for (pair_key, r2_file) in &r2_files {
         if !r1_files.contains_key(pair_key) {
-            warn!("No R1 pair found for {}", r2_file.display());
+            warn!("No R1 pair found for {} (skipping)", r2_file.display());
         }
     }
 
