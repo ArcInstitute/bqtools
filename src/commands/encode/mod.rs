@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
 use paraseq::{
-    fastx::{Format, Reader},
+    fastx::{self, Format, Reader},
     htslib,
     prelude::*,
 };
@@ -16,6 +16,7 @@ use crate::{
         encode::utils::{generate_output_name, get_sequence_len_htslib, pair_r1_r2_files},
         utils::match_output,
     },
+    types::BoxedReader,
 };
 
 mod processor;
@@ -25,23 +26,15 @@ use processor::{BinseqProcessor, VBinseqProcessor};
 use utils::{get_interleaved_sequence_len, get_sequence_len};
 
 fn encode_single(
-    in_path: Option<&str>,
+    mut reader: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
     mode: BinseqMode,
     num_threads: usize,
     compress: bool,
     quality: bool,
     block_size: usize,
-    batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
-    // build reader
-    let mut reader = if let Some(size) = batch_size {
-        Reader::from_optional_path_with_batch_size(in_path, size)
-    } else {
-        Reader::from_optional_path(in_path)
-    }?;
-
     // build writer
     let out_handle = match_output(out_path)?;
 
@@ -364,14 +357,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         )
     } else {
         encode_single(
-            args.input.single_path()?,
+            args.input.build_single_reader()?,
             args.output.borrowed_path(),
             args.output.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
             args.output.block_size,
-            args.input.batch_size,
             args.output.policy.into(),
         )
     }?;

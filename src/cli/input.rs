@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Parser;
+use paraseq::fastx;
+
+use crate::types::BoxedReader;
 
 use super::{BinseqMode, FileFormat};
 
@@ -67,6 +70,32 @@ impl InputFile {
             bail!("Input path is not a directory: {}", path.display());
         }
         Ok(path)
+    }
+
+    pub fn build_single_reader(&self) -> Result<fastx::Reader<BoxedReader>> {
+        let path = self.single_path()?;
+        let reader = if let Some(path) = path {
+            if path.starts_with("gs://") {
+                if let Some(size) = self.batch_size {
+                    fastx::Reader::from_gcs_with_batch_size(path, size)
+                } else {
+                    fastx::Reader::from_gcs(path)
+                }
+            } else {
+                if let Some(size) = self.batch_size {
+                    fastx::Reader::from_path_with_batch_size(path, size)
+                } else {
+                    fastx::Reader::from_path(path)
+                }
+            }
+        } else {
+            if let Some(size) = self.batch_size {
+                fastx::Reader::from_optional_path_with_batch_size(path, size)
+            } else {
+                fastx::Reader::from_optional_path(path)
+            }
+        }?;
+        Ok(reader)
     }
 }
 
