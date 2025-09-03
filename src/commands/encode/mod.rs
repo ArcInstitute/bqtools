@@ -354,9 +354,9 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
     }?;
 
     if let Some(opath) = args.output.borrowed_path() {
-        info!("Wrote {num_records} records to {opath}");
+        info!("Wrote {num_records} records to: {opath}");
     } else {
-        info!("Wrote {num_records} records");
+        info!("Wrote {num_records} records to: stdout");
     }
     if num_skipped > 0 {
         info!("Skipped {num_skipped} records");
