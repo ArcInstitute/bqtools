@@ -8,7 +8,7 @@ use cli::{Cli, Commands};
 
 use anyhow::Result;
 use clap::Parser;
-use log::debug;
+use log::trace;
 
 #[cfg(unix)]
 fn reset_sigpipe() {
@@ -34,7 +34,7 @@ fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    debug!("init");
+    trace!("init");
     match args.command {
         Commands::Encode(ref encode) => commands::encode::run(encode),
         Commands::Decode(ref decode) => commands::decode::run(decode),
@@ -44,6 +44,6 @@ fn main() -> Result<()> {
         Commands::Grep(ref grep) => commands::grep::run(grep),
         Commands::Sample(ref sample) => commands::sample::run(sample),
     }?;
-    debug!("done");
+    trace!("done");
     Ok(())
 }

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
-use log::{debug, info};
+use log::{debug, error, info, trace};
 use paraseq::{
     fastx::{self, Format},
     htslib,
@@ -40,17 +40,17 @@ fn encode_single(
     let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        debug!("converting to bq");
+        trace!("converting to bq");
 
         // Determine the sequence length
         let slen = get_sequence_len(&mut reader)?;
-        debug!("sequence length: {}", slen);
+        trace!("sequence length: {}", slen);
 
         let header = BinseqHeader::new(slen);
         let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel(processor.clone(), num_threads)?;
 
         // Update the number of records
@@ -59,17 +59,17 @@ fn encode_single(
 
         (num_records, num_skipped)
     } else {
-        debug!("converting to vbq");
+        trace!("converting to vbq");
         let quality = match reader.format() {
             Format::Fastq => quality,
             Format::Fasta => false, // never record fasta quality
         };
-        debug!("quality: {}", quality);
+        trace!("quality: {}", quality);
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, false);
         let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel(processor.clone(), num_threads)?;
         processor.finish()?;
 
@@ -100,17 +100,17 @@ fn encode_single_htslib(
     let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        debug!("converting to bq");
+        trace!("converting to bq");
 
         // Determine the sequence length
         let (slen, _) = get_sequence_len_htslib(in_path, false)?;
-        debug!("sequence length: {}", slen);
+        trace!("sequence length: {}", slen);
 
         let header = BinseqHeader::new(slen);
         let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel(processor.clone(), num_threads)?;
 
         // Update the number of records
@@ -119,12 +119,12 @@ fn encode_single_htslib(
 
         (num_records, num_skipped)
     } else {
-        debug!("converting to vbq");
+        trace!("converting to vbq");
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, false);
         let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel(processor.clone(), num_threads)?;
         processor.finish()?;
 
@@ -152,17 +152,17 @@ fn encode_interleaved(
     let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        debug!("converting to bq");
+        trace!("converting to bq");
 
         // Determine the sequence length
         let (slen, xlen) = get_interleaved_sequence_len(&mut reader)?;
-        debug!("sequence length: slen={}, xlen={}", slen, xlen);
+        trace!("sequence length: slen={}, xlen={}", slen, xlen);
 
         let header = BinseqHeader::new_extended(slen, xlen);
         let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
 
         // Update the number of records
@@ -171,17 +171,17 @@ fn encode_interleaved(
 
         (num_records, num_skipped)
     } else {
-        debug!("converting to vbq");
+        trace!("converting to vbq");
         let quality = match reader.format() {
             Format::Fastq => quality,
             Format::Fasta => false, // never record quality for fasta
         };
-        debug!("quality: {}", quality);
+        trace!("quality: {}", quality);
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
         let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
         processor.finish()?;
 
@@ -212,17 +212,17 @@ fn encode_interleaved_htslib(
     let out_handle = match_output(out_path)?;
 
     let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        debug!("converting to bq");
+        trace!("converting to bq");
 
         // Determine the sequence length
         let (slen, xlen) = get_sequence_len_htslib(in_path, true)?;
-        debug!("sequence length: {}, xlen: {}", slen, xlen);
+        trace!("sequence length: {}, xlen: {}", slen, xlen);
 
         let header = BinseqHeader::new_extended(slen, xlen);
         let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
 
         // Update the number of records
@@ -231,12 +231,12 @@ fn encode_interleaved_htslib(
 
         (num_records, num_skipped)
     } else {
-        debug!("converting to vbq");
+        trace!("converting to vbq");
         let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
         let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
         // Process the records in parallel
-        debug!("processing records in parallel (T={})", num_threads);
+        trace!("processing records in parallel (T={})", num_threads);
         reader.process_parallel_interleaved(processor.clone(), num_threads)?;
         processor.finish()?;
 
@@ -266,19 +266,19 @@ fn encode_paired(
 
     let (num_records, num_skipped) = match mode {
         BinseqMode::Binseq => {
-            debug!("converting to bq");
+            trace!("converting to bq");
 
             // Determine the sequence length
             let slen = get_sequence_len(&mut reader_r1)?;
             let xlen = get_sequence_len(&mut reader_r2)?;
-            debug!("sequence length: slen={}, xlen={}", slen, xlen);
+            trace!("sequence length: slen={}, xlen={}", slen, xlen);
 
             // Prepare the output HEADER
             let header = BinseqHeader::new_extended(slen, xlen);
             let processor = BinseqProcessor::new(header, policy, out_handle)?;
 
             // Process the records in parallel
-            debug!("processing records in parallel (T={})", num_threads);
+            trace!("processing records in parallel (T={})", num_threads);
             reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
 
             // Update the number of records
@@ -288,19 +288,19 @@ fn encode_paired(
             (num_records, num_skipped)
         }
         BinseqMode::VBinseq => {
-            debug!("converting to vbq");
+            trace!("converting to vbq");
 
             let quality = match reader_r1.format() {
                 Format::Fastq => quality,
                 Format::Fasta => false, // never record quality for fasta
             };
-            debug!("quality: {}", quality);
+            trace!("quality: {}", quality);
 
             let header = VBinseqHeader::with_capacity(block_size as u64, quality, compress, true);
             let processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
             // Process the records in parallel
-            debug!("processing records in parallel (T={})", num_threads);
+            trace!("processing records in parallel (T={})", num_threads);
             reader_r1.process_parallel_paired(reader_r2, processor.clone(), num_threads)?;
             processor.finish()?;
 
@@ -318,7 +318,7 @@ fn encode_paired(
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
     let (num_records, num_skipped) = if args.input.paired() {
-        debug!("launching paired encoding");
+        trace!("launching paired encoding");
         let (rdr1, rdr2) = args.input.build_paired_readers()?;
         encode_paired(
             rdr1,
@@ -333,7 +333,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         )
     } else if args.input.interleaved {
         if let Some(FileFormat::Bam) = args.input.format {
-            debug!("launching interleaved encoding (htslib)");
+            trace!("launching interleaved encoding (htslib)");
             encode_interleaved_htslib(
                 args.input
                     .single_path()?
@@ -348,7 +348,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.policy.into(),
             )
         } else {
-            debug!("launching interleaved encoding (fastx)");
+            trace!("launching interleaved encoding (fastx)");
             encode_interleaved(
                 args.input.build_single_reader()?,
                 args.output.borrowed_path(),
@@ -361,7 +361,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             )
         }
     } else if let Some(FileFormat::Bam) = args.input.format {
-        debug!("launching single encoding (htslib)");
+        trace!("launching single encoding (htslib)");
         encode_single_htslib(
             args.input
                 .single_path()?
@@ -375,7 +375,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.policy.into(),
         )
     } else {
-        debug!("launching single encoding (fastx)");
+        trace!("launching single encoding (fastx)");
         encode_single(
             args.input.build_single_reader()?,
             args.output.borrowed_path(),
@@ -415,17 +415,17 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
         let base_threads_per_file = num_threads / queue.len();
         let leftover_threads = num_threads % queue.len();
 
-        eprintln!(
+        info!(
             "Distributing {} threads across {} files",
             num_threads,
             queue.len()
         );
         if leftover_threads > 0 {
-            eprintln!(
+            debug!(
                 "Base threads per file: {base_threads_per_file}, extra threads for first {leftover_threads} file(s)"
             );
         } else {
-            eprintln!("Threads per file: {base_threads_per_file}");
+            debug!("Threads per file: {base_threads_per_file}");
         }
 
         let mut handles = vec![];
@@ -478,7 +478,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
 
         for handle in handles {
             if let Err(err) = handle.join() {
-                eprintln!("Error in thread: {err:?}");
+                error!("Error in thread: {err:?}");
             }
         }
 
@@ -512,7 +512,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     let regex = Regex::new(regex_str)?;
 
     let mut fqueue = vec![];
-    eprintln!("Processing files in directory: {}", dir.display());
+    info!("Processing files in directory: {}", dir.display());
 
     let dir_walker = if let Some(max_depth) = args.input.recursion.depth {
         WalkDir::new(dir).max_depth(max_depth)
@@ -543,11 +543,9 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     }
 
     if args.input.recursion.paired {
-        eprintln!("Total file pairs found: {}", pqueue.len());
-        // eprintln!("Pairs: {:#?}", pqueue);
+        info!("Total file pairs found: {}", pqueue.len());
     } else {
-        eprintln!("Total files found: {}", pqueue.len());
-        // eprintln!("Files: {:?}", pqueue);
+        info!("Total files found: {}", pqueue.len());
     }
 
     process_queue(&args, pqueue, &regex)?;
@@ -557,10 +555,10 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
 
 pub fn run(args: &EncodeCommand) -> Result<()> {
     if args.input.recursive {
-        debug!("launching encode-recursive");
+        trace!("launching encode-recursive");
         run_recursive(args)
     } else {
-        debug!("launching encode-atomic");
+        trace!("launching encode-atomic");
         run_atomic(args)
     }
 }

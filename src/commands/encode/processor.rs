@@ -7,7 +7,7 @@ use binseq::{
     vbq::{VBinseqHeader, VBinseqWriter, VBinseqWriterBuilder},
     Policy,
 };
-use log::debug;
+use log::trace;
 use paraseq::parallel::{
     InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor, ProcessError,
 };
@@ -84,7 +84,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
         self.record_count = 0;
         self.skipped_count = 0;
         if *self.debug_interval.lock() % DEBUG_INTERVAL == 0 {
-            debug!("Processed {} records", self.global_record_count.lock());
+            trace!("Processed {} records", self.global_record_count.lock());
         }
     }
 
