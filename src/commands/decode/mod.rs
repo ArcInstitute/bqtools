@@ -3,12 +3,13 @@ use std::io::Write;
 mod decode_binseq;
 mod utils;
 
-use anyhow::{bail, Result};
-use binseq::prelude::*;
+use crate::cli::{DecodeCommand, Mate, OutputFile};
 use decode_binseq::Decoder;
 pub use utils::{write_record_pair, SplitWriter};
 
-use crate::cli::{DecodeCommand, Mate, OutputFile};
+use anyhow::{bail, Result};
+use binseq::prelude::*;
+use log::{info, warn};
 
 /// Convenience type wrapper
 pub type Writer = Box<dyn Write + Send>;
@@ -34,7 +35,7 @@ pub fn build_writer(args: &OutputFile, paired: bool) -> Result<SplitWriter> {
     } else {
         match args.mate {
             Mate::One | Mate::Two => {
-                eprintln!("Warning: Ignoring mate as single channel in file");
+                warn!("Ignoring mate as single channel in file");
             }
             Mate::Both => {}
         }
@@ -57,6 +58,6 @@ pub fn run(args: &DecodeCommand) -> Result<()> {
     let proc = Decoder::new(writer, format, mate);
     reader.process_parallel(proc.clone(), args.output.threads())?;
     let num_records = proc.num_records();
-    eprintln!("Processed {num_records} records...");
+    info!("Processed {num_records} records...");
     Ok(())
 }
