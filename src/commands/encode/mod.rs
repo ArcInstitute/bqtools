@@ -83,7 +83,6 @@ fn encode_single_htslib(
     compress: bool,
     quality: bool,
     block_size: usize,
-    _batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
     // build reader
@@ -352,7 +351,6 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.compress(),
             args.output.quality(),
             args.output.block_size,
-            args.input.batch_size,
             args.output.policy.into(),
         )
     } else {
