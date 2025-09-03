@@ -14,7 +14,9 @@ use walkdir::WalkDir;
 use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
     commands::{
-        encode::utils::{generate_output_name, get_sequence_len_htslib, pair_r1_r2_files},
+        encode::utils::{
+            generate_output_name, get_sequence_len_htslib, pair_r1_r2_files, pull_single_files,
+        },
         utils::match_output,
     },
     types::BoxedReader,
@@ -533,10 +535,10 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     fqueue.sort_unstable();
 
     let pqueue = if args.input.recursion.paired {
-        pair_r1_r2_files(&fqueue)?
+        pair_r1_r2_files(&fqueue)
     } else {
-        fqueue.into_iter().map(|f| vec![f]).collect()
-    };
+        pull_single_files(&fqueue)
+    }?;
 
     if pqueue.is_empty() {
         bail!("No files found matching the expected pattern.");
