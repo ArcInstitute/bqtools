@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 
     env_logger::builder()
         .format_timestamp_millis()
-        .filter_level(log::LevelFilter::Warn)
+        .filter_level(log::LevelFilter::Info)
         .parse_env("BQTOOLS_LOG")
         .init();
 

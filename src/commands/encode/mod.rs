@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use binseq::{bq::BinseqHeader, vbq::VBinseqHeader, Policy};
+use log::{debug, info};
 use paraseq::{
     fastx::{self, Format},
     htslib,
@@ -282,6 +283,7 @@ fn encode_paired(
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
     let (num_records, num_skipped) = if args.input.paired() {
+        debug!("launching paired encoding");
         let (rdr1, rdr2) = args.input.build_paired_readers()?;
         encode_paired(
             rdr1,
@@ -296,6 +298,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         )
     } else if args.input.interleaved {
         if let Some(FileFormat::Bam) = args.input.format {
+            debug!("launching interleaved encoding (htslib)");
             encode_interleaved_htslib(
                 args.input
                     .single_path()?
@@ -310,6 +313,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.policy.into(),
             )
         } else {
+            debug!("launching interleaved encoding (fastx)");
             encode_interleaved(
                 args.input.build_single_reader()?,
                 args.output.borrowed_path(),
@@ -322,6 +326,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             )
         }
     } else if let Some(FileFormat::Bam) = args.input.format {
+        debug!("launching single encoding (htslib)");
         encode_single_htslib(
             args.input
                 .single_path()?
@@ -335,6 +340,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.policy.into(),
         )
     } else {
+        debug!("launching single encoding (fastx)");
         encode_single(
             args.input.build_single_reader()?,
             args.output.borrowed_path(),
@@ -516,8 +522,10 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
 
 pub fn run(args: &EncodeCommand) -> Result<()> {
     if args.input.recursive {
+        debug!("launching encode-recursive");
         run_recursive(args)
     } else {
+        debug!("launching encode-atomic");
         run_atomic(args)
     }
 }
