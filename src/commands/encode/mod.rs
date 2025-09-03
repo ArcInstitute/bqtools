@@ -125,22 +125,15 @@ fn encode_single_htslib(
 }
 
 fn encode_interleaved(
-    in_path: Option<&str>,
+    mut reader: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
     mode: BinseqMode,
     num_threads: usize,
     compress: bool,
     quality: bool,
     block_size: usize,
-    batch_size: Option<usize>,
     policy: Policy,
 ) -> Result<(usize, usize)> {
-    let mut reader = if let Some(size) = batch_size {
-        Reader::from_optional_path_with_batch_size(in_path, size)
-    } else {
-        Reader::from_optional_path(in_path)
-    }?;
-
     // Prepare the processor
     let out_handle = match_output(out_path)?;
 
@@ -329,14 +322,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             )
         } else {
             encode_interleaved(
-                args.input.single_path()?,
+                args.input.build_single_reader()?,
                 args.output.borrowed_path(),
                 args.output.mode()?,
                 args.output.threads(),
                 args.output.compress(),
                 args.output.quality(),
                 args.output.block_size,
-                args.input.batch_size,
                 args.output.policy.into(),
             )
         }
