@@ -8,14 +8,11 @@ use std::{collections::HashSet, io::Write};
 const RESET: &[u8] = b"\x1b[0m";
 const RED_BOLD: &[u8] = b"\x1b[31;1m"; // Red + Bold
 
-fn write_colored_record<W: Write>(
+fn write_colored_sequence<W: Write>(
     writer: &mut W,
-    index: &[u8],
     buffer: &[u8],
     matches: &HashSet<(usize, usize)>,
 ) -> Result<()> {
-    writer.write_all(index)?;
-    writer.write_all(b"\t")?;
     if matches.is_empty() {
         writer.write_all(buffer)?;
     } else {
@@ -29,11 +26,9 @@ fn write_colored_record<W: Write>(
             }
 
             // write colored
-            {
-                writer.write_all(RED_BOLD)?;
-                writer.write_all(&buffer[start..end])?;
-                writer.write_all(RESET)?;
-            }
+            writer.write_all(RED_BOLD)?;
+            writer.write_all(&buffer[start..end])?;
+            writer.write_all(RESET)?;
 
             last_end = end;
         }
@@ -43,6 +38,18 @@ fn write_colored_record<W: Write>(
             writer.write_all(&buffer[last_end..])?;
         }
     }
+    Ok(())
+}
+
+fn write_colored_record<W: Write>(
+    writer: &mut W,
+    index: &[u8],
+    buffer: &[u8],
+    matches: &HashSet<(usize, usize)>,
+) -> Result<()> {
+    writer.write_all(index)?;
+    writer.write_all(b"\t")?;
+    write_colored_sequence(writer, buffer, matches)?;
     writer.write_all(b"\n")?;
     Ok(())
 }
