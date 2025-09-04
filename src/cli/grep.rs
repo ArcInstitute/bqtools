@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 
+use crate::cli::FileFormat;
+
 use super::{InputBinseq, OutputFile};
 
 /// Grep a BINSEQ file and output to FASTQ or FASTA.
@@ -14,6 +16,14 @@ pub struct GrepCommand {
 
     #[clap(flatten)]
     pub grep: GrepArgs,
+}
+impl GrepCommand {
+    pub fn should_color(&self) -> bool {
+        match self.output.format() {
+            Ok(FileFormat::Tsv) => self.grep.color.should_color(),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -45,27 +55,7 @@ pub struct GrepArgs {
         default_value = "auto",
         conflicts_with = "format"
     )]
-    pub color: ColorWhen,
-}
-
-#[derive(Clone, Debug, clap::ValueEnum)]
-pub enum ColorWhen {
-    Auto,
-    Always,
-    Never,
-}
-
-impl ColorWhen {
-    pub fn should_color(&self) -> bool {
-        match self {
-            ColorWhen::Always => true,
-            ColorWhen::Never => false,
-            ColorWhen::Auto => {
-                use is_terminal::IsTerminal;
-                std::io::stdout().is_terminal()
-            }
-        }
-    }
+    color: ColorWhen,
 }
 
 impl GrepArgs {
@@ -92,5 +82,25 @@ impl GrepArgs {
             .iter()
             .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"))
             .collect()
+    }
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+pub enum ColorWhen {
+    Auto,
+    Always,
+    Never,
+}
+
+impl ColorWhen {
+    pub fn should_color(&self) -> bool {
+        match self {
+            ColorWhen::Always => true,
+            ColorWhen::Never => false,
+            ColorWhen::Auto => {
+                use is_terminal::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
+        }
     }
 }
