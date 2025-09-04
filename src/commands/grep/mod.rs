@@ -203,9 +203,12 @@ impl ParallelProcessor for GrepProcessor {
                     self.mate,
                     index,
                     &self.sbuf,
+                    squal,
                     &self.xbuf,
+                    xqual,
                     &self.smatches,
                     &self.xmatches,
+                    self.format,
                 )
             } else {
                 write_record_pair(

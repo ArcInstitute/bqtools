@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::cli::Mate;
+use crate::cli::{FileFormat, Mate};
 
 use std::{collections::HashSet, io::Write};
 
@@ -41,7 +41,7 @@ fn write_colored_sequence<W: Write>(
     Ok(())
 }
 
-fn write_colored_record<W: Write>(
+fn write_colored_tsv<W: Write>(
     writer: &mut W,
     index: &[u8],
     buffer: &[u8],
@@ -54,23 +54,74 @@ fn write_colored_record<W: Write>(
     Ok(())
 }
 
+fn write_colored_fasta<W: Write>(
+    writer: &mut W,
+    index: &[u8],
+    buffer: &[u8],
+    matches: &HashSet<(usize, usize)>,
+) -> Result<()> {
+    writer.write_all(b">")?;
+    writer.write_all(index)?;
+    writer.write_all(b"\n")?;
+    write_colored_sequence(writer, buffer, matches)?;
+    writer.write_all(b"\n")?;
+    Ok(())
+}
+
+fn write_colored_fastq<W: Write>(
+    writer: &mut W,
+    index: &[u8],
+    buffer: &[u8],
+    quality: &[u8],
+    matches: &HashSet<(usize, usize)>,
+) -> Result<()> {
+    writer.write_all(b"@")?;
+    writer.write_all(index)?;
+    writer.write_all(b"\n")?;
+    write_colored_sequence(writer, buffer, matches)?;
+    writer.write_all(b"\n+\n")?;
+    write_colored_sequence(writer, quality, matches)?;
+    writer.write_all(b"\n")?;
+    Ok(())
+}
+
+fn write_colored_record<W: Write>(
+    writer: &mut W,
+    index: &[u8],
+    sequence: &[u8],
+    quality: &[u8],
+    matches: &HashSet<(usize, usize)>,
+    format: FileFormat,
+) -> Result<()> {
+    let qual_buf = &quality[..sequence.len()];
+    match format {
+        FileFormat::Tsv => write_colored_tsv(writer, index, sequence, matches),
+        FileFormat::Fasta => write_colored_fasta(writer, index, sequence, matches),
+        FileFormat::Fastq => write_colored_fastq(writer, index, sequence, qual_buf, matches),
+        _ => unimplemented!("Colored output is not supported for {}", format.extension()),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn write_colored_record_pair<W: Write>(
     writer: &mut W,
     mate: Option<Mate>,
     index: &[u8],
     sbuf: &[u8],
+    squal: &[u8],
     xbuf: &[u8],
+    xqual: &[u8],
     smatch: &HashSet<(usize, usize)>,
     xmatch: &HashSet<(usize, usize)>,
+    format: FileFormat,
 ) -> Result<()> {
     match mate {
         Some(Mate::Both) => {
-            write_colored_record(writer, index, sbuf, smatch)?;
-            write_colored_record(writer, index, xbuf, xmatch)?;
+            write_colored_record(writer, index, sbuf, squal, smatch, format)?;
+            write_colored_record(writer, index, xbuf, xqual, xmatch, format)?;
             Ok(())
         }
-        Some(Mate::One) | None => write_colored_record(writer, index, sbuf, smatch),
-        Some(Mate::Two) => write_colored_record(writer, index, xbuf, xmatch),
+        Some(Mate::One) | None => write_colored_record(writer, index, sbuf, squal, smatch, format),
+        Some(Mate::Two) => write_colored_record(writer, index, xbuf, xqual, xmatch, format),
     }
 }
