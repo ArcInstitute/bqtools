@@ -20,7 +20,11 @@ pub struct GrepCommand {
 impl GrepCommand {
     pub fn should_color(&self) -> bool {
         match self.output.format() {
-            Ok(FileFormat::Tsv) => self.grep.color.should_color(),
+            Ok(FileFormat::Tsv) => {
+                self.output.output.is_none()
+                    && self.output.prefix.is_none()
+                    && self.grep.color.should_color()
+            }
             _ => false,
         }
     }
