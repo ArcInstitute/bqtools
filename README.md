@@ -185,12 +185,12 @@ You can easily search for specific subsequences or regular expressions within BI
 # See full options list
 bqtools grep --help
 
+# Search for a specific regex in either sequence
+bqtools grep input.bq "ACGT[AC]TCCA"
+
 # Search for a specific subsequence (in primary sequence)
-bqtools grep input.bq -e "ATCG"
+bqtools grep input.bq -r "ATCG"
 
-# Search for a regular expression (in primary)
-bqtools grep input.bq -r "AT[CG]"
-
-# Search for both a subsequence (in extended sequence) and a regular expression (in either)
-bqtools grep input.bq -E "ATCG" -P "AT[CG]"
+# Search for a regular expression (in extended)
+bqtools grep input.bq -R "AT[CG]"
 ```
