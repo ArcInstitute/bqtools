@@ -3,21 +3,14 @@ use std::sync::Arc;
 use crate::cli::{FileFormat, GrepCommand, Mate};
 use anyhow::Result;
 use binseq::prelude::*;
-use memchr::memmem::Finder;
 use parking_lot::Mutex;
 
 use super::decode::{build_writer, write_record_pair, SplitWriter};
 
-type Patterns = Vec<Finder<'static>>;
 type Expressions = Vec<regex::bytes::Regex>;
 
 #[derive(Clone)]
 struct GrepProcessor {
-    /// Patterns to search for
-    mp1: Patterns, // in primary
-    mp2: Patterns, // in secondary
-    pat: Patterns, // in either
-
     /// Regex expressions to match on
     re1: Expressions, // in primary
     re2: Expressions, // in secondary
@@ -57,9 +50,6 @@ struct GrepProcessor {
 impl GrepProcessor {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        mp1: Patterns,
-        mp2: Patterns,
-        pat: Patterns,
         re1: Expressions,
         re2: Expressions,
         re: Expressions,
@@ -77,9 +67,6 @@ impl GrepProcessor {
             xbuf: Vec::new(),
             squal: Vec::new(),
             xqual: Vec::new(),
-            mp1,
-            mp2,
-            pat,
             re1,
             re2,
             re,
@@ -96,29 +83,6 @@ impl GrepProcessor {
     pub fn clear_buffers(&mut self) {
         self.sbuf.clear();
         self.xbuf.clear();
-    }
-
-    fn search_primary(&self) -> bool {
-        if self.mp1.is_empty() {
-            return true;
-        }
-        self.mp1.iter().all(|pat| pat.find(&self.sbuf).is_some())
-    }
-
-    fn search_secondary(&self) -> bool {
-        if self.mp2.is_empty() || self.xbuf.is_empty() {
-            return true;
-        }
-        self.mp2.iter().any(|pat| pat.find(&self.xbuf).is_some())
-    }
-
-    fn search_either(&self) -> bool {
-        if self.pat.is_empty() {
-            return true;
-        }
-        self.pat
-            .iter()
-            .any(|pat| pat.find(&self.sbuf).is_some() || pat.find(&self.xbuf).is_some())
     }
 
     fn regex_primary(&self) -> bool {
@@ -145,12 +109,7 @@ impl GrepProcessor {
     }
 
     pub fn pattern_match(&self) -> bool {
-        let pred = self.search_primary()
-            && self.search_secondary()
-            && self.search_either()
-            && self.regex_primary()
-            && self.regex_secondary()
-            && self.regex_either();
+        let pred = self.regex_primary() && self.regex_secondary() && self.regex_either();
         if self.invert {
             !pred
         } else {
@@ -262,9 +221,6 @@ pub fn run(args: &GrepCommand) -> Result<()> {
         None
     };
     let proc = GrepProcessor::new(
-        args.grep.bytes_mp1(),
-        args.grep.bytes_mp2(),
-        args.grep.bytes_pat(),
         args.grep.bytes_reg1(),
         args.grep.bytes_reg2(),
         args.grep.bytes_reg(),
