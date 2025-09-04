@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use memchr::memmem::Finder;
+
+use crate::cli::FileFormat;
 
 use super::{InputBinseq, OutputFile};
 
@@ -16,22 +17,22 @@ pub struct GrepCommand {
     #[clap(flatten)]
     pub grep: GrepArgs,
 }
+impl GrepCommand {
+    pub fn should_color(&self) -> bool {
+        match self.output.format() {
+            Ok(FileFormat::Bam) => false,
+            _ => {
+                self.output.output.is_none()
+                    && self.output.prefix.is_none()
+                    && self.grep.color.should_color()
+            }
+        }
+    }
+}
 
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "SEARCH OPTIONS")]
 pub struct GrepArgs {
-    /// Fixed string pattern to search for in primary sequence
-    #[clap(short = 'e', long)]
-    pub pat1: Vec<String>,
-
-    /// Fixed string pattern to search for in extended sequence
-    #[clap(short = 'E', long)]
-    pub pat2: Vec<String>,
-
-    /// Pattern to search for in either sequence
-    #[clap(short = 'F', long)]
-    pub pat: Vec<String>,
-
     /// Regex expression to search for in primary sequence
     #[clap(short = 'r', long)]
     pub reg1: Vec<String>,
@@ -41,7 +42,6 @@ pub struct GrepArgs {
     pub reg2: Vec<String>,
 
     /// Regex expression to search for in either sequence
-    #[clap(short = 'P', long)]
     pub reg: Vec<String>,
 
     /// Invert pattern criteria (like grep -v)
@@ -51,40 +51,23 @@ pub struct GrepArgs {
     /// Only count matches
     #[clap(short = 'C', long)]
     pub count: bool,
+
+    /// Colorize output (auto, always, never)
+    #[clap(
+        long,
+        value_name = "WHEN",
+        default_value = "auto",
+        conflicts_with = "format"
+    )]
+    color: ColorWhen,
 }
+
 impl GrepArgs {
     pub fn validate(&self) -> Result<()> {
-        if self.pat1.is_empty()
-            && self.pat2.is_empty()
-            && self.pat.is_empty()
-            && self.reg1.is_empty()
-            && self.reg2.is_empty()
-            && self.reg.is_empty()
-        {
+        if self.reg1.is_empty() && self.reg2.is_empty() && self.reg.is_empty() {
             anyhow::bail!("At least one pattern must be specified");
         }
         Ok(())
-    }
-    pub fn bytes_mp1(&self) -> Vec<Finder<'static>> {
-        self.pat1
-            .iter()
-            .map(|s| Finder::new(s.as_bytes()))
-            .map(Finder::into_owned)
-            .collect()
-    }
-    pub fn bytes_mp2(&self) -> Vec<Finder<'static>> {
-        self.pat2
-            .iter()
-            .map(|s| Finder::new(s.as_bytes()))
-            .map(Finder::into_owned)
-            .collect()
-    }
-    pub fn bytes_pat(&self) -> Vec<Finder<'static>> {
-        self.pat
-            .iter()
-            .map(|s| Finder::new(s.as_bytes()))
-            .map(Finder::into_owned)
-            .collect()
     }
     pub fn bytes_reg1(&self) -> Vec<regex::bytes::Regex> {
         self.reg1
@@ -103,5 +86,25 @@ impl GrepArgs {
             .iter()
             .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"))
             .collect()
+    }
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+pub enum ColorWhen {
+    Auto,
+    Always,
+    Never,
+}
+
+impl ColorWhen {
+    pub fn should_color(&self) -> bool {
+        match self {
+            ColorWhen::Always => true,
+            ColorWhen::Never => false,
+            ColorWhen::Auto => {
+                use is_terminal::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
+        }
     }
 }

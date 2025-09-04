@@ -1,23 +1,19 @@
-use std::sync::Arc;
-
-use crate::cli::{FileFormat, GrepCommand, Mate};
-use anyhow::Result;
-use binseq::prelude::*;
-use memchr::memmem::Finder;
-use parking_lot::Mutex;
+mod color;
 
 use super::decode::{build_writer, write_record_pair, SplitWriter};
+use crate::cli::{FileFormat, GrepCommand, Mate};
+use color::write_colored_record_pair;
 
-type Patterns = Vec<Finder<'static>>;
+use std::{collections::HashSet, sync::Arc};
+
+use anyhow::Result;
+use binseq::prelude::*;
+use parking_lot::Mutex;
+
 type Expressions = Vec<regex::bytes::Regex>;
 
 #[derive(Clone)]
 struct GrepProcessor {
-    /// Patterns to search for
-    mp1: Patterns, // in primary
-    mp2: Patterns, // in secondary
-    pat: Patterns, // in either
-
     /// Regex expressions to match on
     re1: Expressions, // in primary
     re2: Expressions, // in secondary
@@ -31,6 +27,10 @@ struct GrepProcessor {
 
     /// Local count
     local_count: usize,
+
+    /// Local primary/extended sequence match indices
+    smatches: HashSet<(usize, usize)>,
+    xmatches: HashSet<(usize, usize)>,
 
     /// Local write buffers
     mixed: Vec<u8>, // General purpose, interleaved or singlets
@@ -49,6 +49,7 @@ struct GrepProcessor {
     format: FileFormat,
     mate: Option<Mate>,
     is_split: bool,
+    color: bool,
 
     /// Global values
     global_writer: Arc<Mutex<SplitWriter>>,
@@ -57,9 +58,6 @@ struct GrepProcessor {
 impl GrepProcessor {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        mp1: Patterns,
-        mp2: Patterns,
-        pat: Patterns,
         re1: Expressions,
         re2: Expressions,
         re: Expressions,
@@ -68,6 +66,7 @@ impl GrepProcessor {
         writer: SplitWriter,
         format: FileFormat,
         mate: Option<Mate>,
+        color: bool,
     ) -> Self {
         Self {
             mixed: Vec::new(),
@@ -77,9 +76,8 @@ impl GrepProcessor {
             xbuf: Vec::new(),
             squal: Vec::new(),
             xqual: Vec::new(),
-            mp1,
-            mp2,
-            pat,
+            smatches: HashSet::new(),
+            xmatches: HashSet::new(),
             re1,
             re2,
             re,
@@ -87,6 +85,7 @@ impl GrepProcessor {
             count,
             format,
             mate,
+            color,
             is_split: writer.is_split(),
             global_writer: Arc::new(Mutex::new(writer)),
             local_count: 0,
@@ -96,61 +95,51 @@ impl GrepProcessor {
     pub fn clear_buffers(&mut self) {
         self.sbuf.clear();
         self.xbuf.clear();
+        self.smatches.clear();
+        self.xmatches.clear();
     }
 
-    fn search_primary(&self) -> bool {
-        if self.mp1.is_empty() {
-            return true;
-        }
-        self.mp1.iter().all(|pat| pat.find(&self.sbuf).is_some())
-    }
-
-    fn search_secondary(&self) -> bool {
-        if self.mp2.is_empty() || self.xbuf.is_empty() {
-            return true;
-        }
-        self.mp2.iter().any(|pat| pat.find(&self.xbuf).is_some())
-    }
-
-    fn search_either(&self) -> bool {
-        if self.pat.is_empty() {
-            return true;
-        }
-        self.pat
-            .iter()
-            .any(|pat| pat.find(&self.sbuf).is_some() || pat.find(&self.xbuf).is_some())
-    }
-
-    fn regex_primary(&self) -> bool {
+    fn regex_primary(&mut self) {
         if self.re1.is_empty() {
-            return true;
+            return;
         }
-        self.re1.iter().any(|re| re.find(&self.sbuf).is_some())
+        for reg in self.re1.iter() {
+            for index in reg.find_iter(&self.sbuf) {
+                self.smatches.insert((index.start(), index.end()));
+            }
+        }
     }
 
-    fn regex_secondary(&self) -> bool {
+    fn regex_secondary(&mut self) {
         if self.re2.is_empty() || self.xbuf.is_empty() {
-            return true;
+            return;
         }
-        self.re2.iter().any(|re| re.find(&self.xbuf).is_some())
+        for reg in self.re2.iter() {
+            for index in reg.find_iter(&self.xbuf) {
+                self.xmatches.insert((index.start(), index.end()));
+            }
+        }
     }
 
-    fn regex_either(&self) -> bool {
+    fn regex_either(&mut self) {
         if self.re.is_empty() {
-            return true;
+            return;
         }
-        self.re
-            .iter()
-            .any(|re| re.find(&self.sbuf).is_some() || re.find(&self.xbuf).is_some())
+        for reg in self.re.iter() {
+            for index in reg.find_iter(&self.sbuf) {
+                self.smatches.insert((index.start(), index.end()));
+            }
+            for index in reg.find_iter(&self.xbuf) {
+                self.xmatches.insert((index.start(), index.end()));
+            }
+        }
     }
 
-    pub fn pattern_match(&self) -> bool {
-        let pred = self.search_primary()
-            && self.search_secondary()
-            && self.search_either()
-            && self.regex_primary()
-            && self.regex_secondary()
-            && self.regex_either();
+    pub fn pattern_match(&mut self) -> bool {
+        self.regex_either();
+        self.regex_primary();
+        self.regex_secondary();
+        let pred = self.smatches.len() > 0 || self.xmatches.len() > 0;
         if self.invert {
             !pred
         } else {
@@ -208,19 +197,34 @@ impl ParallelProcessor for GrepProcessor {
                 &self.xqual
             };
 
-            write_record_pair(
-                &mut self.left,
-                &mut self.right,
-                &mut self.mixed,
-                self.mate,
-                self.is_split,
-                index,
-                &self.sbuf,
-                squal,
-                &self.xbuf,
-                xqual,
-                self.format,
-            )?;
+            if self.color {
+                write_colored_record_pair(
+                    &mut self.mixed,
+                    self.mate,
+                    index,
+                    &self.sbuf,
+                    squal,
+                    &self.xbuf,
+                    xqual,
+                    &self.smatches,
+                    &self.xmatches,
+                    self.format,
+                )
+            } else {
+                write_record_pair(
+                    &mut self.left,
+                    &mut self.right,
+                    &mut self.mixed,
+                    self.mate,
+                    self.is_split,
+                    index,
+                    &self.sbuf,
+                    squal,
+                    &self.xbuf,
+                    xqual,
+                    self.format,
+                )
+            }?;
         }
 
         Ok(())
@@ -262,9 +266,6 @@ pub fn run(args: &GrepCommand) -> Result<()> {
         None
     };
     let proc = GrepProcessor::new(
-        args.grep.bytes_mp1(),
-        args.grep.bytes_mp2(),
-        args.grep.bytes_pat(),
         args.grep.bytes_reg1(),
         args.grep.bytes_reg2(),
         args.grep.bytes_reg(),
@@ -273,6 +274,7 @@ pub fn run(args: &GrepCommand) -> Result<()> {
         writer,
         format,
         mate,
+        args.should_color(),
     );
     reader.process_parallel(proc.clone(), args.output.threads())?;
     if args.grep.count {
