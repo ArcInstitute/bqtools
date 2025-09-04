@@ -8,9 +8,7 @@ use binseq::{
     Policy,
 };
 use log::trace;
-use paraseq::parallel::{
-    InterleavedParallelProcessor, PairedParallelProcessor, ParallelProcessor, ProcessError,
-};
+use paraseq::{prelude::*, ProcessError};
 use parking_lot::Mutex;
 
 /// Default capacity for the buffer used by the processor.
@@ -112,12 +110,12 @@ impl<W: Write + Send> Clone for BinseqProcessor<W> {
     }
 }
 
-impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
-    fn process_record<Rf: paraseq::Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
+impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for BinseqProcessor<W> {
+    fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
         if self
             .writer
             .write_nucleotides(0, &record.seq())
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?
+            .map_err(IntoProcessError::into_process_error)?
         {
             self.record_count += 1;
         } else {
@@ -128,24 +126,20 @@ impl<W: Write + Send> ParallelProcessor for BinseqProcessor<W> {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+            .map_err(IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
 
-impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
-    fn process_interleaved_pair<Rf: paraseq::Record>(
-        &mut self,
-        record1: Rf,
-        record2: Rf,
-    ) -> paraseq::parallel::Result<()> {
+impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for BinseqProcessor<W> {
+    fn process_record_pair(&mut self, record1: Rf, record2: Rf) -> paraseq::Result<()> {
         if self
             .writer
             .write_paired(0, &record1.seq(), &record2.seq())
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?
+            .map_err(IntoProcessError::into_process_error)?
         {
             self.record_count += 1;
         } else {
@@ -156,38 +150,10 @@ impl<W: Write + Send> InterleavedParallelProcessor for BinseqProcessor<W> {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
-        Ok(())
-    }
-}
-
-impl<W: Write + Send> PairedParallelProcessor for BinseqProcessor<W> {
-    fn process_record_pair<Rf: paraseq::Record>(
-        &mut self,
-        record1: Rf,
-        record2: Rf,
-    ) -> paraseq::parallel::Result<()> {
-        if self
-            .writer
-            .write_paired(0, &record1.seq(), &record2.seq())
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?
-        {
-            self.record_count += 1;
-        } else {
-            self.skipped_count += 1;
-        }
-
-        // implicitly skip the record if encoding fails
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
-        self.update_global_counters();
-        self.write_batch()
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+            .map_err(IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
@@ -281,8 +247,8 @@ impl<W: Write + Send> Clone for VBinseqProcessor<W> {
     }
 }
 
-impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
-    fn process_record<Rf: paraseq::Record>(&mut self, record: Rf) -> paraseq::parallel::Result<()> {
+impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for VBinseqProcessor<W> {
+    fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
         if self.writer.is_paired() {
             return Err(ProcessError::from(anyhow!(
                 "Provided VBinseq Configuration is expecting paired records."
@@ -295,7 +261,7 @@ impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
         } else {
             self.writer.write_nucleotides(0, &record.seq())
         }
-        .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        .map_err(IntoProcessError::into_process_error)?;
 
         if write_status {
             self.record_count += 1;
@@ -307,20 +273,16 @@ impl<W: Write + Send> ParallelProcessor for VBinseqProcessor<W> {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+            .map_err(IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
 
-impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
-    fn process_interleaved_pair<Rf: paraseq::Record>(
-        &mut self,
-        record1: Rf,
-        record2: Rf,
-    ) -> paraseq::parallel::Result<()> {
+impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for VBinseqProcessor<W> {
+    fn process_record_pair(&mut self, record1: Rf, record2: Rf) -> paraseq::Result<()> {
         if !self.writer.is_paired() {
             return Err(ProcessError::from(anyhow!(
                 "Provided VBinseq Configuration does not expect paired records."
@@ -339,7 +301,7 @@ impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
             self.writer
                 .write_nucleotides_paired(0, &record1.seq(), &record2.seq())
         }
-        .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+        .map_err(IntoProcessError::into_process_error)?;
 
         if write_status {
             self.record_count += 1;
@@ -351,54 +313,10 @@ impl<W: Write + Send> InterleavedParallelProcessor for VBinseqProcessor<W> {
         Ok(())
     }
 
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
+    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
-        Ok(())
-    }
-}
-
-impl<W: Write + Send> PairedParallelProcessor for VBinseqProcessor<W> {
-    fn process_record_pair<Rf: paraseq::Record>(
-        &mut self,
-        record1: Rf,
-        record2: Rf,
-    ) -> paraseq::parallel::Result<()> {
-        if !self.writer.is_paired() {
-            return Err(ProcessError::from(anyhow!(
-                "Provided VBinseq Configuration does not expect paired records."
-            )));
-        }
-
-        let write_status = if self.writer.has_quality() {
-            self.writer.write_nucleotides_quality_paired(
-                0,
-                &record1.seq(),
-                &record2.seq(),
-                record1.qual().unwrap(),
-                record2.qual().unwrap(),
-            )
-        } else {
-            self.writer
-                .write_nucleotides_paired(0, &record1.seq(), &record2.seq())
-        }
-        .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
-
-        if write_status {
-            self.record_count += 1;
-        } else {
-            self.skipped_count += 1;
-        }
-
-        // implicitly skip the record if encoding fails
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> paraseq::parallel::Result<()> {
-        self.update_global_counters();
-        self.write_batch()
-            .map_err(paraseq::parallel::IntoProcessError::into_process_error)?;
+            .map_err(IntoProcessError::into_process_error)?;
         Ok(())
     }
 }
