@@ -11,7 +11,7 @@ pub fn write_fastq_parts<W: Write>(
     sequence: &[u8],
     quality: &[u8],
 ) -> std::io::Result<()> {
-    writer.write_all(b"@seq.")?;
+    writer.write_all(b"@")?;
     writer.write_all(index)?;
     writer.write_all(b"\n")?;
     writer.write_all(sequence)?;
@@ -26,7 +26,7 @@ pub fn write_fasta_parts<W: Write>(
     index: &[u8],
     sequence: &[u8],
 ) -> std::io::Result<()> {
-    writer.write_all(b">seq.")?;
+    writer.write_all(b">")?;
     writer.write_all(index)?;
     writer.write_all(b"\n")?;
     writer.write_all(sequence)?;
