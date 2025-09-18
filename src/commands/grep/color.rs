@@ -106,22 +106,25 @@ fn write_colored_record<W: Write>(
 pub fn write_colored_record_pair<W: Write>(
     writer: &mut W,
     mate: Option<Mate>,
-    index: &[u8],
     sbuf: &[u8],
     squal: &[u8],
+    sheader: &[u8],
     xbuf: &[u8],
     xqual: &[u8],
+    xheader: &[u8],
     smatch: &HashSet<(usize, usize)>,
     xmatch: &HashSet<(usize, usize)>,
     format: FileFormat,
 ) -> Result<()> {
     match mate {
         Some(Mate::Both) => {
-            write_colored_record(writer, index, sbuf, squal, smatch, format)?;
-            write_colored_record(writer, index, xbuf, xqual, xmatch, format)?;
+            write_colored_record(writer, sheader, sbuf, squal, smatch, format)?;
+            write_colored_record(writer, xheader, xbuf, xqual, xmatch, format)?;
             Ok(())
         }
-        Some(Mate::One) | None => write_colored_record(writer, index, sbuf, squal, smatch, format),
-        Some(Mate::Two) => write_colored_record(writer, index, xbuf, xqual, xmatch, format),
+        Some(Mate::One) | None => {
+            write_colored_record(writer, sheader, sbuf, squal, smatch, format)
+        }
+        Some(Mate::Two) => write_colored_record(writer, xheader, xbuf, xqual, xmatch, format),
     }
 }

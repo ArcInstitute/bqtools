@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
-use binseq::Policy;
+use binseq::{BitSize, Policy};
 use clap::{Parser, ValueEnum};
+use log::warn;
 use std::{io::Write, path::Path};
 
 use crate::{
@@ -157,6 +158,14 @@ pub struct OutputBinseq {
     #[clap(short = 'p', long, default_value = "r")]
     pub policy: PolicyWrapper,
 
+    /// Encoding bitsize (2 or 4 bits per nucleotide)
+    #[clap(short = 'S', long, default_value = "2")]
+    bitsize: u8,
+
+    /// Include sequence names (headers) in the vbq file
+    #[clap(short = 'H', long)]
+    pub headers: bool,
+
     /// Skip ZSTD compression of VBQ blocks (default: compressed)
     ///
     /// Only used by vbq.
@@ -174,12 +183,6 @@ pub struct OutputBinseq {
     /// Only used by vbq
     #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
     pub block_size: usize,
-
-    /// Index vbq after encoding
-    ///
-    /// Only used by vbq
-    #[clap(short = 'i', long)]
-    pub index: bool,
 
     /// Number of threads to use for parallel reading and writing.
     ///
@@ -231,6 +234,17 @@ impl OutputBinseq {
         match self.threads {
             0 => num_cpus::get(),
             n => n.min(num_cpus::get()),
+        }
+    }
+
+    pub fn bitsize(&self) -> BitSize {
+        match self.bitsize {
+            2 => BitSize::Two,
+            4 => BitSize::Four,
+            _ => {
+                warn!("Invalid provided bitsize - defaulting to 2");
+                BitSize::Two
+            }
         }
     }
 }

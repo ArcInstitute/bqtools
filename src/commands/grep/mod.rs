@@ -45,6 +45,10 @@ struct GrepProcessor {
     squal: Vec<u8>,
     xqual: Vec<u8>,
 
+    /// Header buffers
+    sheader: Vec<u8>,
+    xheader: Vec<u8>,
+
     /// Write Options
     format: FileFormat,
     mate: Option<Mate>,
@@ -76,6 +80,8 @@ impl GrepProcessor {
             xbuf: Vec::new(),
             squal: Vec::new(),
             xqual: Vec::new(),
+            sheader: Vec::new(),
+            xheader: Vec::new(),
             smatches: HashSet::new(),
             xmatches: HashSet::new(),
             re1,
@@ -157,8 +163,10 @@ impl ParallelProcessor for GrepProcessor {
 
         // Decode sequences
         record.decode_s(&mut self.sbuf)?;
+        record.sheader(&mut self.sheader);
         if record.is_paired() {
             record.decode_x(&mut self.xbuf)?;
+            record.xheader(&mut self.xheader);
         }
 
         if self.pattern_match() {
@@ -167,10 +175,6 @@ impl ParallelProcessor for GrepProcessor {
                 // No further processing needed
                 return Ok(());
             }
-
-            // decode index
-            let mut ibuf = itoa::Buffer::new();
-            let index = ibuf.format(record.index()).as_bytes();
 
             let squal = if record.has_quality() {
                 record.squal()
@@ -201,11 +205,12 @@ impl ParallelProcessor for GrepProcessor {
                 write_colored_record_pair(
                     &mut self.mixed,
                     self.mate,
-                    index,
                     &self.sbuf,
                     squal,
+                    &self.sheader,
                     &self.xbuf,
                     xqual,
+                    &self.xheader,
                     &self.smatches,
                     &self.xmatches,
                     self.format,
@@ -217,11 +222,12 @@ impl ParallelProcessor for GrepProcessor {
                     &mut self.mixed,
                     self.mate,
                     self.is_split,
-                    index,
                     &self.sbuf,
                     squal,
+                    &self.sheader,
                     &self.xbuf,
                     xqual,
+                    &self.xheader,
                     self.format,
                 )
             }?;

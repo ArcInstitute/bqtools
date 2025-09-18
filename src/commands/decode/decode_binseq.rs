@@ -25,6 +25,10 @@ pub struct Decoder {
     squal: Vec<u8>,
     /// Quality buffer (extended)
     xqual: Vec<u8>,
+    /// Header buffer (primary)
+    sheader: Vec<u8>,
+    /// Header buffer (extended)
+    xheader: Vec<u8>,
 
     /// Options
     format: FileFormat,
@@ -47,6 +51,8 @@ impl Decoder {
             local_count: 0,
             squal: Vec::new(),
             xqual: Vec::new(),
+            sheader: Vec::new(),
+            xheader: Vec::new(),
             format,
             mate,
             is_split: writer.is_split(),
@@ -66,12 +72,9 @@ impl ParallelProcessor for Decoder {
         self.sbuf.clear();
         self.xbuf.clear();
 
-        // decode index
-        let mut ibuf = itoa::Buffer::new();
-        let index = ibuf.format(record.index()).as_bytes();
-
         // decode sequences
         record.decode_s(&mut self.sbuf)?;
+        record.sheader(&mut self.sheader);
         let squal = if record.has_quality() {
             record.squal()
         } else {
@@ -83,6 +86,7 @@ impl ParallelProcessor for Decoder {
 
         let xqual = if record.is_paired() {
             record.decode_x(&mut self.xbuf)?;
+            record.xheader(&mut self.xheader);
             if record.has_quality() {
                 record.xqual()
             } else {
@@ -104,11 +108,12 @@ impl ParallelProcessor for Decoder {
             &mut self.mixed,
             self.mate,
             self.is_split,
-            index,
             &self.sbuf,
             squal,
+            &self.sheader,
             &self.xbuf,
             xqual,
+            &self.xheader,
             self.format,
         )?;
 

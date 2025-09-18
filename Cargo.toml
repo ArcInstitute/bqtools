@@ -11,7 +11,8 @@ keywords = ["bioinformatics", "binseq", "vbinseq", "file-format", "sequencing"]
 
 [dependencies]
 anyhow = "1.0.94"
-binseq = "0.6.4"
+# binseq = "0.6.4"
+binseq = { path = "../../lib/binseq"}
 clap = { version = "4.5.23", features = ["derive"] }
 env_logger = "0.11.8"
 is-terminal = "0.4.9"
@@ -36,8 +37,8 @@ nucgen = "0.2.0"
 tempfile = "3.20.0"
 
 [profile.release]
-lto = true
-codegen-units = 1
+# lto = true
+# codegen-units = 1
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

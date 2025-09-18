@@ -7,7 +7,7 @@ use paraseq::fastx;
 
 use crate::types::BoxedReader;
 
-use super::{BinseqMode, FileFormat};
+use super::FileFormat;
 
 #[derive(Parser, Debug, Clone)]
 #[clap(next_help_heading = "INPUT FILE OPTIONS")]
@@ -162,10 +162,6 @@ pub struct InputBinseq {
 impl InputBinseq {
     pub fn path(&self) -> &str {
         &self.input
-    }
-
-    pub fn mode(&self) -> Result<BinseqMode> {
-        BinseqMode::determine(self.path())
     }
 }
 
