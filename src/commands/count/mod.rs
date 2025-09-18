@@ -13,12 +13,19 @@ fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
     println!("Number of records : {num_records}");
 }
 
-fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize) {
+fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: bool) -> Result<()> {
     let header = reader.header();
-    println!("Format Version    : {}", header.format);
-    println!("Compression:      : {}", header.compressed);
-    println!("Quality:          : {}", header.qual);
-    println!("Number of records : {num_records}");
+
+    if print_index {
+        let index = reader.load_index()?;
+        index.pprint();
+    } else {
+        println!("Format Version    : {}", header.format);
+        println!("Compression:      : {}", header.compressed);
+        println!("Quality:          : {}", header.qual);
+        println!("Number of records : {num_records}");
+    }
+    Ok(())
 }
 
 pub fn run(args: &CountCommand) -> Result<()> {
@@ -29,7 +36,9 @@ pub fn run(args: &CountCommand) -> Result<()> {
     } else {
         match reader {
             BinseqReader::Bq(ref bq_reader) => log_reader_bq(bq_reader, num_records),
-            BinseqReader::Vbq(ref vbq_reader) => log_reader_vbq(vbq_reader, num_records),
+            BinseqReader::Vbq(ref vbq_reader) => {
+                log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?
+            }
         }
     }
     Ok(())
