@@ -182,7 +182,7 @@ pub struct OutputBinseq {
     ///
     /// Only used by vbq
     #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
-    pub block_size: usize,
+    block_size: usize,
 
     /// Number of threads to use for parallel reading and writing.
     ///
@@ -200,6 +200,18 @@ pub struct OutputBinseq {
     /// Pipe the output to stdout
     #[clap(short = 'P', long)]
     pub pipe: bool,
+
+    /// Archive mode
+    ///
+    /// Automatically sets the relevant flags for VBQ archival mode.
+    ///
+    /// - 4bit encoding
+    /// - headers included
+    /// - block size set to 200M
+    /// - quality scores kept
+    /// - zstd compression
+    #[clap(short = 'A', long, conflicts_with_all = ["uncompressed", "headers", "bitsize", "block_size", "skip_quality", "level"])]
+    pub archive: bool,
 }
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
@@ -222,12 +234,28 @@ impl OutputBinseq {
         }
     }
 
+    pub fn block_size(&self) -> usize {
+        if self.archive {
+            200 * 1024 * 1024
+        } else {
+            self.block_size
+        }
+    }
+
     pub fn compress(&self) -> bool {
-        !self.uncompressed
+        if self.archive {
+            true
+        } else {
+            !self.uncompressed
+        }
     }
 
     pub fn quality(&self) -> bool {
-        !self.skip_quality
+        if self.archive {
+            true
+        } else {
+            !self.skip_quality
+        }
     }
 
     pub fn threads(&self) -> usize {
@@ -238,12 +266,16 @@ impl OutputBinseq {
     }
 
     pub fn bitsize(&self) -> BitSize {
-        match self.bitsize {
-            2 => BitSize::Two,
-            4 => BitSize::Four,
-            _ => {
-                warn!("Invalid provided bitsize - defaulting to 2");
-                BitSize::Two
+        if self.archive {
+            BitSize::Four
+        } else {
+            match self.bitsize {
+                2 => BitSize::Two,
+                4 => BitSize::Four,
+                _ => {
+                    warn!("Invalid provided bitsize - defaulting to 2");
+                    BitSize::Two
+                }
             }
         }
     }
