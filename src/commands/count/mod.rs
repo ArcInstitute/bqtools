@@ -5,7 +5,10 @@ use crate::cli::CountCommand;
 
 fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
     let header = reader.header();
+    let bitsize: u8 = header.bits.into();
     println!("Format Version    : {}", header.format);
+    println!("Bitsize           : {}", bitsize);
+    println!("Flags             : {}", header.flags);
     println!("Sequence Length   : {}", header.slen);
     if header.xlen > 0 {
         println!("Extended Length   : {}", header.xlen);
@@ -20,9 +23,13 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
         let index = reader.load_index()?;
         index.pprint();
     } else {
+        let bitsize: u8 = header.bits.into();
         println!("Format Version    : {}", header.format);
+        println!("Bitsize           : {}", bitsize);
         println!("Compression:      : {}", header.compressed);
         println!("Quality:          : {}", header.qual);
+        println!("Headers:          : {}", header.headers);
+        println!("Flags             : {}", header.flags);
         println!("Number of records : {num_records}");
     }
     Ok(())

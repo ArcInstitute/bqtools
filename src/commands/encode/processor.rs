@@ -114,7 +114,7 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for BinseqProce
     fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
         if self
             .writer
-            .write_nucleotides(0, &record.seq())
+            .write_record(None, &record.seq())
             .map_err(IntoProcessError::into_process_error)?
         {
             self.record_count += 1;
@@ -138,7 +138,7 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Binse
     fn process_record_pair(&mut self, record1: Rf, record2: Rf) -> paraseq::Result<()> {
         if self
             .writer
-            .write_paired(0, &record1.seq(), &record2.seq())
+            .write_paired_record(None, &record1.seq(), &record2.seq())
             .map_err(IntoProcessError::into_process_error)?
         {
             self.record_count += 1;
@@ -257,7 +257,7 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for VBinseqProc
 
         let write_status = self
             .writer
-            .write_record(0, Some(record.id()), &record.seq(), record.qual())
+            .write_record(None, Some(record.id()), &record.seq(), record.qual())
             .map_err(IntoProcessError::into_process_error)?;
 
         if write_status {
@@ -289,7 +289,7 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for VBins
         let write_status = self
             .writer
             .write_paired_record(
-                0,
+                None,
                 Some(record1.id()),
                 &record1.seq(),
                 record1.qual(),

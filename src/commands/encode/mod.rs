@@ -53,6 +53,7 @@ fn encode_single(
         let header = bq::BinseqHeaderBuilder::new()
             .slen(slen)
             .bitsize(bitsize)
+            .flags(false)
             .build()?;
         let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
 
@@ -78,6 +79,7 @@ fn encode_single(
             .compressed(compress)
             .bitsize(bitsize)
             .headers(headers)
+            .flags(false)
             .build();
         let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
@@ -124,6 +126,7 @@ fn encode_single_htslib(
         let header = bq::BinseqHeaderBuilder::new()
             .slen(slen)
             .bitsize(bitsize)
+            .flags(false)
             .build()?;
         let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
 
@@ -144,6 +147,7 @@ fn encode_single_htslib(
             .compressed(compress)
             .bitsize(bitsize)
             .headers(headers)
+            .flags(false)
             .build();
         let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
@@ -188,6 +192,7 @@ fn encode_interleaved(
             .slen(slen)
             .xlen(xlen)
             .bitsize(bitsize)
+            .flags(false)
             .build()?;
         let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
 
@@ -214,6 +219,7 @@ fn encode_interleaved(
             .paired(true)
             .bitsize(bitsize)
             .headers(headers)
+            .flags(false)
             .build();
         let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
@@ -261,6 +267,7 @@ fn encode_interleaved_htslib(
             .slen(slen)
             .xlen(xlen)
             .bitsize(bitsize)
+            .flags(false)
             .build()?;
         let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
 
@@ -282,6 +289,7 @@ fn encode_interleaved_htslib(
             .paired(true)
             .bitsize(bitsize)
             .headers(headers)
+            .flags(false)
             .build();
         let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
@@ -330,6 +338,7 @@ fn encode_paired(
                 .slen(slen)
                 .xlen(xlen)
                 .bitsize(bitsize)
+                .flags(false)
                 .build()?;
             let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
 
@@ -358,6 +367,7 @@ fn encode_paired(
                 .paired(true)
                 .bitsize(bitsize)
                 .headers(headers)
+                .flags(false)
                 .build();
             let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
 
