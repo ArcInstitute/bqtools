@@ -85,6 +85,7 @@ fn write_colored_fastq<W: Write>(
     Ok(())
 }
 
+#[allow(clippy::match_wildcard_for_single_variants)]
 fn write_colored_record<W: Write>(
     writer: &mut W,
     index: &[u8],

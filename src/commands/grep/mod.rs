@@ -13,6 +13,7 @@ use parking_lot::Mutex;
 type Expressions = Vec<regex::bytes::Regex>;
 
 #[derive(Clone)]
+#[allow(clippy::struct_excessive_bools)]
 struct GrepProcessor {
     /// Regex expressions to match on
     re1: Expressions, // in primary

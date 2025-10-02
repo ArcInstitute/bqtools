@@ -28,6 +28,7 @@ mod utils;
 use processor::{BinseqProcessor, VBinseqProcessor};
 use utils::{get_interleaved_sequence_len, get_sequence_len};
 
+#[allow(clippy::too_many_arguments)]
 fn encode_single(
     mut reader: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
@@ -98,6 +99,7 @@ fn encode_single(
     Ok((num_records, num_skipped))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn encode_single_htslib(
     in_path: &str,
     out_path: Option<&str>,
@@ -166,6 +168,7 @@ fn encode_single_htslib(
     Ok((num_records, num_skipped))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn encode_interleaved(
     mut reader: fastx::Reader<BoxedReader>,
     out_path: Option<&str>,
@@ -238,6 +241,7 @@ fn encode_interleaved(
     Ok((num_records, num_skipped))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn encode_interleaved_htslib(
     in_path: &str,
     out_path: Option<&str>,
@@ -308,6 +312,7 @@ fn encode_interleaved_htslib(
     Ok((num_records, num_skipped))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn encode_paired(
     mut reader_r1: fastx::Reader<BoxedReader>,
     mut reader_r2: fastx::Reader<BoxedReader>,
