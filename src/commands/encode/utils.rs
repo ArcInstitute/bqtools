@@ -173,12 +173,11 @@ pub fn pull_single_files(input_files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
         if pair_regex.is_match(file_str) {
             num_suspect += 1;
         }
-        pqueue.push(vec![file.to_owned()])
+        pqueue.push(vec![file.to_owned()]);
     }
     if num_suspect > 0 {
         warn!(
-            "Found {} files that may be paired but are not. If this is not intentional, consider adding the `--paired` flag.",
-            num_suspect
+            "Found {num_suspect} files that may be paired but are not. If this is not intentional, consider adding the `--paired` flag."
         );
     }
     Ok(pqueue)

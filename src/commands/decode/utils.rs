@@ -11,7 +11,7 @@ pub fn write_fastq_parts<W: Write>(
     sequence: &[u8],
     quality: &[u8],
 ) -> std::io::Result<()> {
-    writer.write_all(b"@seq.")?;
+    writer.write_all(b"@")?;
     writer.write_all(index)?;
     writer.write_all(b"\n")?;
     writer.write_all(sequence)?;
@@ -26,7 +26,7 @@ pub fn write_fasta_parts<W: Write>(
     index: &[u8],
     sequence: &[u8],
 ) -> std::io::Result<()> {
-    writer.write_all(b">seq.")?;
+    writer.write_all(b">")?;
     writer.write_all(index)?;
     writer.write_all(b"\n")?;
     writer.write_all(sequence)?;
@@ -113,16 +113,16 @@ impl SplitWriter {
 
 pub fn write_record<W: Write>(
     writer: &mut W,
-    index: &[u8],
+    header: &[u8],
     sequence: &[u8],
     quality: &[u8],
     format: FileFormat,
 ) -> Result<(), std::io::Error> {
     let qual_buf = &quality[..sequence.len()];
     match format {
-        FileFormat::Fasta => write_fasta_parts(writer, index, sequence),
-        FileFormat::Fastq => write_fastq_parts(writer, index, sequence, qual_buf),
-        FileFormat::Tsv => write_tsv_parts(writer, index, sequence),
+        FileFormat::Fasta => write_fasta_parts(writer, header, sequence),
+        FileFormat::Fastq => write_fastq_parts(writer, header, sequence, qual_buf),
+        FileFormat::Tsv => write_tsv_parts(writer, header, sequence),
         FileFormat::Bam => unimplemented!("Cannot write BAM record from here"),
     }
 }
@@ -134,32 +134,33 @@ pub fn write_record_pair<W: Write>(
     mixed: &mut W,
     mate: Option<Mate>,
     split: bool,
-    index: &[u8],
     sbuf: &[u8],
     squal: &[u8],
+    sheader: &[u8],
     xbuf: &[u8],
     xqual: &[u8],
+    xheader: &[u8],
     format: FileFormat,
 ) -> Result<()> {
     match mate {
         Some(Mate::Both) => {
             if split {
-                write_record(left, index, sbuf, squal, format)?;
+                write_record(left, sheader, sbuf, squal, format)?;
                 if !xbuf.is_empty() {
-                    write_record(right, index, xbuf, xqual, format)?;
+                    write_record(right, xheader, xbuf, xqual, format)?;
                 }
             } else {
-                write_record(mixed, index, sbuf, squal, format)?;
+                write_record(mixed, sheader, sbuf, squal, format)?;
                 if !xbuf.is_empty() {
-                    write_record(mixed, index, xbuf, xqual, format)?;
+                    write_record(mixed, xheader, xbuf, xqual, format)?;
                 }
             }
         }
         Some(Mate::One) | None => {
-            write_record(mixed, index, sbuf, squal, format)?;
+            write_record(mixed, sheader, sbuf, squal, format)?;
         }
         Some(Mate::Two) => {
-            write_record(mixed, index, xbuf, xqual, format)?;
+            write_record(mixed, xheader, xbuf, xqual, format)?;
         }
     }
 

@@ -18,8 +18,7 @@ pub enum FileFormat {
 impl FileFormat {
     pub fn from_path(path: &str) -> Option<Self> {
         let ext = match path.split('.').next_back()? {
-            "gz" => path.split('.').nth_back(1)?,
-            "zst" => path.split('.').nth_back(1)?,
+            "gz" | "zst" => path.split('.').nth_back(1)?,
             ext => ext,
         };
         match ext {

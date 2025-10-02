@@ -16,7 +16,6 @@ fn run_encode(
     in_path: &Path,
     out_path: &Path,
     threads: Option<usize>,
-    #[builder(default)] vbq_index: bool,
     #[builder(default)] vbq_vcomp: bool,
     #[builder(default)] vbq_skip_qual: bool,
 ) -> Result<bool> {
@@ -32,9 +31,6 @@ fn run_encode(
     if let Some(t) = threads {
         args.push("-T".to_string());
         args.push(format!("{}", t));
-    }
-    if vbq_index {
-        args.push("--index".to_string());
     }
     if vbq_vcomp {
         args.push("--uncompressed".to_string());
@@ -74,10 +70,9 @@ fn test_encoding() -> Result<()> {
 
 #[test]
 fn test_vbq_specialization() -> Result<()> {
-    for (comp, format, vindex, vcomp, skip_qual) in iproduct!(
+    for (comp, format, vcomp, skip_qual) in iproduct!(
         CompressionStatus::enum_iter(),
         FastxFormat::enum_iter(),
-        [false, true],
         [false, true],
         [false, true],
     ) {
@@ -86,7 +81,6 @@ fn test_vbq_specialization() -> Result<()> {
         let status = run_encode()
             .in_path(in_tmp.path())
             .out_path(out_tmp.path())
-            .vbq_index(vindex)
             .vbq_vcomp(vcomp)
             .vbq_skip_qual(skip_qual)
             .call()?;

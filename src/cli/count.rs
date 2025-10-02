@@ -18,4 +18,8 @@ pub struct CountOpts {
     /// Only print the number of records in the file
     #[clap(short, long)]
     pub num: bool,
+
+    /// Print the index of the file
+    #[clap(long)]
+    pub show_index: bool,
 }

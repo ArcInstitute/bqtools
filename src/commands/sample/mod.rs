@@ -27,6 +27,10 @@ struct SampleProcessor {
     squal: Vec<u8>,
     xqual: Vec<u8>,
 
+    /// Header buffers
+    sheader: Vec<u8>,
+    xheader: Vec<u8>,
+
     /// Write Options
     format: FileFormat,
     mate: Option<Mate>,
@@ -55,6 +59,8 @@ impl SampleProcessor {
             xbuf: Vec::new(),
             squal: Vec::new(),
             xqual: Vec::new(),
+            sheader: Vec::new(),
+            xheader: Vec::new(),
             is_split: writer.is_split(),
             global_writer: Arc::new(Mutex::new(writer)),
         }
@@ -73,15 +79,13 @@ impl ParallelProcessor for SampleProcessor {
 
         // Decode sequences
         record.decode_s(&mut self.sbuf)?;
+        record.sheader(&mut self.sheader);
         if record.is_paired() {
             record.decode_x(&mut self.xbuf)?;
+            record.xheader(&mut self.xheader);
         }
 
         if self.include_record() {
-            // decode index
-            let mut ibuf = itoa::Buffer::new();
-            let index = ibuf.format(record.index()).as_bytes();
-
             let squal = if record.has_quality() {
                 record.squal()
             } else {
@@ -113,11 +117,12 @@ impl ParallelProcessor for SampleProcessor {
                 &mut self.mixed,
                 self.mate,
                 self.is_split,
-                index,
                 &self.sbuf,
                 squal,
+                &self.sheader,
                 &self.xbuf,
                 xqual,
+                &self.xheader,
                 self.format,
             )?;
         }

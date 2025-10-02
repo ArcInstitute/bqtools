@@ -81,7 +81,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
         *self.debug_interval.lock() += 1;
         self.record_count = 0;
         self.skipped_count = 0;
-        if *self.debug_interval.lock() % DEBUG_INTERVAL == 0 {
+        if (*self.debug_interval.lock()).is_multiple_of(DEBUG_INTERVAL) {
             trace!("Processed {} records", self.global_record_count.lock());
         }
     }
@@ -114,7 +114,7 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for BinseqProce
     fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
         if self
             .writer
-            .write_nucleotides(0, &record.seq())
+            .write_record(None, &record.seq())
             .map_err(IntoProcessError::into_process_error)?
         {
             self.record_count += 1;
@@ -138,7 +138,7 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Binse
     fn process_record_pair(&mut self, record1: Rf, record2: Rf) -> paraseq::Result<()> {
         if self
             .writer
-            .write_paired(0, &record1.seq(), &record2.seq())
+            .write_paired_record(None, &record1.seq(), &record2.seq())
             .map_err(IntoProcessError::into_process_error)?
         {
             self.record_count += 1;
@@ -255,13 +255,10 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for VBinseqProc
             )));
         }
 
-        let write_status = if self.writer.has_quality() {
-            self.writer
-                .write_nucleotides_quality(0, &record.seq(), record.qual().unwrap())
-        } else {
-            self.writer.write_nucleotides(0, &record.seq())
-        }
-        .map_err(IntoProcessError::into_process_error)?;
+        let write_status = self
+            .writer
+            .write_record(None, Some(record.id()), &record.seq(), record.qual())
+            .map_err(IntoProcessError::into_process_error)?;
 
         if write_status {
             self.record_count += 1;
@@ -289,19 +286,18 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for VBins
             )));
         }
 
-        let write_status = if self.writer.has_quality() {
-            self.writer.write_nucleotides_quality_paired(
-                0,
+        let write_status = self
+            .writer
+            .write_paired_record(
+                None,
+                Some(record1.id()),
                 &record1.seq(),
+                record1.qual(),
+                Some(record2.id()),
                 &record2.seq(),
-                record1.qual().unwrap(),
-                record2.qual().unwrap(),
+                record2.qual(),
             )
-        } else {
-            self.writer
-                .write_nucleotides_paired(0, &record1.seq(), &record2.seq())
-        }
-        .map_err(IntoProcessError::into_process_error)?;
+            .map_err(IntoProcessError::into_process_error)?;
 
         if write_status {
             self.record_count += 1;

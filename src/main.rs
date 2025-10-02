@@ -40,7 +40,6 @@ fn main() -> Result<()> {
         Commands::Decode(ref decode) => commands::decode::run(decode),
         Commands::Cat(cat) => commands::cat::run(cat),
         Commands::Count(ref count) => commands::count::run(count),
-        Commands::Index(ref index) => commands::index::run(index),
         Commands::Grep(ref grep) => commands::grep::run(grep),
         Commands::Sample(ref sample) => commands::sample::run(sample),
     }?;

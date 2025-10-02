@@ -34,11 +34,8 @@ pub enum CompressionType {
     Zstd,
 }
 impl CompressionType {
-    pub fn is_compressed(&self) -> bool {
-        match self {
-            CompressionType::Uncompressed => false,
-            _ => true,
-        }
+    pub fn is_compressed(self) -> bool {
+        !matches!(self, CompressionType::Uncompressed)
     }
 }
 

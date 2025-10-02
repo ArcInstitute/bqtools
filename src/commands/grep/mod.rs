@@ -13,6 +13,7 @@ use parking_lot::Mutex;
 type Expressions = Vec<regex::bytes::Regex>;
 
 #[derive(Clone)]
+#[allow(clippy::struct_excessive_bools)]
 struct GrepProcessor {
     /// Regex expressions to match on
     re1: Expressions, // in primary
@@ -45,6 +46,10 @@ struct GrepProcessor {
     squal: Vec<u8>,
     xqual: Vec<u8>,
 
+    /// Header buffers
+    sheader: Vec<u8>,
+    xheader: Vec<u8>,
+
     /// Write Options
     format: FileFormat,
     mate: Option<Mate>,
@@ -76,6 +81,8 @@ impl GrepProcessor {
             xbuf: Vec::new(),
             squal: Vec::new(),
             xqual: Vec::new(),
+            sheader: Vec::new(),
+            xheader: Vec::new(),
             smatches: HashSet::new(),
             xmatches: HashSet::new(),
             re1,
@@ -103,7 +110,7 @@ impl GrepProcessor {
         if self.re1.is_empty() {
             return;
         }
-        for reg in self.re1.iter() {
+        for reg in &self.re1 {
             for index in reg.find_iter(&self.sbuf) {
                 self.smatches.insert((index.start(), index.end()));
             }
@@ -114,7 +121,7 @@ impl GrepProcessor {
         if self.re2.is_empty() || self.xbuf.is_empty() {
             return;
         }
-        for reg in self.re2.iter() {
+        for reg in &self.re2 {
             for index in reg.find_iter(&self.xbuf) {
                 self.xmatches.insert((index.start(), index.end()));
             }
@@ -125,7 +132,7 @@ impl GrepProcessor {
         if self.re.is_empty() {
             return;
         }
-        for reg in self.re.iter() {
+        for reg in &self.re {
             for index in reg.find_iter(&self.sbuf) {
                 self.smatches.insert((index.start(), index.end()));
             }
@@ -139,7 +146,7 @@ impl GrepProcessor {
         self.regex_either();
         self.regex_primary();
         self.regex_secondary();
-        let pred = self.smatches.len() > 0 || self.xmatches.len() > 0;
+        let pred = !self.smatches.is_empty() || !self.xmatches.is_empty();
         if self.invert {
             !pred
         } else {
@@ -157,8 +164,10 @@ impl ParallelProcessor for GrepProcessor {
 
         // Decode sequences
         record.decode_s(&mut self.sbuf)?;
+        record.sheader(&mut self.sheader);
         if record.is_paired() {
             record.decode_x(&mut self.xbuf)?;
+            record.xheader(&mut self.xheader);
         }
 
         if self.pattern_match() {
@@ -167,10 +176,6 @@ impl ParallelProcessor for GrepProcessor {
                 // No further processing needed
                 return Ok(());
             }
-
-            // decode index
-            let mut ibuf = itoa::Buffer::new();
-            let index = ibuf.format(record.index()).as_bytes();
 
             let squal = if record.has_quality() {
                 record.squal()
@@ -201,11 +206,12 @@ impl ParallelProcessor for GrepProcessor {
                 write_colored_record_pair(
                     &mut self.mixed,
                     self.mate,
-                    index,
                     &self.sbuf,
                     squal,
+                    &self.sheader,
                     &self.xbuf,
                     xqual,
+                    &self.xheader,
                     &self.smatches,
                     &self.xmatches,
                     self.format,
@@ -217,11 +223,12 @@ impl ParallelProcessor for GrepProcessor {
                     &mut self.mixed,
                     self.mate,
                     self.is_split,
-                    index,
                     &self.sbuf,
                     squal,
+                    &self.sheader,
                     &self.xbuf,
                     xqual,
+                    &self.xheader,
                     self.format,
                 )
             }?;
