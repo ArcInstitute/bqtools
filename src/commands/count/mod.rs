@@ -7,7 +7,7 @@ fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
     let header = reader.header();
     let bitsize: u8 = header.bits.into();
     println!("Format Version    : {}", header.format);
-    println!("Bitsize           : {}", bitsize);
+    println!("Bitsize           : {bitsize}");
     println!("Flags             : {}", header.flags);
     println!("Sequence Length   : {}", header.slen);
     if header.xlen > 0 {
@@ -25,7 +25,7 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
     } else {
         let bitsize: u8 = header.bits.into();
         println!("Format Version    : {}", header.format);
-        println!("Bitsize           : {}", bitsize);
+        println!("Bitsize           : {bitsize}");
         println!("Compression:      : {}", header.compressed);
         println!("Quality:          : {}", header.qual);
         println!("Headers:          : {}", header.headers);
@@ -44,7 +44,7 @@ pub fn run(args: &CountCommand) -> Result<()> {
         match reader {
             BinseqReader::Bq(ref bq_reader) => log_reader_bq(bq_reader, num_records),
             BinseqReader::Vbq(ref vbq_reader) => {
-                log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?
+                log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?;
             }
         }
     }

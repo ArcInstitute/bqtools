@@ -109,7 +109,7 @@ impl GrepProcessor {
         if self.re1.is_empty() {
             return;
         }
-        for reg in self.re1.iter() {
+        for reg in &self.re1 {
             for index in reg.find_iter(&self.sbuf) {
                 self.smatches.insert((index.start(), index.end()));
             }
@@ -120,7 +120,7 @@ impl GrepProcessor {
         if self.re2.is_empty() || self.xbuf.is_empty() {
             return;
         }
-        for reg in self.re2.iter() {
+        for reg in &self.re2 {
             for index in reg.find_iter(&self.xbuf) {
                 self.xmatches.insert((index.start(), index.end()));
             }
@@ -131,7 +131,7 @@ impl GrepProcessor {
         if self.re.is_empty() {
             return;
         }
-        for reg in self.re.iter() {
+        for reg in &self.re {
             for index in reg.find_iter(&self.sbuf) {
                 self.smatches.insert((index.start(), index.end()));
             }
@@ -145,7 +145,7 @@ impl GrepProcessor {
         self.regex_either();
         self.regex_primary();
         self.regex_secondary();
-        let pred = self.smatches.len() > 0 || self.xmatches.len() > 0;
+        let pred = !self.smatches.is_empty() || !self.xmatches.is_empty();
         if self.invert {
             !pred
         } else {

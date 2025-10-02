@@ -114,13 +114,10 @@ fn load_simple_reader(
         "stdin".to_string()
     };
     if let Some(size) = batch_size {
-        debug!(
-            "building on-disk fastx reader with batch size {} from: {}",
-            size, path_display
-        );
+        debug!("building on-disk fastx reader with batch size {size} from: {path_display}");
         fastx::Reader::from_optional_path_with_batch_size(path, size)
     } else {
-        debug!("building on-disk fastx reader from: {}", path_display);
+        debug!("building on-disk fastx reader from: {path_display}");
         fastx::Reader::from_optional_path(path)
     }
 }
@@ -130,13 +127,10 @@ fn load_gcs_reader(
     batch_size: Option<usize>,
 ) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
     if let Some(size) = batch_size {
-        debug!(
-            "building GCS fastx reader with batch size {} from: {}",
-            size, path
-        );
+        debug!("building GCS fastx reader with batch size {size} from: {path}");
         fastx::Reader::from_gcs_with_batch_size(path, size)
     } else {
-        debug!("building GCS fastx reader from: {}", path);
+        debug!("building GCS fastx reader from: {path}");
         fastx::Reader::from_gcs(path)
     }
 }

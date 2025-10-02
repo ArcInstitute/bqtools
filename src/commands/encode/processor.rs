@@ -81,7 +81,7 @@ impl<W: Write + Send> BinseqProcessor<W> {
         *self.debug_interval.lock() += 1;
         self.record_count = 0;
         self.skipped_count = 0;
-        if *self.debug_interval.lock() % DEBUG_INTERVAL == 0 {
+        if (*self.debug_interval.lock()).is_multiple_of(DEBUG_INTERVAL) {
             trace!("Processed {} records", self.global_record_count.lock());
         }
     }
