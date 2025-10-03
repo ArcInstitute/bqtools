@@ -193,6 +193,9 @@ bqtools count input.bq
 
 You can easily search for specific subsequences or regular expressions within BINSEQ files:
 
+By default the multiple pattern logic is AND (i.e. all patterns must match).
+The logic can be changed to OR (i.e. any pattern must match) with the `--or-logic` option.
+
 ```bash
 # See full options list
 bqtools grep --help
@@ -205,4 +208,11 @@ bqtools grep input.bq -r "ATCG"
 
 # Search for a regular expression (in extended)
 bqtools grep input.bq -R "AT[CG]"
+
+# Search for multiple regular expressions in either
+bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A"
+
+# Search for multiple regular expressions (OR-logic)
+bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A" --or-logic
+
 ```
