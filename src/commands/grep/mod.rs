@@ -20,6 +20,9 @@ struct GrepProcessor {
     re2: Expressions, // in secondary
     re: Expressions,  // in either
 
+    /// Match logic (true = AND, false = OR)
+    and_logic: bool,
+
     /// Invert the pattern selection
     invert: bool,
 
@@ -67,6 +70,7 @@ impl GrepProcessor {
         re1: Expressions,
         re2: Expressions,
         re: Expressions,
+        and_logic: bool,
         invert: bool,
         count: bool,
         writer: SplitWriter,
@@ -90,6 +94,7 @@ impl GrepProcessor {
             re1,
             re2,
             re,
+            and_logic,
             invert,
             count,
             format,
@@ -158,7 +163,13 @@ impl GrepProcessor {
         let found_either = self.regex_either();
         let found_primary = self.regex_primary();
         let found_secondary = self.regex_secondary();
-        let pred = found_either && found_primary && found_secondary;
+
+        let pred = if self.and_logic {
+            found_either && found_primary && found_secondary
+        } else {
+            !self.smatches.is_empty() || !self.xmatches.is_empty()
+        };
+
         if self.invert {
             !pred
         } else {
@@ -289,6 +300,7 @@ pub fn run(args: &GrepCommand) -> Result<()> {
         args.grep.bytes_reg1(),
         args.grep.bytes_reg2(),
         args.grep.bytes_reg(),
+        args.grep.and_logic(),
         args.grep.invert,
         args.grep.count,
         writer,
