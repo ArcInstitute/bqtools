@@ -16,7 +16,7 @@ It currently has two variants: BQ and VBQ.
 - **BQ (\*.bq)**: Optimized for _fixed-length_ DNA sequences **without** quality scores.
 - **VBQ (\*.vbq)**: Optimized for _variable-length_ DNA sequences **with optional** quality scores.
 
-Both support single and paired sequences and make use of two-bit encoding for efficient nucleotide packing using [`bitnuc`](https://crates.io/crates/bitnuc) and efficient parallel FASTX processing using [`paraseq`](https://crates.io/crates/paraseq).
+Both support single and paired sequences and make use of two-bit or four-bit encoding for efficient nucleotide packing using [`bitnuc`](https://crates.io/crates/bitnuc) and efficient parallel FASTX processing using [`paraseq`](https://crates.io/crates/paraseq).
 
 For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/content/10.1101/2025.04.08.647863v1) where we describe the format family and its applications.
 
@@ -82,6 +82,9 @@ bqtools encode input.fastq -o output.bq
 # Encode a single file to vbq
 bqtools encode input.fastq -o output.vbq
 
+# Encode a single file to vbq with 4bit encoding
+bqtools encode input.fastq -o output.vbq -S4
+
 # Encode a file stream to bq (auto-determine input format and compression status)
 /bin/cat input.fastq.zst | bqtools encode -o output.bq
 
@@ -97,11 +100,18 @@ bqtools encode input.bam -fb -o output.bq
 # Encode an paired-end CRAM file to BINSEQ (sorted by read name)
 bqtools encode input.paired.cram -I -fb -o output.vbq
 
-# Specify a policy for handling non-ATCG nucleotides
+# Specify a policy for handling non-ATCG nucleotides (2-bit only)
 bqtools encode input.fastq -o output.bq -p r  # Randomly draw A/C/G/T for each N
 
 # Set threads for parallel processing
 bqtools encode input.fastq -o output.bq -T 4
+
+# Include sequencing headers in the encoding (unused by .bq)
+bqtools encode input.fastq -o output.vbq -H
+
+# Encode with ARCHIVE mode (useful for genomes, cDNA libraries, and larger sequences)
+# where there are common Ns, large sequence sizes, and headers are important
+bqtools encode input.fasta -o output.vbq -A
 ```
 
 Available policies for handling non-ATCG nucleotides:
@@ -113,6 +123,8 @@ Available policies for handling non-ATCG nucleotides:
 - `c`: Set all Ns to C
 - `g`: Set all Ns to G
 - `t`: Set all Ns to T
+
+> Note: These are only applied when encoding with 2-bit.
 
 #### Recursive Encoding
 
