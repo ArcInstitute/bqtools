@@ -52,6 +52,10 @@ pub struct GrepArgs {
     #[clap(short = 'C', long)]
     pub count: bool,
 
+    /// use OR logic for multiple patterns (default=AND)
+    #[clap(long)]
+    pub or_logic: bool,
+
     /// Colorize output (auto, always, never)
     #[clap(
         long,
@@ -86,6 +90,9 @@ impl GrepArgs {
             .iter()
             .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"))
             .collect()
+    }
+    pub fn and_logic(&self) -> bool {
+        !self.or_logic
     }
 }
 
