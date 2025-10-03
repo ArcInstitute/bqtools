@@ -37,6 +37,7 @@ struct GrepProcessor {
     mixed: Vec<u8>, // General purpose, interleaved or singlets
     left: Vec<u8>, // Used when writing pairs of files (R1/R2)
     right: Vec<u8>,
+    interval_buffer: Vec<(usize, usize)>, // reused by colored writer for merging intervals
 
     /// Local decoding buffers
     sbuf: Vec<u8>,
@@ -85,6 +86,7 @@ impl GrepProcessor {
             xheader: Vec::new(),
             smatches: HashSet::new(),
             xmatches: HashSet::new(),
+            interval_buffer: Vec::new(),
             re1,
             re2,
             re,
@@ -106,47 +108,57 @@ impl GrepProcessor {
         self.xmatches.clear();
     }
 
-    fn regex_primary(&mut self) {
+    fn regex_primary(&mut self) -> bool {
         if self.re1.is_empty() {
-            return;
+            return true;
         }
-        for reg in &self.re1 {
+        self.re1.iter().all(|reg| {
+            let mut found = false;
             for index in reg.find_iter(&self.sbuf) {
                 self.smatches.insert((index.start(), index.end()));
+                found = true;
             }
-        }
+            found
+        })
     }
 
-    fn regex_secondary(&mut self) {
+    fn regex_secondary(&mut self) -> bool {
         if self.re2.is_empty() || self.xbuf.is_empty() {
-            return;
+            return true;
         }
-        for reg in &self.re2 {
+        self.re2.iter().all(|reg| {
+            let mut found = false;
             for index in reg.find_iter(&self.xbuf) {
                 self.xmatches.insert((index.start(), index.end()));
+                found = true;
             }
-        }
+            found
+        })
     }
 
-    fn regex_either(&mut self) {
+    fn regex_either(&mut self) -> bool {
         if self.re.is_empty() {
-            return;
+            return true;
         }
-        for reg in &self.re {
+        self.re.iter().all(|reg| {
+            let mut found = false;
             for index in reg.find_iter(&self.sbuf) {
                 self.smatches.insert((index.start(), index.end()));
+                found = true;
             }
             for index in reg.find_iter(&self.xbuf) {
                 self.xmatches.insert((index.start(), index.end()));
+                found = true;
             }
-        }
+            found
+        })
     }
 
     pub fn pattern_match(&mut self) -> bool {
-        self.regex_either();
-        self.regex_primary();
-        self.regex_secondary();
-        let pred = !self.smatches.is_empty() || !self.xmatches.is_empty();
+        let found_either = self.regex_either();
+        let found_primary = self.regex_primary();
+        let found_secondary = self.regex_secondary();
+        let pred = found_either && found_primary && found_secondary;
         if self.invert {
             !pred
         } else {
@@ -215,6 +227,7 @@ impl ParallelProcessor for GrepProcessor {
                     &self.smatches,
                     &self.xmatches,
                     self.format,
+                    &mut self.interval_buffer,
                 )
             } else {
                 write_record_pair(
