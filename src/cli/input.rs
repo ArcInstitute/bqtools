@@ -39,8 +39,19 @@ pub struct InputFile {
     #[clap(short = 'r', long)]
     pub recursive: bool,
 
+    /// Path to a text file containing a list of input files to process.
+    ///
+    /// for R1/R2 encodings pair this with the `--paired` option.
+    ///
+    /// Options used will be applied to all files in the manifest.
+    #[clap(short = 'M', long)]
+    pub manifest: Option<String>,
+
     #[clap(flatten)]
     pub recursion: RecursiveOptions,
+
+    #[clap(flatten)]
+    pub batch_encoding_options: BatchEncodingOptions,
 }
 impl InputFile {
     pub fn single_path(&self) -> Result<Option<&str>> {
@@ -60,6 +71,10 @@ impl InputFile {
 
     pub fn paired(&self) -> bool {
         self.input.len() == 2
+    }
+
+    pub fn is_stdin(&self) -> bool {
+        self.input.is_empty()
     }
 
     pub fn as_directory(&self) -> Result<PathBuf> {
@@ -138,13 +153,17 @@ fn load_gcs_reader(
 #[derive(Parser, Debug, Clone, PartialEq, Eq)]
 #[clap(next_help_heading = "RECURSION OPTIONS")]
 pub struct RecursiveOptions {
-    /// Encode *{_R1,_R2}* record pairs. Requires `--recursive`.
-    #[clap(short = 'R', long = "paired", requires = "recursive")]
-    pub paired: bool,
-
     /// Maximum depth in the directory tree to process. Leaving this option empty will set no limit.
     #[clap(long, requires = "recursive")]
     pub depth: Option<usize>,
+}
+
+#[derive(Parser, Debug, Clone, PartialEq, Eq)]
+#[clap(next_help_heading = "BATCH ENCODING OPTIONS")]
+pub struct BatchEncodingOptions {
+    /// Encode *{_R1,_R2}* record pairs. Ignored unless `--manifest` or `--recursive` is specified.
+    #[clap(short = 'P', long)]
+    pub paired: bool,
 }
 
 #[derive(Parser, Debug)]

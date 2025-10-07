@@ -1,4 +1,8 @@
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::PathBuf,
+};
 
 use anyhow::{bail, Context, Result};
 use binseq::{bq, vbq, BitSize, Policy};
@@ -15,7 +19,8 @@ use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
     commands::{
         encode::utils::{
-            generate_output_name, get_sequence_len_htslib, pair_r1_r2_files, pull_single_files,
+            generate_output_name, get_interleaved_sequence_len, get_sequence_len,
+            get_sequence_len_htslib, pair_r1_r2_files, pull_single_files,
         },
         utils::match_output,
     },
@@ -23,10 +28,9 @@ use crate::{
 };
 
 mod processor;
-mod utils;
+pub mod utils;
 
 use processor::{BinseqProcessor, VBinseqProcessor};
-use utils::{get_interleaved_sequence_len, get_sequence_len};
 
 #[allow(clippy::too_many_arguments)]
 fn encode_single(
@@ -400,7 +404,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         encode_paired(
             rdr1,
             rdr2,
-            args.output.borrowed_path(),
+            args.output_path()?.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -432,7 +436,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             trace!("launching interleaved encoding (fastx)");
             encode_interleaved(
                 args.input.build_single_reader()?,
-                args.output.borrowed_path(),
+                args.output_path()?.as_deref(),
                 args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
@@ -463,7 +467,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         trace!("launching single encoding (fastx)");
         encode_single(
             args.input.build_single_reader()?,
-            args.output.borrowed_path(),
+            args.output_path()?.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -596,7 +600,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     let args = args.to_owned();
     let dir = args.input.as_directory()?;
 
-    let regex_str = if args.input.recursion.paired {
+    let regex_str = if args.input.batch_encoding_options.paired {
         r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
     } else {
         r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
@@ -625,7 +629,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     }
     fqueue.sort_unstable();
 
-    let pqueue = if args.input.recursion.paired {
+    let pqueue = if args.input.batch_encoding_options.paired {
         pair_r1_r2_files(&fqueue)
     } else {
         pull_single_files(&fqueue)
@@ -635,7 +639,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         bail!("No files found matching the expected pattern.");
     }
 
-    if args.input.recursion.paired {
+    if args.input.batch_encoding_options.paired {
         info!("Total file pairs found: {}", pqueue.len());
     } else {
         info!("Total files found: {}", pqueue.len());
@@ -646,10 +650,61 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     Ok(())
 }
 
+fn run_manifest(args: &EncodeCommand) -> Result<()> {
+    let Some(manifest) = &args.input.manifest else {
+        bail!("No manifest file provided");
+    };
+
+    let regex_str = if args.input.batch_encoding_options.paired {
+        r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
+    } else {
+        r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
+    };
+    let regex = Regex::new(regex_str)?;
+
+    let handle = File::open(manifest).map(BufReader::new)?;
+    let mut fqueue = vec![];
+    for line in handle.lines() {
+        let line = line?;
+        let path = PathBuf::from(line);
+        let path_str = path.as_os_str().to_str().unwrap();
+        if path.is_file() && regex.is_match(path_str) {
+            fqueue.push(path);
+        }
+    }
+    if fqueue.is_empty() {
+        bail!("No files found");
+    }
+    fqueue.sort_unstable();
+
+    let pqueue = if args.input.batch_encoding_options.paired {
+        pair_r1_r2_files(&fqueue)
+    } else {
+        pull_single_files(&fqueue)
+    }?;
+
+    if pqueue.is_empty() {
+        bail!("No files found matching the expected pattern.");
+    }
+
+    if args.input.batch_encoding_options.paired {
+        info!("Total file pairs found: {}", pqueue.len());
+    } else {
+        info!("Total files found: {}", pqueue.len());
+    }
+
+    process_queue(args, pqueue, &regex)?;
+
+    Ok(())
+}
+
 pub fn run(args: &EncodeCommand) -> Result<()> {
     if args.input.recursive {
         trace!("launching encode-recursive");
         run_recursive(args)
+    } else if args.input.manifest.is_some() {
+        trace!("launching encode-manifest");
+        run_manifest(args)
     } else {
         trace!("launching encode-atomic");
         run_atomic(args)

@@ -139,12 +139,7 @@ pub enum Mate {
 #[clap(next_help_heading = "OUTPUT BINSEQ OPTIONS")]
 #[allow(clippy::struct_excessive_bools)]
 pub struct OutputBinseq {
-    #[clap(
-        short = 'o',
-        long,
-        required_unless_present = "pipe",
-        required_unless_present = "recursive"
-    )]
+    #[clap(short = 'o', long)]
     /// Output binseq file
     ///
     /// To output to stdout, use the `-P/--pipe` flag.
@@ -328,9 +323,9 @@ impl From<PolicyWrapper> for Policy {
 #[derive(Debug, Clone, Copy, ValueEnum, Default, PartialEq)]
 pub enum BinseqMode {
     #[clap(name = "bq")]
-    #[default]
     Binseq,
     #[clap(name = "vbq")]
+    #[default]
     VBinseq,
 }
 impl BinseqMode {
