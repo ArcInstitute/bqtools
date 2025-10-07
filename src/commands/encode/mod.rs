@@ -401,7 +401,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             rdr1,
             rdr2,
             args.output.borrowed_path(),
-            args.output.mode()?,
+            args.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
@@ -418,7 +418,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                     .single_path()?
                     .context("Must provide an input path for HTSLib")?,
                 args.output.borrowed_path(),
-                args.output.mode()?,
+                args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
                 args.output.quality(),
@@ -433,7 +433,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             encode_interleaved(
                 args.input.build_single_reader()?,
                 args.output.borrowed_path(),
-                args.output.mode()?,
+                args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
                 args.output.quality(),
@@ -450,7 +450,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 .single_path()?
                 .context("Must provide an input path for HTSlib")?,
             args.output.borrowed_path(),
-            args.output.mode()?,
+            args.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
@@ -464,7 +464,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         encode_single(
             args.input.build_single_reader()?,
             args.output.borrowed_path(),
-            args.output.mode()?,
+            args.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
@@ -512,7 +512,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
         for (i, pair) in queue.into_iter().enumerate() {
             let thread_args = args.clone();
             let thread_regex = regex.clone();
-            let mode = args.output.mode()?;
+            let mode = args.mode()?;
 
             // First `leftover_threads` files get one extra thread
             let threads_for_this_file = if i < leftover_threads {
@@ -524,15 +524,16 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
             let handle = std::thread::spawn(move || -> Result<()> {
                 let mut file_args = thread_args.clone();
 
-                match pair.len() {
+                let outpath = match pair.len() {
                     1 => {
                         let inpath = pair[0].to_str().unwrap().to_string();
                         let outpath = thread_regex
                             .replace_all(&inpath, mode.extension())
                             .to_string();
                         file_args.input.input = vec![inpath];
-                        file_args.output.output = Some(outpath);
+                        file_args.output.output = Some(outpath.clone());
                         file_args.output.threads = threads_for_this_file;
+                        outpath
                     }
                     2 => {
                         let inpaths: Vec<String> = pair
@@ -542,23 +543,35 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                         let outpath = generate_output_name(&pair, mode.extension())?;
 
                         file_args.input.input = inpaths;
-                        file_args.output.output = Some(outpath);
+                        file_args.output.output = Some(outpath.clone());
                         file_args.output.threads = threads_for_this_file;
+                        outpath
                     }
                     _ => {
                         bail!("Invalid number of input files found: {}", pair.len())
                     }
-                }
+                };
 
-                run_atomic(&file_args)?;
+                match run_atomic(&file_args) {
+                    Ok(()) => (),
+                    Err(err) => {
+                        error!("Error generating output: {outpath}\n{err:?}\nSkipping.");
+                        trace!("Removing partial file: {outpath}");
+                        std::fs::remove_file(outpath)?;
+                    }
+                }
                 Ok(())
             });
             handles.push(handle);
         }
 
         for handle in handles {
-            if let Err(err) = handle.join() {
-                error!("Error in thread: {err:?}");
+            match handle.join() {
+                Ok(res) => match res {
+                    Ok(()) => (),
+                    Err(err) => error!("Error in thread: {err:?}"),
+                },
+                Err(err) => error!("Error joining thread: {err:?}"),
             }
         }
 

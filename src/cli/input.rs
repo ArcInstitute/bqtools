@@ -36,7 +36,7 @@ pub struct InputFile {
     /// For R1/R2 encodings pair this with the `--paired` option.
     ///
     /// Options used will be applied to all in the directory.
-    #[clap(short = 'r', long, requires = "mode")]
+    #[clap(short = 'r', long)]
     pub recursive: bool,
 
     #[clap(flatten)]
