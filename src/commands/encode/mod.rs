@@ -553,7 +553,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                 };
 
                 match run_atomic(&file_args) {
-                    Ok(_) => (),
+                    Ok(()) => (),
                     Err(err) => error!("Error generating output: {outpath}\n{err:?}\nSkipping."),
                 }
                 Ok(())
@@ -564,7 +564,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
         for handle in handles {
             match handle.join() {
                 Ok(res) => match res {
-                    Ok(_) => (),
+                    Ok(()) => (),
                     Err(err) => error!("Error in thread: {err:?}"),
                 },
                 Err(err) => error!("Error joining thread: {err:?}"),
