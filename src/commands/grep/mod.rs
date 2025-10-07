@@ -65,7 +65,7 @@ struct GrepProcessor {
     global_count: Arc<Mutex<usize>>,
 }
 impl GrepProcessor {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
     pub fn new(
         re1: Expressions,
         re2: Expressions,
