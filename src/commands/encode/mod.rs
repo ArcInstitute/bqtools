@@ -401,7 +401,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             rdr1,
             rdr2,
             args.output.borrowed_path(),
-            args.output.mode()?,
+            args.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
@@ -418,7 +418,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                     .single_path()?
                     .context("Must provide an input path for HTSLib")?,
                 args.output.borrowed_path(),
-                args.output.mode()?,
+                args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
                 args.output.quality(),
@@ -433,7 +433,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             encode_interleaved(
                 args.input.build_single_reader()?,
                 args.output.borrowed_path(),
-                args.output.mode()?,
+                args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
                 args.output.quality(),
@@ -450,7 +450,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 .single_path()?
                 .context("Must provide an input path for HTSlib")?,
             args.output.borrowed_path(),
-            args.output.mode()?,
+            args.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
@@ -464,7 +464,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         encode_single(
             args.input.build_single_reader()?,
             args.output.borrowed_path(),
-            args.output.mode()?,
+            args.mode()?,
             args.output.threads(),
             args.output.compress(),
             args.output.quality(),
@@ -512,7 +512,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
         for (i, pair) in queue.into_iter().enumerate() {
             let thread_args = args.clone();
             let thread_regex = regex.clone();
-            let mode = args.output.mode()?;
+            let mode = args.mode()?;
 
             // First `leftover_threads` files get one extra thread
             let threads_for_this_file = if i < leftover_threads {
@@ -553,7 +553,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                 };
 
                 match run_atomic(&file_args) {
-                    Ok(_) => (),
+                    Ok(()) => (),
                     Err(err) => error!("Error generating output: {outpath}\n{err:?}\nSkipping."),
                 }
                 Ok(())
@@ -564,7 +564,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
         for handle in handles {
             match handle.join() {
                 Ok(res) => match res {
-                    Ok(_) => (),
+                    Ok(()) => (),
                     Err(err) => error!("Error in thread: {err:?}"),
                 },
                 Err(err) => error!("Error joining thread: {err:?}"),
