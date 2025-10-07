@@ -554,7 +554,11 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
 
                 match run_atomic(&file_args) {
                     Ok(()) => (),
-                    Err(err) => error!("Error generating output: {outpath}\n{err:?}\nSkipping."),
+                    Err(err) => {
+                        error!("Error generating output: {outpath}\n{err:?}\nSkipping.");
+                        trace!("Removing partial file: {outpath}");
+                        std::fs::remove_file(outpath)?;
+                    }
                 }
                 Ok(())
             });
