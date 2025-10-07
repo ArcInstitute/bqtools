@@ -62,6 +62,10 @@ impl InputFile {
         self.input.len() == 2
     }
 
+    pub fn is_stdin(&self) -> bool {
+        self.input.is_empty()
+    }
+
     pub fn as_directory(&self) -> Result<PathBuf> {
         if !self.recursive {
             bail!("Recursive mode is required to process a directory.");

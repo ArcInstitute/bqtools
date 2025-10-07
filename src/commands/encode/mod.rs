@@ -15,7 +15,8 @@ use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
     commands::{
         encode::utils::{
-            generate_output_name, get_sequence_len_htslib, pair_r1_r2_files, pull_single_files,
+            generate_output_name, get_interleaved_sequence_len, get_sequence_len,
+            get_sequence_len_htslib, pair_r1_r2_files, pull_single_files,
         },
         utils::match_output,
     },
@@ -23,10 +24,9 @@ use crate::{
 };
 
 mod processor;
-mod utils;
+pub mod utils;
 
 use processor::{BinseqProcessor, VBinseqProcessor};
-use utils::{get_interleaved_sequence_len, get_sequence_len};
 
 #[allow(clippy::too_many_arguments)]
 fn encode_single(
@@ -400,7 +400,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         encode_paired(
             rdr1,
             rdr2,
-            args.output.borrowed_path(),
+            args.output_path()?.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -432,7 +432,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             trace!("launching interleaved encoding (fastx)");
             encode_interleaved(
                 args.input.build_single_reader()?,
-                args.output.borrowed_path(),
+                args.output_path()?.as_deref(),
                 args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
@@ -463,7 +463,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         trace!("launching single encoding (fastx)");
         encode_single(
             args.input.build_single_reader()?,
-            args.output.borrowed_path(),
+            args.output_path()?.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),

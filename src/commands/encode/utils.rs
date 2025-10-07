@@ -1,7 +1,7 @@
 use std::{collections::HashMap, io::Read, path::PathBuf};
 
 use anyhow::{bail, Result};
-use log::warn;
+use log::{error, warn};
 use paraseq::{
     fastx,
     rust_htslib::{self, bam::Read as BamRead},
@@ -138,6 +138,10 @@ pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Res
             let output_name = extension_regex
                 .replace(input_path, new_extension)
                 .to_string();
+            if output_name == input_path {
+                error!("Unable to autodetermine the output filename for {input_path}");
+                bail!("Unable to autodetermine the output filename for {input_path}");
+            }
             Ok(output_name)
         }
         2 => {
@@ -150,6 +154,10 @@ pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Res
                 let base = &caps[1];
                 let suffix = caps.get(2).map_or("", |m| m.as_str());
                 let output_name = format!("{base}{suffix}{new_extension}");
+                if output_name == input_path {
+                    error!("Unable to autodetermine the output filename for {input_path}");
+                    bail!("Unable to autodetermine the output filename for {input_path}");
+                }
                 Ok(output_name)
             } else {
                 // Fallback: use the first file's name with extension replaced
@@ -157,6 +165,10 @@ pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Res
                 let output_name = extension_regex
                     .replace(input_path, new_extension)
                     .to_string();
+                if output_name == input_path {
+                    error!("Unable to autodetermine the output filename for {input_path}");
+                    bail!("Unable to autodetermine the output filename for {input_path}");
+                }
                 Ok(output_name)
             }
         }
