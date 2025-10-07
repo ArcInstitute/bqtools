@@ -524,15 +524,16 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
             let handle = std::thread::spawn(move || -> Result<()> {
                 let mut file_args = thread_args.clone();
 
-                match pair.len() {
+                let outpath = match pair.len() {
                     1 => {
                         let inpath = pair[0].to_str().unwrap().to_string();
                         let outpath = thread_regex
                             .replace_all(&inpath, mode.extension())
                             .to_string();
                         file_args.input.input = vec![inpath];
-                        file_args.output.output = Some(outpath);
+                        file_args.output.output = Some(outpath.clone());
                         file_args.output.threads = threads_for_this_file;
+                        outpath
                     }
                     2 => {
                         let inpaths: Vec<String> = pair
@@ -542,23 +543,31 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                         let outpath = generate_output_name(&pair, mode.extension())?;
 
                         file_args.input.input = inpaths;
-                        file_args.output.output = Some(outpath);
+                        file_args.output.output = Some(outpath.clone());
                         file_args.output.threads = threads_for_this_file;
+                        outpath
                     }
                     _ => {
                         bail!("Invalid number of input files found: {}", pair.len())
                     }
-                }
+                };
 
-                run_atomic(&file_args)?;
+                match run_atomic(&file_args) {
+                    Ok(_) => (),
+                    Err(err) => error!("Error generating output: {outpath}\n{err:?}\nSkipping."),
+                }
                 Ok(())
             });
             handles.push(handle);
         }
 
         for handle in handles {
-            if let Err(err) = handle.join() {
-                error!("Error in thread: {err:?}");
+            match handle.join() {
+                Ok(res) => match res {
+                    Ok(_) => (),
+                    Err(err) => error!("Error in thread: {err:?}"),
+                },
+                Err(err) => error!("Error joining thread: {err:?}"),
             }
         }
 
