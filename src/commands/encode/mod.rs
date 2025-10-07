@@ -556,6 +556,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                     Ok(()) => (),
                     Err(err) => {
                         error!("Error generating output: {outpath}\n{err:?}\nSkipping.");
+                        trace!("Removing partial file: {outpath}");
                         std::fs::remove_file(outpath)?;
                     }
                 }
