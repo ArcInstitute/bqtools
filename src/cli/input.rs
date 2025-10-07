@@ -19,7 +19,7 @@ pub struct InputFile {
     pub input: Vec<String>,
 
     #[clap(short, long, help = "Input file format")]
-    pub format: Option<FileFormat>,
+    format: Option<FileFormat>,
 
     /// Batch size (in records) to use in parallel processing
     ///
@@ -55,6 +55,26 @@ impl InputFile {
         match self.input.len() {
             2 => Ok((&self.input[0], &self.input[1])),
             _ => bail!("Two input files are required."),
+        }
+    }
+
+    pub fn format(&self) -> Result<Option<FileFormat>> {
+        if let Some(format) = self.format {
+            Ok(Some(format))
+        } else {
+            if !self.paired() {
+                if let Some(path) = self.single_path()? {
+                    if path.ends_with(".bam") || path.ends_with(".sam") || path.ends_with(".cram") {
+                        Ok(Some(FileFormat::Bam))
+                    } else {
+                        Ok(None)
+                    }
+                } else {
+                    Ok(None)
+                }
+            } else {
+                Ok(None)
+            }
         }
     }
 

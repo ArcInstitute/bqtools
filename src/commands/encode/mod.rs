@@ -40,11 +40,11 @@ fn encode_single(
     policy: Policy,
     bitsize: BitSize,
     headers: bool,
-) -> Result<(usize, usize)> {
+) -> Result<(Option<String>, usize, usize)> {
     // build writer
     let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+    let (out_path, num_records, num_skipped) = if mode == BinseqMode::Binseq {
         trace!("converting to bq");
 
         // Determine the sequence length
@@ -66,7 +66,7 @@ fn encode_single(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     } else {
         trace!("converting to vbq");
         let quality = match reader.format() {
@@ -93,10 +93,14 @@ fn encode_single(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     };
 
-    Ok((num_records, num_skipped))
+    Ok((
+        out_path.map(|path| path.to_owned()),
+        num_records,
+        num_skipped,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -111,14 +115,14 @@ fn encode_single_htslib(
     policy: Policy,
     bitsize: BitSize,
     headers: bool,
-) -> Result<(usize, usize)> {
+) -> Result<(Option<String>, usize, usize)> {
     // build reader
     let reader = htslib::Reader::from_path(in_path)?;
 
     // build writer
     let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+    let (out_path, num_records, num_skipped) = if mode == BinseqMode::Binseq {
         trace!("converting to bq");
 
         // Determine the sequence length
@@ -140,7 +144,7 @@ fn encode_single_htslib(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     } else {
         trace!("converting to vbq");
         let header = vbq::VBinseqHeaderBuilder::new()
@@ -162,10 +166,14 @@ fn encode_single_htslib(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     };
 
-    Ok((num_records, num_skipped))
+    Ok((
+        out_path.map(|path| path.to_string()),
+        num_records,
+        num_skipped,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -180,11 +188,11 @@ fn encode_interleaved(
     policy: Policy,
     bitsize: BitSize,
     headers: bool,
-) -> Result<(usize, usize)> {
+) -> Result<(Option<String>, usize, usize)> {
     // Prepare the processor
     let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+    let (out_path, num_records, num_skipped) = if mode == BinseqMode::Binseq {
         trace!("converting to bq");
 
         // Determine the sequence length
@@ -207,7 +215,7 @@ fn encode_interleaved(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     } else {
         trace!("converting to vbq");
         let quality = match reader.format() {
@@ -235,10 +243,14 @@ fn encode_interleaved(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     };
 
-    Ok((num_records, num_skipped))
+    Ok((
+        out_path.map(|path| path.to_string()),
+        num_records,
+        num_skipped,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -254,13 +266,13 @@ fn encode_interleaved_htslib(
     policy: Policy,
     bitsize: BitSize,
     headers: bool,
-) -> Result<(usize, usize)> {
+) -> Result<(Option<String>, usize, usize)> {
     let reader = htslib::Reader::from_path(in_path)?;
 
     // Prepare the processor
     let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
+    let (out_path, num_records, num_skipped) = if mode == BinseqMode::Binseq {
         trace!("converting to bq");
 
         // Determine the sequence length
@@ -283,7 +295,7 @@ fn encode_interleaved_htslib(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     } else {
         trace!("converting to vbq");
         let header = vbq::VBinseqHeaderBuilder::new()
@@ -306,10 +318,14 @@ fn encode_interleaved_htslib(
         let num_records = processor.get_global_record_count();
         let num_skipped = processor.get_global_skipped_count();
 
-        (num_records, num_skipped)
+        (out_path, num_records, num_skipped)
     };
 
-    Ok((num_records, num_skipped))
+    Ok((
+        out_path.map(|path| path.to_string()),
+        num_records,
+        num_skipped,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -325,11 +341,11 @@ fn encode_paired(
     policy: Policy,
     bitsize: BitSize,
     headers: bool,
-) -> Result<(usize, usize)> {
+) -> Result<(Option<String>, usize, usize)> {
     // Prepare the output handle
     let out_handle = match_output(out_path)?;
 
-    let (num_records, num_skipped) = match mode {
+    let (out_path, num_records, num_skipped) = match mode {
         BinseqMode::Binseq => {
             trace!("converting to bq");
 
@@ -355,7 +371,7 @@ fn encode_paired(
             let num_records = processor.get_global_record_count();
             let num_skipped = processor.get_global_skipped_count();
 
-            (num_records, num_skipped)
+            (out_path, num_records, num_skipped)
         }
         BinseqMode::VBinseq => {
             trace!("converting to vbq");
@@ -385,16 +401,20 @@ fn encode_paired(
             let num_records = processor.get_global_record_count();
             let num_skipped = processor.get_global_skipped_count();
 
-            (num_records, num_skipped)
+            (out_path, num_records, num_skipped)
         }
     };
 
-    Ok((num_records, num_skipped))
+    Ok((
+        out_path.map(|path| path.to_string()),
+        num_records,
+        num_skipped,
+    ))
 }
 
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
-    let (num_records, num_skipped) = if args.input.paired() {
+    let (opath, num_records, num_skipped) = if args.input.paired() {
         trace!("launching paired encoding");
         let (rdr1, rdr2) = args.input.build_paired_readers()?;
         encode_paired(
@@ -411,13 +431,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.headers,
         )
     } else if args.input.interleaved {
-        if let Some(FileFormat::Bam) = args.input.format {
+        if let Some(FileFormat::Bam) = args.input.format()? {
             trace!("launching interleaved encoding (htslib)");
             encode_interleaved_htslib(
                 args.input
                     .single_path()?
                     .context("Must provide an input path for HTSLib")?,
-                args.output.borrowed_path(),
+                args.output_path()?.as_deref(),
                 args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
@@ -443,13 +463,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.headers,
             )
         }
-    } else if let Some(FileFormat::Bam) = args.input.format {
+    } else if let Some(FileFormat::Bam) = args.input.format()? {
         trace!("launching single encoding (htslib)");
         encode_single_htslib(
             args.input
                 .single_path()?
                 .context("Must provide an input path for HTSlib")?,
-            args.output.borrowed_path(),
+            args.output_path()?.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -475,7 +495,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         )
     }?;
 
-    if let Some(opath) = args.output.borrowed_path() {
+    if let Some(opath) = opath {
         info!("Wrote {num_records} records to: {opath}");
     } else {
         info!("Wrote {num_records} records to: stdout");
