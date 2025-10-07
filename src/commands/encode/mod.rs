@@ -693,7 +693,7 @@ fn run_manifest(args: &EncodeCommand) -> Result<()> {
         info!("Total files found: {}", pqueue.len());
     }
 
-    process_queue(&args, pqueue, &regex)?;
+    process_queue(args, pqueue, &regex)?;
 
     Ok(())
 }
