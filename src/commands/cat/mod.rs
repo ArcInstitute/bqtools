@@ -3,12 +3,13 @@ use std::{fs::File, io::Write};
 use anyhow::{bail, Result};
 use binseq::{
     bq::{BinseqHeader, MmapReader, SIZE_HEADER},
-    BinseqReader,
+    vbq::{self, VBinseqHeader},
+    BinseqReader, ParallelReader,
 };
 use log::{error, trace};
 use memmap2::MmapOptions;
 
-use crate::cli::CatCommand;
+use crate::{cli::CatCommand, commands::encode::processor::VBinseqProcessor};
 
 fn strip_header(path: &str) -> Result<BinseqHeader> {
     let reader = MmapReader::new(path)?;
@@ -72,10 +73,31 @@ fn run_bq(args: CatCommand) -> Result<()> {
     Ok(())
 }
 
+fn record_vbq_header(paths: &[String]) -> Result<VBinseqHeader> {
+    if paths.is_empty() {
+        bail!("No input files.");
+    }
+    let reader = vbq::MmapReader::new(&paths[0])?;
+    let header = reader.header();
+    Ok(header.clone())
+}
+
+fn run_vbq(args: CatCommand) -> Result<()> {
+    let out_handle = args.output.as_writer()?;
+    let header = record_vbq_header(&args.input.input)?;
+    let processor = VBinseqProcessor::new(header, args.output.policy.into(), out_handle)?;
+    for path in args.input.input {
+        let reader = vbq::MmapReader::new(&path)?;
+        reader.process_parallel(processor.clone(), args.output.threads())?;
+    }
+    processor.finish()?;
+    Ok(())
+}
+
 pub fn run(args: CatCommand) -> Result<()> {
     if is_all_bq(&args.input.input)? {
         run_bq(args)
     } else {
-        unimplemented!("Not implemented yet for VBQ")
+        run_vbq(args)
     }
 }
