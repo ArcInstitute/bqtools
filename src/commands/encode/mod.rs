@@ -27,7 +27,7 @@ use crate::{
     types::BoxedReader,
 };
 
-mod processor;
+pub mod processor;
 pub mod utils;
 
 use processor::{BinseqProcessor, VBinseqProcessor};
