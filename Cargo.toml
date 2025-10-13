@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.4.4"
+version = "0.4.5"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
@@ -16,21 +16,21 @@ clap = { version = "4.5.48", features = ["derive"] }
 env_logger = "0.11.8"
 is-terminal = "0.4.16"
 itoa = "1.0.15"
-gzp = "1.0.1"
-libc = "0.2.176"
+gzp = "2.0.0"
+libc = "0.2.177"
 log = "0.4.28"
 memmap2 = "0.9.8"
 niffler = "3.0.0"
 num_cpus = "1.17.0"
-paraseq = { version = "0.4.2", features = ["htslib", "gcs"] }
-parking_lot = "0.12.4"
+paraseq = { version = "0.4.3", features = ["htslib", "gcs"] }
+parking_lot = "0.12.5"
 rand = "0.9.2"
-regex = "1.11.3"
+regex = "1.12.2"
 zstd = { version = "0.13.3", features = ["zstdmt"] }
 walkdir = "2.5.0"
 
 [dev-dependencies]
-bon = "3.7.2"
+bon = "3.8.1"
 itertools = "0.14.0"
 nucgen = "0.2.0"
 tempfile = "3.23.0"

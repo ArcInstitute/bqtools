@@ -27,7 +27,7 @@ use crate::{
     types::BoxedReader,
 };
 
-mod processor;
+pub mod processor;
 pub mod utils;
 
 use processor::{BinseqProcessor, VBinseqProcessor};
@@ -398,13 +398,14 @@ fn encode_paired(
 
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
+    let opath = args.output_path()?;
     let (num_records, num_skipped) = if args.input.paired() {
         trace!("launching paired encoding");
         let (rdr1, rdr2) = args.input.build_paired_readers()?;
         encode_paired(
             rdr1,
             rdr2,
-            args.output_path()?.as_deref(),
+            opath.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -415,13 +416,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.headers,
         )
     } else if args.input.interleaved {
-        if let Some(FileFormat::Bam) = args.input.format {
+        if let Some(FileFormat::Bam) = args.input.format() {
             trace!("launching interleaved encoding (htslib)");
             encode_interleaved_htslib(
                 args.input
                     .single_path()?
                     .context("Must provide an input path for HTSLib")?,
-                args.output.borrowed_path(),
+                opath.as_deref(),
                 args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
@@ -436,7 +437,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             trace!("launching interleaved encoding (fastx)");
             encode_interleaved(
                 args.input.build_single_reader()?,
-                args.output_path()?.as_deref(),
+                opath.as_deref(),
                 args.mode()?,
                 args.output.threads(),
                 args.output.compress(),
@@ -447,13 +448,13 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.headers,
             )
         }
-    } else if let Some(FileFormat::Bam) = args.input.format {
+    } else if let Some(FileFormat::Bam) = args.input.format() {
         trace!("launching single encoding (htslib)");
         encode_single_htslib(
             args.input
                 .single_path()?
                 .context("Must provide an input path for HTSlib")?,
-            args.output.borrowed_path(),
+            opath.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -467,7 +468,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         trace!("launching single encoding (fastx)");
         encode_single(
             args.input.build_single_reader()?,
-            args.output_path()?.as_deref(),
+            opath.as_deref(),
             args.mode()?,
             args.output.threads(),
             args.output.compress(),
@@ -479,7 +480,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         )
     }?;
 
-    if let Some(opath) = args.output.borrowed_path() {
+    if let Some(opath) = opath {
         info!("Wrote {num_records} records to: {opath}");
     } else {
         info!("Wrote {num_records} records to: stdout");
