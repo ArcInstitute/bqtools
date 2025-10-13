@@ -19,7 +19,7 @@ pub struct InputFile {
     pub input: Vec<String>,
 
     #[clap(short, long, help = "Input file format")]
-    pub format: Option<FileFormat>,
+    format: Option<FileFormat>,
 
     /// Batch size (in records) to use in parallel processing
     ///
@@ -71,6 +71,21 @@ impl InputFile {
 
     pub fn paired(&self) -> bool {
         self.input.len() == 2
+    }
+
+    pub fn format(&self) -> Option<FileFormat> {
+        if let Some(format) = self.format {
+            Some(format)
+        } else if self.input.len() == 1 {
+            let path = &self.input[0];
+            if path.ends_with(".bam") || path.ends_with(".sam") || path.ends_with(".cram") {
+                Some(FileFormat::Bam)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     pub fn is_stdin(&self) -> bool {
