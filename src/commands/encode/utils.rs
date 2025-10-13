@@ -134,7 +134,8 @@ pub fn generate_output_name(input_files: &[PathBuf], new_extension: &str) -> Res
         1 => {
             // Single file: just replace the extension
             let input_path = input_files[0].to_str().unwrap();
-            let extension_regex = Regex::new(r"\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$")?;
+            let extension_regex =
+                Regex::new(r"\.(?:fastq|fq|fasta|fa|sam|bam|cram)(?:\.gz|\.zst)?$")?;
             let output_name = extension_regex
                 .replace(input_path, new_extension)
                 .to_string();

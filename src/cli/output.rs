@@ -214,10 +214,6 @@ impl OutputBinseq {
         Ok(writer)
     }
 
-    pub fn borrowed_path(&self) -> Option<&str> {
-        self.output.as_deref()
-    }
-
     pub fn mode(&self) -> Result<BinseqMode> {
         if let Some(mode) = self.mode {
             Ok(mode)
