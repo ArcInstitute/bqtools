@@ -1,10 +1,15 @@
 use std::{fs::File, io::Write};
 
 use anyhow::{bail, Result};
-use binseq::bq::{BinseqHeader, MmapReader, SIZE_HEADER};
+use binseq::{
+    bq::{BinseqHeader, MmapReader, SIZE_HEADER},
+    vbq::{self, VBinseqHeader},
+    BinseqReader, ParallelReader,
+};
+use log::{error, trace};
 use memmap2::MmapOptions;
 
-use crate::cli::CatCommand;
+use crate::{cli::CatCommand, commands::encode::processor::VBinseqProcessor};
 
 fn strip_header(path: &str) -> Result<BinseqHeader> {
     let reader = MmapReader::new(path)?;
@@ -26,7 +31,34 @@ fn recover_header(paths: &[String]) -> Result<BinseqHeader> {
     exp_header.ok_or_else(|| anyhow::anyhow!("No input files."))
 }
 
-pub fn run(args: CatCommand) -> Result<()> {
+fn is_all_bq(paths: &[String]) -> Result<bool> {
+    let mut all_bq = true;
+    let mut all_vbq = true;
+    for path in paths {
+        let reader = BinseqReader::new(path)?;
+        match reader {
+            BinseqReader::Bq(_) => all_vbq = false,
+            BinseqReader::Vbq(_) => all_bq = false,
+        }
+    }
+    match (all_bq, all_vbq) {
+        (true, true) => bail!("No input files."),
+        (true, false) => {
+            trace!("All BQ files");
+            Ok(true)
+        } // all bq files
+        (false, true) => {
+            trace!("All VBQ files");
+            Ok(false)
+        } // all vbq files
+        (false, false) => {
+            error!("Inconsistent file types. Must provide either all BQ or all VBQ files.");
+            bail!("Inconsistent file types.")
+        }
+    }
+}
+
+fn run_bq(args: CatCommand) -> Result<()> {
     let header = recover_header(&args.input.input)?;
     let mut out_handle = args.output.as_writer()?;
 
@@ -39,4 +71,33 @@ pub fn run(args: CatCommand) -> Result<()> {
     out_handle.flush()?;
 
     Ok(())
+}
+
+fn record_vbq_header(paths: &[String]) -> Result<VBinseqHeader> {
+    if paths.is_empty() {
+        bail!("No input files.");
+    }
+    let reader = vbq::MmapReader::new(&paths[0])?;
+    let header = reader.header();
+    Ok(header.clone())
+}
+
+fn run_vbq(args: CatCommand) -> Result<()> {
+    let out_handle = args.output.as_writer()?;
+    let header = record_vbq_header(&args.input.input)?;
+    let processor = VBinseqProcessor::new(header, args.output.policy.into(), out_handle)?;
+    for path in args.input.input {
+        let reader = vbq::MmapReader::new(&path)?;
+        reader.process_parallel(processor.clone(), args.output.threads())?;
+    }
+    processor.finish()?;
+    Ok(())
+}
+
+pub fn run(args: CatCommand) -> Result<()> {
+    if is_all_bq(&args.input.input)? {
+        run_bq(args)
+    } else {
+        run_vbq(args)
+    }
 }
