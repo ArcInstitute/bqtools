@@ -416,7 +416,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.output.headers,
         )
     } else if args.input.interleaved {
-        if let Some(FileFormat::Bam) = args.input.format {
+        if let Some(FileFormat::Bam) = args.input.format() {
             trace!("launching interleaved encoding (htslib)");
             encode_interleaved_htslib(
                 args.input
@@ -448,7 +448,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.output.headers,
             )
         }
-    } else if let Some(FileFormat::Bam) = args.input.format {
+    } else if let Some(FileFormat::Bam) = args.input.format() {
         trace!("launching single encoding (htslib)");
         encode_single_htslib(
             args.input
