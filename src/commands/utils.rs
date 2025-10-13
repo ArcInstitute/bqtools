@@ -55,7 +55,7 @@ pub fn compress_gzip_passthrough(
     writer: Box<dyn Write + Send>,
     num_threads: usize,
 ) -> Result<Box<dyn Write + Send>> {
-    let encoder: ParCompress<Gzip> = ParCompressBuilder::new()
+    let encoder: ParCompress<Gzip, _> = ParCompressBuilder::new()
         .num_threads(num_threads)?
         .from_writer(writer);
     Ok(Box::new(encoder))
