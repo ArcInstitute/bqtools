@@ -96,7 +96,7 @@ impl Clone for GrepProcessor {
             xmatches: HashSet::new(),
             interval_buffer: Vec::new(),
             local_count: 0,
-            global_count: Arc::new(Mutex::new(0)),
+            global_count: self.global_count.clone(),
             is_split: self.is_split,
         }
     }
