@@ -9,7 +9,6 @@ use crate::{
 
 use anyhow::Result;
 use binseq::prelude::*;
-use log::warn;
 
 fn run_fuzzy(
     args: &GrepCommand,
@@ -41,6 +40,7 @@ fn run_fuzzy(
     }
     #[cfg(not(feature = "fuzzy"))]
     {
+        use log::warn;
         warn!("Fuzzy finding feature flag is not set during compilation - falling back to regex");
         run_regex(args, reader, writer, format, mate)
     }
