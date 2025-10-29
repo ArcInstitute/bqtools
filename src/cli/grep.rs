@@ -56,18 +56,6 @@ pub struct GrepArgs {
     #[clap(long)]
     pub or_logic: bool,
 
-    /// Fuzzy finding using `sassy`
-    ///
-    /// Note that regex expressions are not supported with this flag.
-    #[clap(short = 'z', long)]
-    pub fuzzy: bool,
-
-    /// Maximum edit distance to allow when fuzzy matching
-    ///
-    /// Only used with fuzzy matching
-    #[clap(short = 'k', long, default_value = "1")]
-    pub distance: usize,
-
     /// Colorize output (auto, always, never)
     #[clap(
         long,
@@ -76,6 +64,10 @@ pub struct GrepArgs {
         conflicts_with = "format"
     )]
     color: ColorWhen,
+
+    #[cfg(feature = "fuzzy")]
+    #[clap(flatten)]
+    pub fuzzy_args: FuzzyArgs,
 }
 
 impl GrepArgs {
@@ -119,6 +111,23 @@ impl GrepArgs {
     pub fn bytes_pat(&self) -> Vec<Vec<u8>> {
         self.reg.iter().map(|s| s.as_bytes().to_vec()).collect()
     }
+}
+
+#[cfg(feature = "fuzzy")]
+#[derive(Parser, Debug)]
+#[clap(next_help_heading = "FUZZY MATCHING OPTIONS")]
+pub struct FuzzyArgs {
+    /// Fuzzy finding using `sassy`
+    ///
+    /// Note that regex expressions are not supported with this flag.
+    #[clap(short = 'z', long)]
+    pub fuzzy: bool,
+
+    /// Maximum edit distance to allow when fuzzy matching
+    ///
+    /// Only used with fuzzy matching
+    #[clap(short = 'k', long, default_value = "1")]
+    pub distance: usize,
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]

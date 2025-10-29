@@ -10,6 +10,7 @@ use crate::{
 use anyhow::Result;
 use binseq::prelude::*;
 
+#[cfg(feature = "fuzzy")]
 fn run_fuzzy(
     args: &GrepCommand,
     reader: BinseqReader,
@@ -17,33 +18,24 @@ fn run_fuzzy(
     format: FileFormat,
     mate: Option<Mate>,
 ) -> Result<()> {
-    #[cfg(feature = "fuzzy")]
-    {
-        let proc = FuzzyProcessor::new(
-            args.grep.bytes_pat1(),
-            args.grep.bytes_pat2(),
-            args.grep.bytes_pat(),
-            args.grep.distance,
-            args.grep.and_logic(),
-            args.grep.invert,
-            args.grep.count,
-            writer,
-            format,
-            mate,
-            args.should_color(),
-        );
-        reader.process_parallel(proc.clone(), args.output.threads())?;
-        if args.grep.count {
-            proc.pprint_counts();
-        }
-        Ok(())
+    let proc = FuzzyProcessor::new(
+        args.grep.bytes_pat1(),
+        args.grep.bytes_pat2(),
+        args.grep.bytes_pat(),
+        args.grep.fuzzy_args.distance,
+        args.grep.and_logic(),
+        args.grep.invert,
+        args.grep.count,
+        writer,
+        format,
+        mate,
+        args.should_color(),
+    );
+    reader.process_parallel(proc.clone(), args.output.threads())?;
+    if args.grep.count {
+        proc.pprint_counts();
     }
-    #[cfg(not(feature = "fuzzy"))]
-    {
-        use log::warn;
-        warn!("Fuzzy finding feature flag is not set during compilation - falling back to regex");
-        run_regex(args, reader, writer, format, mate)
-    }
+    Ok(())
 }
 
 fn run_regex(
@@ -89,9 +81,18 @@ pub fn run(args: &GrepCommand) -> Result<()> {
     } else {
         None
     };
-    if args.grep.fuzzy {
-        run_fuzzy(args, reader, writer, format, mate)
-    } else {
+
+    #[cfg(feature = "fuzzy")]
+    {
+        if args.grep.fuzzy_args.fuzzy {
+            run_fuzzy(args, reader, writer, format, mate)
+        } else {
+            run_regex(args, reader, writer, format, mate)
+        }
+    }
+
+    #[cfg(not(feature = "fuzzy"))]
+    {
         run_regex(args, reader, writer, format, mate)
     }
 }
