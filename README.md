@@ -54,6 +54,25 @@ cargo install --path .
 bqtools --help
 ```
 
+### Feature Flags
+
+`bqtools` supports the following feature flags:
+
+- `fuzzy`: Enable fuzzy sequencing matching using [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy)
+
+Currently `fuzzy` requires being installed with the `nightly` rust toolchain.
+
+To install the `nightly` toolchain and make use of the `fuzzy` feature, run the following commands:
+
+```bash
+# install the nightly toolchain and set it as default
+rustup toolchain install nightly
+rustup default nightly
+
+# install bqtools with the fuzzy feature enabled
+cargo install bqtools -F fuzzy
+```
+
 ## Usage
 
 ```bash
@@ -214,5 +233,16 @@ bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A"
 
 # Search for multiple regular expressions (OR-logic)
 bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A" --or-logic
+```
 
+`bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
+
+Please note that this requires compiling `bqtools` with the `-F fuzzy` flag (see installation above for details).
+
+```bash
+# Run grep with fuzzy matching (-z)
+bqtools grep input.bq "ACGTACGT" -z
+
+# Run fuzzy matching with an edit distance of 2
+bqtools grep input.bq "ACGTACGT" -z -k2
 ```
