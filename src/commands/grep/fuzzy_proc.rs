@@ -67,6 +67,7 @@ pub struct GrepProcessor {
     global_count: Arc<Mutex<usize>>,
 }
 
+/// TODO: Remove this once clone is included on stable sassy
 impl Clone for GrepProcessor {
     fn clone(&self) -> Self {
         Self {
