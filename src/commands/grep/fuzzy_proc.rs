@@ -160,7 +160,7 @@ impl GrepProcessor {
         }
         self.pat1.iter().all(|pat| {
             let mut found = false;
-            for mat in self.searcher.search_all(pat, &self.sbuf, self.k) {
+            for mat in self.searcher.search(pat, &self.sbuf, self.k) {
                 self.smatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
@@ -174,7 +174,7 @@ impl GrepProcessor {
         }
         self.pat2.iter().all(|pat| {
             let mut found = false;
-            for mat in self.searcher.search_all(pat, &self.xbuf, self.k) {
+            for mat in self.searcher.search(pat, &self.xbuf, self.k) {
                 self.xmatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
@@ -188,11 +188,11 @@ impl GrepProcessor {
         }
         self.pat.iter().all(|pat| {
             let mut found = false;
-            for mat in self.searcher.search_all(pat, &self.sbuf, self.k) {
+            for mat in self.searcher.search(pat, &self.sbuf, self.k) {
                 self.smatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
-            for mat in self.searcher.search_all(pat, &self.xbuf, self.k) {
+            for mat in self.searcher.search(pat, &self.xbuf, self.k) {
                 self.xmatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
