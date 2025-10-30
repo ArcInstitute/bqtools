@@ -19,6 +19,7 @@ pub struct GrepProcessor {
     pat2: Patterns, // in secondary
     pat: Patterns,  // in either
     k: usize,       // maximum edit distance to accept
+    inexact: bool,  // whether to only report inexact matches
 
     searcher: Searcher<Dna>,
 
@@ -75,6 +76,7 @@ impl Clone for GrepProcessor {
             pat2: self.pat2.clone(),
             pat: self.pat.clone(),
             k: self.k,
+            inexact: self.inexact,
             searcher: Searcher::new_fwd(), // Initialize searcher with default settings
             and_logic: self.and_logic,
             invert: self.invert,
@@ -109,6 +111,7 @@ impl GrepProcessor {
         pat2: Patterns,
         pat: Patterns,
         k: usize,
+        inexact: bool,
         and_logic: bool,
         invert: bool,
         count: bool,
@@ -135,6 +138,7 @@ impl GrepProcessor {
             pat2,
             pat,
             k,
+            inexact,
             and_logic,
             invert,
             count,
@@ -161,6 +165,9 @@ impl GrepProcessor {
         self.pat1.iter().all(|pat| {
             let mut found = false;
             for mat in self.searcher.search(pat, &self.sbuf, self.k) {
+                if self.inexact && mat.cost == 0 {
+                    continue;
+                }
                 self.smatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
@@ -175,6 +182,9 @@ impl GrepProcessor {
         self.pat2.iter().all(|pat| {
             let mut found = false;
             for mat in self.searcher.search(pat, &self.xbuf, self.k) {
+                if self.inexact && mat.cost == 0 {
+                    continue;
+                }
                 self.xmatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
@@ -189,10 +199,16 @@ impl GrepProcessor {
         self.pat.iter().all(|pat| {
             let mut found = false;
             for mat in self.searcher.search(pat, &self.sbuf, self.k) {
+                if self.inexact && mat.cost == 0 {
+                    continue;
+                }
                 self.smatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }
             for mat in self.searcher.search(pat, &self.xbuf, self.k) {
+                if self.inexact && mat.cost == 0 {
+                    continue;
+                }
                 self.xmatches.insert((mat.text_start, mat.text_end));
                 found = true;
             }

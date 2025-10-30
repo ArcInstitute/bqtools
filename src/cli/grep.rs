@@ -128,6 +128,12 @@ pub struct FuzzyArgs {
     /// Only used with fuzzy matching
     #[clap(short = 'k', long, default_value = "1")]
     pub distance: usize,
+
+    /// Only return inexact matches on fuzzy matching
+    ///
+    /// This will capture matches that are not exact, but are within the specified edit distance.
+    #[clap(short = 'i', long)]
+    pub inexact: bool,
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]

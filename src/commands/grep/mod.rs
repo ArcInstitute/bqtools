@@ -23,6 +23,7 @@ fn run_fuzzy(
         args.grep.bytes_pat2(),
         args.grep.bytes_pat(),
         args.grep.fuzzy_args.distance,
+        args.grep.fuzzy_args.inexact,
         args.grep.and_logic(),
         args.grep.invert,
         args.grep.count,
