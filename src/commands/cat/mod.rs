@@ -79,7 +79,7 @@ fn record_vbq_header(paths: &[String]) -> Result<VBinseqHeader> {
     }
     let reader = vbq::MmapReader::new(&paths[0])?;
     let header = reader.header();
-    Ok(header.clone())
+    Ok(header)
 }
 
 fn run_vbq(args: CatCommand) -> Result<()> {
