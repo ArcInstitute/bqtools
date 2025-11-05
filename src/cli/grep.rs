@@ -64,6 +64,9 @@ pub struct GrepArgs {
         conflicts_with = "format"
     )]
     color: ColorWhen,
+
+    #[clap(flatten)]
+    pub fuzzy_args: FuzzyArgs,
 }
 
 impl GrepArgs {
@@ -94,6 +97,40 @@ impl GrepArgs {
     pub fn and_logic(&self) -> bool {
         !self.or_logic
     }
+}
+
+impl GrepArgs {
+    pub fn bytes_pat1(&self) -> Vec<Vec<u8>> {
+        self.reg1.iter().map(|s| s.as_bytes().to_vec()).collect()
+    }
+    pub fn bytes_pat2(&self) -> Vec<Vec<u8>> {
+        self.reg2.iter().map(|s| s.as_bytes().to_vec()).collect()
+    }
+    pub fn bytes_pat(&self) -> Vec<Vec<u8>> {
+        self.reg.iter().map(|s| s.as_bytes().to_vec()).collect()
+    }
+}
+
+#[derive(Parser, Debug)]
+#[clap(next_help_heading = "FUZZY MATCHING OPTIONS")]
+pub struct FuzzyArgs {
+    /// Fuzzy finding using `sassy`
+    ///
+    /// Note that regex expressions are not supported with this flag.
+    #[clap(short = 'z', long)]
+    pub fuzzy: bool,
+
+    /// Maximum edit distance to allow when fuzzy matching
+    ///
+    /// Only used with fuzzy matching
+    #[clap(short = 'k', long, default_value = "1")]
+    pub distance: usize,
+
+    /// Only return inexact matches on fuzzy matching
+    ///
+    /// This will capture matches that are not exact, but are within the specified edit distance.
+    #[clap(short = 'i', long)]
+    pub inexact: bool,
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]

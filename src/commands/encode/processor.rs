@@ -359,10 +359,10 @@ impl<W: Write + Send> binseq::ParallelProcessor for VBinseqProcessor<W> {
                 record.flag(),
                 Some(&self.sheader),
                 &self.sbuf,
-                Some(&record.squal()),
+                Some(record.squal()),
                 Some(&self.xheader),
                 &self.xbuf,
-                Some(&record.xqual()),
+                Some(record.xqual()),
             )
         } else {
             record.decode_s(&mut self.sbuf)?;
@@ -372,7 +372,7 @@ impl<W: Write + Send> binseq::ParallelProcessor for VBinseqProcessor<W> {
                 record.flag(),
                 Some(&self.sheader),
                 &self.sbuf,
-                Some(&record.squal()),
+                Some(record.squal()),
             )
         }?;
 

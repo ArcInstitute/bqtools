@@ -26,7 +26,7 @@ For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/co
 - **Decode**: Convert a BINSEQ file back to FASTA, FASTQ, or TSV format
 - **Cat**: Concatenate multiple BINSEQ files
 - **Count**: Count records in a BINSEQ file
-- **Grep**: Search for fixed-string or regex patterns in BINSEQ files.
+- **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
 
 ## Installation
 
@@ -214,5 +214,14 @@ bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A"
 
 # Search for multiple regular expressions (OR-logic)
 bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A" --or-logic
+```
 
+`bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
+
+```bash
+# Run grep with fuzzy matching (-z)
+bqtools grep input.bq "ACGTACGT" -z
+
+# Run fuzzy matching with an edit distance of 2
+bqtools grep input.bq "ACGTACGT" -z -k2
 ```

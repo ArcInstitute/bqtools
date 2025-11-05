@@ -26,7 +26,7 @@ impl EncodeCommand {
     }
     pub fn output_path(&self) -> Result<Option<String>> {
         if let Some(path) = &self.output.output {
-            Ok(Some(path.to_string()))
+            Ok(Some(path.clone()))
         } else if self.output.pipe {
             Ok(None)
         } else if self.input.is_stdin() {
