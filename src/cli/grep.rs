@@ -65,6 +65,7 @@ pub struct GrepArgs {
     )]
     color: ColorWhen,
 
+    #[cfg(feature = "fuzzy")]
     #[clap(flatten)]
     pub fuzzy_args: FuzzyArgs,
 }
@@ -99,6 +100,7 @@ impl GrepArgs {
     }
 }
 
+#[cfg(feature = "fuzzy")]
 impl GrepArgs {
     pub fn bytes_pat1(&self) -> Vec<Vec<u8>> {
         self.reg1.iter().map(|s| s.as_bytes().to_vec()).collect()
@@ -111,6 +113,7 @@ impl GrepArgs {
     }
 }
 
+#[cfg(feature = "fuzzy")]
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "FUZZY MATCHING OPTIONS")]
 pub struct FuzzyArgs {

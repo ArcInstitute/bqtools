@@ -54,6 +54,24 @@ cargo install --path .
 bqtools --help
 ```
 
+### Feature Flags
+
+bqtools supports the following feature flags:
+
+- `fuzzy`: Enable fuzzy matching in the `grep` command using the [`sassy`](https://crates.io/crates/sassy) library
+
+To enable fuzzy matching, `bqtools` must be compiled using a `native` target cpu:
+
+
+```bash
+# Install from source
+cargo install --path . -F fuzzy;
+
+# Or install from crates but enforce native target cpu
+export RUSTFLAGS="-C target-cpu=native"; cargo install bqtools -F fuzzy;
+```
+
+
 ## Usage
 
 ```bash
@@ -217,6 +235,8 @@ bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A" --or-logic
 ```
 
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
+
+This requires installing using the `fuzzy` feature flag (see installation above):
 
 ```bash
 # Run grep with fuzzy matching (-z)
