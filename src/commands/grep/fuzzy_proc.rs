@@ -123,7 +123,7 @@ impl GrepProcessor {
         self.xmatches.clear();
     }
 
-    fn regex_primary(&mut self) -> bool {
+    fn match_primary(&mut self) -> bool {
         if self.pat1.is_empty() {
             return true;
         }
@@ -140,7 +140,7 @@ impl GrepProcessor {
         })
     }
 
-    fn regex_secondary(&mut self) -> bool {
+    fn match_secondary(&mut self) -> bool {
         if self.pat2.is_empty() || self.xbuf.is_empty() {
             return true;
         }
@@ -157,7 +157,7 @@ impl GrepProcessor {
         })
     }
 
-    fn regex_either(&mut self) -> bool {
+    fn match_either(&mut self) -> bool {
         if self.pat.is_empty() {
             return true;
         }
@@ -182,9 +182,9 @@ impl GrepProcessor {
     }
 
     pub fn pattern_match(&mut self) -> bool {
-        let found_either = self.regex_either();
-        let found_primary = self.regex_primary();
-        let found_secondary = self.regex_secondary();
+        let found_either = self.match_either();
+        let found_primary = self.match_primary();
+        let found_secondary = self.match_secondary();
 
         let pred = if self.and_logic {
             found_either && found_primary && found_secondary
