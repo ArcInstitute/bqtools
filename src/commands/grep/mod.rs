@@ -84,16 +84,8 @@ pub fn run(args: &GrepCommand) -> Result<()> {
     };
 
     #[cfg(feature = "fuzzy")]
-    {
-        if args.grep.fuzzy_args.fuzzy {
-            run_fuzzy(args, reader, writer, format, mate)
-        } else {
-            run_regex(args, reader, writer, format, mate)
-        }
+    if args.grep.fuzzy_args.fuzzy {
+        return run_fuzzy(args, reader, writer, format, mate);
     }
-
-    #[cfg(not(feature = "fuzzy"))]
-    {
-        run_regex(args, reader, writer, format, mate)
-    }
+    run_regex(args, reader, writer, format, mate)
 }
