@@ -26,7 +26,7 @@ For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/co
 - **Decode**: Convert a BINSEQ file back to FASTA, FASTQ, or TSV format
 - **Cat**: Concatenate multiple BINSEQ files
 - **Count**: Count records in a BINSEQ file
-- **Grep**: Search for fixed-string or regex patterns in BINSEQ files.
+- **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
 
 ## Installation
 
@@ -52,25 +52,6 @@ cargo install --path .
 
 # Check installation
 bqtools --help
-```
-
-### Feature Flags
-
-`bqtools` supports the following feature flags:
-
-- `fuzzy`: Enable fuzzy sequencing matching using [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy)
-
-Currently `fuzzy` requires being installed with the `nightly` rust toolchain.
-
-To install the `nightly` toolchain and make use of the `fuzzy` feature, run the following commands:
-
-```bash
-# install the nightly toolchain and set it as default
-rustup toolchain install nightly
-rustup default nightly
-
-# install bqtools with the fuzzy feature enabled
-cargo install bqtools -F fuzzy
 ```
 
 ## Usage
@@ -236,8 +217,6 @@ bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A" --or-logic
 ```
 
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
-
-Please note that this requires compiling `bqtools` with the `-F fuzzy` flag (see installation above for details).
 
 ```bash
 # Run grep with fuzzy matching (-z)

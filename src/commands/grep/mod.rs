@@ -1,5 +1,9 @@
 mod color;
+mod fuzzy_proc;
 mod regex_proc;
+
+use fuzzy_proc::GrepProcessor as FuzzyProcessor;
+use regex_proc::GrepProcessor as RegexProcessor;
 
 use super::decode::build_writer;
 use crate::{
@@ -10,7 +14,6 @@ use crate::{
 use anyhow::Result;
 use binseq::prelude::*;
 
-#[cfg(feature = "fuzzy")]
 fn run_fuzzy(
     args: &GrepCommand,
     reader: BinseqReader,
@@ -65,13 +68,6 @@ fn run_regex(
     Ok(())
 }
 
-#[cfg(feature = "fuzzy")]
-mod fuzzy_proc;
-#[cfg(feature = "fuzzy")]
-use fuzzy_proc::GrepProcessor as FuzzyProcessor;
-
-use regex_proc::GrepProcessor as RegexProcessor;
-
 pub fn run(args: &GrepCommand) -> Result<()> {
     args.grep.validate()?;
     let reader = BinseqReader::new(args.input.path())?;
@@ -83,9 +79,9 @@ pub fn run(args: &GrepCommand) -> Result<()> {
         None
     };
 
-    #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
-        return run_fuzzy(args, reader, writer, format, mate);
+        run_fuzzy(args, reader, writer, format, mate)
+    } else {
+        run_regex(args, reader, writer, format, mate)
     }
-    run_regex(args, reader, writer, format, mate)
 }
