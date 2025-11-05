@@ -52,6 +52,10 @@ pub struct GrepArgs {
     #[clap(short = 'C', long)]
     pub count: bool,
 
+    /// Count number of matches per pattern
+    #[clap(short = 'P', long)]
+    pub pattern_count: bool,
+
     /// use OR logic for multiple patterns (default=AND)
     #[clap(long)]
     pub or_logic: bool,
