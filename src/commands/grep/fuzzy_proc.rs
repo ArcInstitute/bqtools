@@ -12,6 +12,7 @@ use sassy::{profiles::Dna, Searcher};
 
 type Patterns = Vec<Vec<u8>>;
 
+#[derive(Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct GrepProcessor {
     /// Patterns to fuzzy match on
@@ -66,42 +67,6 @@ pub struct GrepProcessor {
     /// Global values
     global_writer: Arc<Mutex<SplitWriter>>,
     global_count: Arc<Mutex<usize>>,
-}
-
-/// TODO: Remove this once clone is included on stable sassy
-impl Clone for GrepProcessor {
-    fn clone(&self) -> Self {
-        Self {
-            pat1: self.pat1.clone(),
-            pat2: self.pat2.clone(),
-            pat: self.pat.clone(),
-            k: self.k,
-            inexact: self.inexact,
-            searcher: Searcher::new_fwd(), // Initialize searcher with default settings
-            and_logic: self.and_logic,
-            invert: self.invert,
-            count: self.count,
-            global_writer: self.global_writer.clone(),
-            format: self.format,
-            mate: self.mate.clone(),
-            color: self.color,
-            mixed: Vec::new(),
-            left: Vec::new(),
-            right: Vec::new(),
-            sbuf: Vec::new(),
-            xbuf: Vec::new(),
-            squal: Vec::new(),
-            xqual: Vec::new(),
-            sheader: Vec::new(),
-            xheader: Vec::new(),
-            smatches: HashSet::new(),
-            xmatches: HashSet::new(),
-            interval_buffer: Vec::new(),
-            local_count: 0,
-            global_count: self.global_count.clone(),
-            is_split: self.is_split,
-        }
-    }
 }
 
 impl GrepProcessor {
