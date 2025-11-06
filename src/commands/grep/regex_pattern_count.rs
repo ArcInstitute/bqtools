@@ -58,11 +58,7 @@ impl GrepPatternCountProcessor {
             return;
         }
         self.re1.iter().enumerate().for_each(|(index, reg)| {
-            if reg.find(&self.sbuf).is_some() {
-                if !self.invert {
-                    self.local_pattern_count[index] += 1;
-                }
-            } else if self.invert {
+            if reg.find(&self.sbuf).is_some() != self.invert {
                 self.local_pattern_count[index] += 1;
             }
         });
@@ -73,11 +69,7 @@ impl GrepPatternCountProcessor {
             return;
         }
         self.re2.iter().enumerate().for_each(|(index, reg)| {
-            if reg.find(&self.xbuf).is_some() {
-                if !self.invert {
-                    self.local_pattern_count[self.re1.len() + index] += 1;
-                }
-            } else if self.invert {
+            if reg.find(&self.xbuf).is_some() != self.invert {
                 self.local_pattern_count[self.re1.len() + index] += 1;
             }
         });
@@ -88,11 +80,7 @@ impl GrepPatternCountProcessor {
             return;
         }
         self.re.iter().enumerate().for_each(|(index, reg)| {
-            if reg.find(&self.sbuf).is_some() || reg.find(&self.xbuf).is_some() {
-                if !self.invert {
-                    self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
-                }
-            } else if self.invert {
+            if (reg.find(&self.sbuf).is_some() || reg.find(&self.xbuf).is_some()) != self.invert {
                 self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
             }
         });

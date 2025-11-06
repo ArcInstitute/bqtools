@@ -88,11 +88,7 @@ impl FuzzyPatternCountProcessor {
                         counted = true;
                     }
                 });
-            if counted {
-                if !self.invert {
-                    self.local_pattern_count[index] += 1;
-                }
-            } else if self.invert {
+            if counted != self.invert {
                 self.local_pattern_count[index] += 1;
             }
         });
@@ -117,11 +113,7 @@ impl FuzzyPatternCountProcessor {
                         counted = true;
                     }
                 });
-            if counted {
-                if !self.invert {
-                    self.local_pattern_count[self.pat1.len() + index] += 1;
-                }
-            } else if self.invert {
+            if counted != self.invert {
                 self.local_pattern_count[self.pat1.len() + index] += 1;
             }
         });
@@ -161,11 +153,7 @@ impl FuzzyPatternCountProcessor {
                     }
                 });
 
-            if counted {
-                if !self.invert {
-                    self.local_pattern_count[self.pat1.len() + self.pat2.len() + index] += 1;
-                }
-            } else if self.invert {
+            if counted != self.invert {
                 self.local_pattern_count[self.pat1.len() + self.pat2.len() + index] += 1;
             }
         })
