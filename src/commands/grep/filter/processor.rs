@@ -12,6 +12,7 @@ use std::sync::Arc;
 use super::{MatchRanges, PatternMatcher};
 
 #[derive(Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct FilterProcessor<Pm: PatternMatcher> {
     matcher: Pm,
 
@@ -60,6 +61,8 @@ pub struct FilterProcessor<Pm: PatternMatcher> {
     global_count: Arc<Mutex<usize>>,
 }
 impl<Pm: PatternMatcher> FilterProcessor<Pm> {
+    #[allow(clippy::fn_params_excessive_bools)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         matcher: Pm,
         and_logic: bool,
