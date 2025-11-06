@@ -115,9 +115,14 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
             &self.xbuf,
             &mut self.smatches,
             &mut self.xmatches,
+            self.and_logic,
         );
-        let found_primary = self.matcher.match_primary(&self.sbuf, &mut self.smatches);
-        let found_secondary = self.matcher.match_secondary(&self.xbuf, &mut self.xmatches);
+        let found_primary =
+            self.matcher
+                .match_primary(&self.sbuf, &mut self.smatches, self.and_logic);
+        let found_secondary =
+            self.matcher
+                .match_secondary(&self.xbuf, &mut self.xmatches, self.and_logic);
 
         let pred = if self.and_logic {
             found_either && found_primary && found_secondary

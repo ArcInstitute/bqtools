@@ -29,9 +29,9 @@ fn run_fuzzy(
 ) -> Result<()> {
     if args.grep.pattern_count {
         let counter = FuzzyPatternCounter::new(
-            args.grep.bytes_pat1(),
-            args.grep.bytes_pat2(),
-            args.grep.bytes_pat(),
+            args.grep.bytes_pat1()?,
+            args.grep.bytes_pat2()?,
+            args.grep.bytes_pat()?,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
@@ -41,9 +41,9 @@ fn run_fuzzy(
         proc.pprint_pattern_counts()?;
     } else {
         let matcher = FuzzyMatcher::new(
-            args.grep.bytes_pat1(),
-            args.grep.bytes_pat2(),
-            args.grep.bytes_pat(),
+            args.grep.bytes_pat1()?,
+            args.grep.bytes_pat2()?,
+            args.grep.bytes_pat()?,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
         );
@@ -75,9 +75,9 @@ fn run_regex(
 ) -> Result<()> {
     if args.grep.pattern_count {
         let counter = RegexPatternCounter::new(
-            args.grep.bytes_reg1(),
-            args.grep.bytes_reg2(),
-            args.grep.bytes_reg(),
+            args.grep.bytes_reg1()?,
+            args.grep.bytes_reg2()?,
+            args.grep.bytes_reg()?,
             args.grep.invert,
         );
         let proc = PatternCountProcessor::new(counter);
@@ -85,9 +85,9 @@ fn run_regex(
         proc.pprint_pattern_counts()?;
     } else {
         let matcher = RegexMatcher::new(
-            args.grep.bytes_reg1(),
-            args.grep.bytes_reg2(),
-            args.grep.bytes_reg(),
+            args.grep.bytes_reg1()?,
+            args.grep.bytes_reg2()?,
+            args.grep.bytes_reg()?,
         );
         let proc = FilterProcessor::new(
             matcher,
