@@ -102,9 +102,13 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
     pub fn clear_buffers(&mut self) {
         self.sbuf.clear();
         self.xbuf.clear();
+        self.clear_matches();
+    }
+    pub fn clear_matches(&mut self) {
         self.smatches.clear();
         self.xmatches.clear();
     }
+
     pub fn pattern_match(&mut self) -> bool {
         let found_either = self.matcher.match_either(
             &self.sbuf,
@@ -122,6 +126,7 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
         };
 
         if self.invert {
+            self.clear_matches(); // ensure no partial matches are highlighted
             !pred
         } else {
             pred
