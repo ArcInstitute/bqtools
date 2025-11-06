@@ -249,21 +249,21 @@ bqtools grep input.bq "ACGTACGT" -z -k2
 bqtools grep input.bq "ACGTACGT" -zi
 ```
 
-`bqtools` also introduces a new feature for the counting the occurences of individual patterns.
+`bqtools` also introduces a new feature for the counting the occurrences of individual patterns.
 This is useful for seeing how many times each pattern occurs across a sequencing dataset without having to iterate over the dataset multiple times using traditional methods.
 
 Some important notes are:
 1. A pattern will only be counted once across a sequencing record (primary and secondary)
-2. A sequencing record may contribute to multiple patterns occurences
+2. A sequencing record may contribute to multiple patterns occurrences
 3. Providing multiple patterns will match records with `OR` logic (this is different behavior from `bqtools grep` default which uses `AND` logic when multiple patterns are provided)
 4. Regular expressions are supported and treated as a single pattern (e.g. `ACGT|TCGA` will return a single output row but match on both `ACGT` and `TCGA`).
 5. Invert is supported for counting patterns and will return the number of records a pattern does not occur in.
 
 ```bash
-# Count the number of occurences for each of three expressions
+# Count the number of occurrences for each of three expressions
 bqtools grep input.bq "ACGTACGT" "TCGATCGA$" "AAA(TT|CC)AAA" -P
 
-# Count the number of occurences for each of three patterns with fuzzy matching
+# Count the number of occurrences for each of three patterns with fuzzy matching
 bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pz
 
 # Count the number of records a pattern does not occur in
