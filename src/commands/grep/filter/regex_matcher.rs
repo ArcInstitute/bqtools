@@ -16,33 +16,36 @@ impl RegexMatcher {
     }
 }
 
+fn find_and_insert_matches(
+    reg: &regex::bytes::Regex,
+    sequence: &[u8],
+    matches: &mut MatchRanges,
+) -> bool {
+    let mut found = false;
+    for index in reg.find_iter(sequence) {
+        matches.insert((index.start(), index.end()));
+        found = true;
+    }
+    found
+}
+
 impl PatternMatcher for RegexMatcher {
     fn match_primary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
         if self.re1.is_empty() {
             return true;
         }
-        self.re1.iter().all(|reg| {
-            let mut found = false;
-            for index in reg.find_iter(sequence) {
-                matches.insert((index.start(), index.end()));
-                found = true;
-            }
-            found
-        })
+        self.re1
+            .iter()
+            .all(|reg| find_and_insert_matches(reg, sequence, matches))
     }
 
     fn match_secondary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
         if self.re2.is_empty() || sequence.is_empty() {
             return true;
         }
-        self.re2.iter().all(|reg| {
-            let mut found = false;
-            for index in reg.find_iter(sequence) {
-                matches.insert((index.start(), index.end()));
-                found = true;
-            }
-            found
-        })
+        self.re2
+            .iter()
+            .all(|reg| find_and_insert_matches(reg, sequence, matches))
     }
 
     fn match_either(
@@ -56,16 +59,9 @@ impl PatternMatcher for RegexMatcher {
             return true;
         }
         self.re.iter().all(|reg| {
-            let mut found = false;
-            for index in reg.find_iter(primary) {
-                smatches.insert((index.start(), index.end()));
-                found = true;
-            }
-            for index in reg.find_iter(secondary) {
-                xmatches.insert((index.start(), index.end()));
-                found = true;
-            }
-            found
+            let found_s = find_and_insert_matches(reg, primary, smatches);
+            let found_x = find_and_insert_matches(reg, secondary, xmatches);
+            found_s || found_x
         })
     }
 }

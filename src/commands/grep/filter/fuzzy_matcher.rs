@@ -27,21 +27,39 @@ impl FuzzyMatcher {
     }
 }
 
+fn find_and_insert_matches(
+    pat: &[u8],
+    sequence: &[u8],
+    matches: &mut MatchRanges,
+    searcher: &mut Searcher<Dna>,
+    k: usize,
+    inexact: bool,
+) -> bool {
+    let mut found = false;
+    for mat in searcher.search(pat, &sequence, k) {
+        if inexact && mat.cost == 0 {
+            continue;
+        }
+        matches.insert((mat.text_start, mat.text_end));
+        found = true;
+    }
+    found
+}
+
 impl PatternMatcher for FuzzyMatcher {
     fn match_primary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
         if self.pat1.is_empty() {
             return true;
         }
         self.pat1.iter().all(|pat| {
-            let mut found = false;
-            for mat in self.searcher.search(pat, &sequence, self.k) {
-                if self.inexact && mat.cost == 0 {
-                    continue;
-                }
-                matches.insert((mat.text_start, mat.text_end));
-                found = true;
-            }
-            found
+            find_and_insert_matches(
+                pat,
+                sequence,
+                matches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+            )
         })
     }
 
@@ -50,15 +68,14 @@ impl PatternMatcher for FuzzyMatcher {
             return true;
         }
         self.pat2.iter().all(|pat| {
-            let mut found = false;
-            for mat in self.searcher.search(pat, &sequence, self.k) {
-                if self.inexact && mat.cost == 0 {
-                    continue;
-                }
-                matches.insert((mat.text_start, mat.text_end));
-                found = true;
-            }
-            found
+            find_and_insert_matches(
+                pat,
+                sequence,
+                matches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+            )
         })
     }
 
@@ -73,22 +90,23 @@ impl PatternMatcher for FuzzyMatcher {
             return true;
         }
         self.pat.iter().all(|pat| {
-            let mut found = false;
-            for mat in self.searcher.search(pat, &primary, self.k) {
-                if self.inexact && mat.cost == 0 {
-                    continue;
-                }
-                smatches.insert((mat.text_start, mat.text_end));
-                found = true;
-            }
-            for mat in self.searcher.search(pat, &secondary, self.k) {
-                if self.inexact && mat.cost == 0 {
-                    continue;
-                }
-                xmatches.insert((mat.text_start, mat.text_end));
-                found = true;
-            }
-            found
+            let found_s = find_and_insert_matches(
+                pat,
+                primary,
+                smatches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+            );
+            let found_x = find_and_insert_matches(
+                pat,
+                secondary,
+                xmatches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+            );
+            found_s || found_x
         })
     }
 }
