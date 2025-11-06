@@ -49,11 +49,19 @@ pub struct GrepArgs {
     pub invert: bool,
 
     /// Only count matches
-    #[clap(short = 'C', long)]
+    #[clap(short = 'C', long, conflicts_with = "pattern_count")]
     pub count: bool,
 
+    /// Count number of matches per pattern
+    ///
+    /// This will output a TSV with the number of matches per pattern.
+    /// Note that a sequence may contribute to multiple patterns counts.
+    /// A pattern will also only be counted once per sequence.
+    #[clap(short = 'P', long, conflicts_with = "count")]
+    pub pattern_count: bool,
+
     /// use OR logic for multiple patterns (default=AND)
-    #[clap(long)]
+    #[clap(long, conflicts_with = "pattern_count")]
     pub or_logic: bool,
 
     /// Colorize output (auto, always, never)

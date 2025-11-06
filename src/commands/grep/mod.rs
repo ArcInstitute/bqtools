@@ -1,4 +1,5 @@
 mod color;
+mod pattern_count;
 mod regex_proc;
 
 #[cfg(feature = "fuzzy")]
@@ -6,6 +7,11 @@ mod fuzzy_proc;
 
 #[cfg(feature = "fuzzy")]
 use fuzzy_proc::GrepProcessor as FuzzyProcessor;
+
+#[cfg(feature = "fuzzy")]
+use pattern_count::FuzzyPatternCounter;
+
+use pattern_count::{PatternCountProcessor, RegexPatternCounter};
 use regex_proc::GrepProcessor as RegexProcessor;
 
 use super::decode::build_writer;
@@ -25,24 +31,39 @@ fn run_fuzzy(
     format: FileFormat,
     mate: Option<Mate>,
 ) -> Result<()> {
-    let proc = FuzzyProcessor::new(
-        args.grep.bytes_pat1(),
-        args.grep.bytes_pat2(),
-        args.grep.bytes_pat(),
-        args.grep.fuzzy_args.distance,
-        args.grep.fuzzy_args.inexact,
-        args.grep.and_logic(),
-        args.grep.invert,
-        args.grep.count,
-        writer,
-        format,
-        mate,
-        args.should_color(),
-    );
-    reader.process_parallel(proc.clone(), args.output.threads())?;
-    if args.grep.count {
-        proc.pprint_counts();
+    if args.grep.pattern_count {
+        let counter = FuzzyPatternCounter::new(
+            args.grep.bytes_pat1(),
+            args.grep.bytes_pat2(),
+            args.grep.bytes_pat(),
+            args.grep.fuzzy_args.distance,
+            args.grep.fuzzy_args.inexact,
+            args.grep.invert,
+        );
+        let proc = PatternCountProcessor::new(counter);
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+        proc.pprint_pattern_counts()?;
+    } else {
+        let proc = FuzzyProcessor::new(
+            args.grep.bytes_pat1(),
+            args.grep.bytes_pat2(),
+            args.grep.bytes_pat(),
+            args.grep.fuzzy_args.distance,
+            args.grep.fuzzy_args.inexact,
+            args.grep.and_logic(),
+            args.grep.invert,
+            args.grep.count,
+            writer,
+            format,
+            mate,
+            args.should_color(),
+        );
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+        if args.grep.count {
+            proc.pprint_counts();
+        }
     }
+
     Ok(())
 }
 
@@ -53,21 +74,33 @@ fn run_regex(
     format: FileFormat,
     mate: Option<Mate>,
 ) -> Result<()> {
-    let proc = RegexProcessor::new(
-        args.grep.bytes_reg1(),
-        args.grep.bytes_reg2(),
-        args.grep.bytes_reg(),
-        args.grep.and_logic(),
-        args.grep.invert,
-        args.grep.count,
-        writer,
-        format,
-        mate,
-        args.should_color(),
-    );
-    reader.process_parallel(proc.clone(), args.output.threads())?;
-    if args.grep.count {
-        proc.pprint_counts();
+    if args.grep.pattern_count {
+        let counter = RegexPatternCounter::new(
+            args.grep.bytes_reg1(),
+            args.grep.bytes_reg2(),
+            args.grep.bytes_reg(),
+            args.grep.invert,
+        );
+        let proc = PatternCountProcessor::new(counter);
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+        proc.pprint_pattern_counts()?;
+    } else {
+        let proc = RegexProcessor::new(
+            args.grep.bytes_reg1(),
+            args.grep.bytes_reg2(),
+            args.grep.bytes_reg(),
+            args.grep.and_logic(),
+            args.grep.invert,
+            args.grep.count,
+            writer,
+            format,
+            mate,
+            args.should_color(),
+        );
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+        if args.grep.count {
+            proc.pprint_counts();
+        }
     }
     Ok(())
 }
