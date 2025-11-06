@@ -80,7 +80,7 @@ impl GrepPatternCountProcessor {
             } else if self.invert {
                 self.local_pattern_count[self.re1.len() + index] += 1;
             }
-        })
+        });
     }
 
     fn regex_either(&mut self) {
@@ -95,7 +95,7 @@ impl GrepPatternCountProcessor {
             } else if self.invert {
                 self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
             }
-        })
+        });
     }
 
     pub fn pattern_match(&mut self) {
@@ -125,7 +125,7 @@ impl GrepPatternCountProcessor {
                 let count = *count.lock();
                 let frac_matched = count as f64 / total_counts as f64;
                 let frac_total = count as f64 / total_records as f64;
-                println!("{}\t{}\t{}\t{}", re, count, frac_matched, frac_total);
+                println!("{re}\t{count}\t{frac_matched}\t{frac_total}");
             });
     }
 }
