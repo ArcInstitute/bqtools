@@ -83,7 +83,7 @@ impl FuzzyPatternCounter {
             if counted != self.invert {
                 pattern_counts[self.pat1.len() + self.pat2.len() + index] += 1;
             }
-        })
+        });
     }
 }
 
