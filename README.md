@@ -249,6 +249,23 @@ bqtools grep input.bq "ACGTACGT" -z -k2
 bqtools grep input.bq "ACGTACGT" -zi
 ```
 
+`bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
+You can provide files for either primary/extended, just primary, or just extended patterns with the relevant flags.
+Notably this will match *solely* with OR logic.
+This can be used also with fuzzy matching as well as with pattern counting described below.
+Regex is also fully supported and files can be additionally paired with CLI arguments.
+
+```bash
+# Run grep with patterns from a file
+bqtools grep input.bq --file patterns.txt
+
+# Run grep with patterns from a file (primary)
+bqtools grep input.bq --sfile patterns.txt
+
+# Run grep with patterns from a file (extended)
+bqtools grep input.bq --xfile patterns.txt
+```
+
 `bqtools` also introduces a new feature for the counting the occurrences of individual patterns.
 This is useful for seeing how many times each pattern occurs across a sequencing dataset without having to iterate over the dataset multiple times using traditional methods.
 
@@ -268,4 +285,7 @@ bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pz
 
 # Count the number of records a pattern does not occur in
 bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pv
+
+# Count the number of occurences for each pattern from a file
+bqtools grep input.bq --file patterns.txt -P
 ```

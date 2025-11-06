@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 
 use crate::cli::FileFormat;
@@ -62,7 +62,7 @@ pub struct GrepArgs {
 
     /// use OR logic for multiple patterns (default=AND)
     #[clap(long, conflicts_with = "pattern_count")]
-    pub or_logic: bool,
+    or_logic: bool,
 
     /// Colorize output (auto, always, never)
     #[clap(
@@ -76,48 +76,79 @@ pub struct GrepArgs {
     #[cfg(feature = "fuzzy")]
     #[clap(flatten)]
     pub fuzzy_args: FuzzyArgs,
+
+    #[clap(flatten)]
+    pub file_args: PatternFileArgs,
 }
 
 impl GrepArgs {
     pub fn validate(&self) -> Result<()> {
-        if self.reg1.is_empty() && self.reg2.is_empty() && self.reg.is_empty() {
+        if self.reg1.is_empty()
+            && self.reg2.is_empty()
+            && self.reg.is_empty()
+            && self.file_args.empty()
+        {
             anyhow::bail!("At least one pattern must be specified");
         }
         Ok(())
     }
-    pub fn bytes_reg1(&self) -> Vec<regex::bytes::Regex> {
-        self.reg1
+    fn chain_regex(
+        &self,
+        cli_patterns: &[String],
+        filetype: PatternFileType,
+    ) -> Result<Vec<regex::bytes::Regex>> {
+        let cli_iter = cli_patterns
             .iter()
-            .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"))
-            .collect()
+            .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"));
+        if self.file_args.empty_file(filetype) {
+            Ok(cli_iter.collect())
+        } else {
+            let patterns = self.file_args.regex(filetype)?;
+            Ok(cli_iter.chain(patterns.into_iter()).collect())
+        }
     }
-    pub fn bytes_reg2(&self) -> Vec<regex::bytes::Regex> {
-        self.reg2
-            .iter()
-            .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"))
-            .collect()
+    pub fn bytes_reg1(&self) -> Result<Vec<regex::bytes::Regex>> {
+        self.chain_regex(&self.reg1, PatternFileType::SFile)
     }
-    pub fn bytes_reg(&self) -> Vec<regex::bytes::Regex> {
-        self.reg
-            .iter()
-            .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"))
-            .collect()
+    pub fn bytes_reg2(&self) -> Result<Vec<regex::bytes::Regex>> {
+        self.chain_regex(&self.reg2, PatternFileType::XFile)
+    }
+    pub fn bytes_reg(&self) -> Result<Vec<regex::bytes::Regex>> {
+        self.chain_regex(&self.reg, PatternFileType::File)
     }
     pub fn and_logic(&self) -> bool {
-        !self.or_logic
+        if self.file_args.empty() {
+            !self.or_logic
+        } else {
+            // using any FILE args forces OR logic
+            false
+        }
     }
 }
 
 #[cfg(feature = "fuzzy")]
 impl GrepArgs {
-    pub fn bytes_pat1(&self) -> Vec<Vec<u8>> {
-        self.reg1.iter().map(|s| s.as_bytes().to_vec()).collect()
+    fn chain_bytes(
+        &self,
+        cli_patterns: &[String],
+        filetype: PatternFileType,
+    ) -> Result<Vec<Vec<u8>>> {
+        let bytes_iter = cli_patterns.iter().map(|s| s.as_bytes().to_vec());
+        if self.file_args.empty_file(filetype) {
+            Ok(bytes_iter.collect())
+        } else {
+            let patterns = self.file_args.patterns(filetype)?;
+            Ok(bytes_iter.chain(patterns.into_iter()).collect())
+        }
     }
-    pub fn bytes_pat2(&self) -> Vec<Vec<u8>> {
-        self.reg2.iter().map(|s| s.as_bytes().to_vec()).collect()
+    pub fn bytes_pat1(&self) -> Result<Vec<Vec<u8>>> {
+        self.chain_bytes(&self.reg1, PatternFileType::SFile)
     }
-    pub fn bytes_pat(&self) -> Vec<Vec<u8>> {
-        self.reg.iter().map(|s| s.as_bytes().to_vec()).collect()
+    pub fn bytes_pat2(&self) -> Result<Vec<Vec<u8>>> {
+        self.chain_bytes(&self.reg2, PatternFileType::XFile)
+    }
+    pub fn bytes_pat(&self) -> Result<Vec<Vec<u8>>> {
+        self.chain_bytes(&self.reg, PatternFileType::File)
     }
 }
 
@@ -142,6 +173,90 @@ pub struct FuzzyArgs {
     /// This will capture matches that are not exact, but are within the specified edit distance.
     #[clap(short = 'i', long)]
     pub inexact: bool,
+}
+
+#[derive(Parser, Debug)]
+#[clap(next_help_heading = "PATTERN FILE OPTIONS")]
+pub struct PatternFileArgs {
+    /// File of patterns to search for
+    ///
+    /// This assumes one pattern per line.
+    /// Patterns may be regex or literal (fuzzy doesn't support regex).
+    /// These will match against either primary or extended sequence.
+    #[clap(long)]
+    pub file: Option<String>,
+
+    /// File of patterns to search for in primary sequence
+    ///
+    /// This assumes one pattern per line.
+    /// Patterns may be regex or literal (fuzzy doesn't support regex).
+    #[clap(long)]
+    pub sfile: Option<String>,
+
+    /// File of patterns to search for in extended sequence
+    ///
+    /// This assumes one pattern per line.
+    /// Patterns may be regex or literal (fuzzy doesn't support regex).
+    #[clap(long)]
+    pub xfile: Option<String>,
+}
+impl PatternFileArgs {
+    fn empty(&self) -> bool {
+        self.file.is_none() && self.sfile.is_none() && self.xfile.is_none()
+    }
+
+    fn empty_file(&self, filetype: PatternFileType) -> bool {
+        match filetype {
+            PatternFileType::File => self.file.is_none(),
+            PatternFileType::SFile => self.sfile.is_none(),
+            PatternFileType::XFile => self.xfile.is_none(),
+        }
+    }
+
+    fn read_file(&self, filetype: PatternFileType) -> Result<String> {
+        let file = match filetype {
+            PatternFileType::File => &self.file,
+            PatternFileType::SFile => &self.sfile,
+            PatternFileType::XFile => &self.xfile,
+        };
+        if let Some(file) = file {
+            Ok(std::fs::read_to_string(file)?)
+        } else {
+            bail!("Specified file type {:?} not provided at CLI", filetype)
+        }
+    }
+
+    fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {
+        let contents = self.read_file(filetype)?;
+        let mut patterns = Vec::new();
+        for line in contents.lines() {
+            patterns.push(line.as_bytes().to_vec());
+        }
+        Ok(patterns)
+    }
+
+    fn regex(&self, filetype: PatternFileType) -> Result<Vec<regex::bytes::Regex>> {
+        let contents = self.read_file(filetype)?;
+        let mut regexes = Vec::new();
+        for line in contents.lines() {
+            if let Ok(regex) = regex::bytes::Regex::new(&line) {
+                regexes.push(regex);
+            } else {
+                eprintln!("Invalid regex pattern: {}", line);
+            }
+        }
+        Ok(regexes)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PatternFileType {
+    /// patterns for either primary or extended sequence
+    File,
+    /// primary sequence patterns
+    SFile,
+    /// extended sequence patterns
+    XFile,
 }
 
 #[derive(Clone, Debug, clap::ValueEnum)]

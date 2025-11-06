@@ -30,22 +30,44 @@ fn find_and_insert_matches(
 }
 
 impl PatternMatcher for RegexMatcher {
-    fn match_primary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
+    fn match_primary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
         if self.re1.is_empty() {
             return true;
         }
-        self.re1
-            .iter()
-            .all(|reg| find_and_insert_matches(reg, sequence, matches))
+        if and_logic {
+            self.re1
+                .iter()
+                .all(|reg| find_and_insert_matches(reg, sequence, matches))
+        } else {
+            self.re1
+                .iter()
+                .any(|reg| find_and_insert_matches(reg, sequence, matches))
+        }
     }
 
-    fn match_secondary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
+    fn match_secondary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
         if self.re2.is_empty() || sequence.is_empty() {
             return true;
         }
-        self.re2
-            .iter()
-            .all(|reg| find_and_insert_matches(reg, sequence, matches))
+        if and_logic {
+            self.re2
+                .iter()
+                .all(|reg| find_and_insert_matches(reg, sequence, matches))
+        } else {
+            self.re2
+                .iter()
+                .any(|reg| find_and_insert_matches(reg, sequence, matches))
+        }
     }
 
     fn match_either(
@@ -54,14 +76,23 @@ impl PatternMatcher for RegexMatcher {
         secondary: &[u8],
         smatches: &mut MatchRanges,
         xmatches: &mut MatchRanges,
+        and_logic: bool,
     ) -> bool {
         if self.re.is_empty() {
             return true;
         }
-        self.re.iter().all(|reg| {
-            let found_s = find_and_insert_matches(reg, primary, smatches);
-            let found_x = find_and_insert_matches(reg, secondary, xmatches);
-            found_s || found_x
-        })
+        if and_logic {
+            self.re.iter().all(|reg| {
+                let found_s = find_and_insert_matches(reg, primary, smatches);
+                let found_x = find_and_insert_matches(reg, secondary, xmatches);
+                found_s || found_x // still or because we want to match either
+            })
+        } else {
+            self.re.iter().any(|reg| {
+                let found_s = find_and_insert_matches(reg, primary, smatches);
+                let found_x = find_and_insert_matches(reg, secondary, xmatches);
+                found_s || found_x
+            })
+        }
     }
 }

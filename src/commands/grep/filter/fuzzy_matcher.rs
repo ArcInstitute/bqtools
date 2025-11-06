@@ -47,36 +47,72 @@ fn find_and_insert_matches(
 }
 
 impl PatternMatcher for FuzzyMatcher {
-    fn match_primary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
+    fn match_primary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
         if self.pat1.is_empty() {
             return true;
         }
-        self.pat1.iter().all(|pat| {
-            find_and_insert_matches(
-                pat,
-                sequence,
-                matches,
-                &mut self.searcher,
-                self.k,
-                self.inexact,
-            )
-        })
+        if and_logic {
+            self.pat1.iter().all(|pat| {
+                find_and_insert_matches(
+                    pat,
+                    sequence,
+                    matches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                )
+            })
+        } else {
+            self.pat1.iter().any(|pat| {
+                find_and_insert_matches(
+                    pat,
+                    sequence,
+                    matches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                )
+            })
+        }
     }
 
-    fn match_secondary(&mut self, sequence: &[u8], matches: &mut MatchRanges) -> bool {
+    fn match_secondary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
         if self.pat2.is_empty() || sequence.is_empty() {
             return true;
         }
-        self.pat2.iter().all(|pat| {
-            find_and_insert_matches(
-                pat,
-                sequence,
-                matches,
-                &mut self.searcher,
-                self.k,
-                self.inexact,
-            )
-        })
+        if and_logic {
+            self.pat2.iter().all(|pat| {
+                find_and_insert_matches(
+                    pat,
+                    sequence,
+                    matches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                )
+            })
+        } else {
+            self.pat2.iter().any(|pat| {
+                find_and_insert_matches(
+                    pat,
+                    sequence,
+                    matches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                )
+            })
+        }
     }
 
     fn match_either(
@@ -85,28 +121,51 @@ impl PatternMatcher for FuzzyMatcher {
         secondary: &[u8],
         smatches: &mut MatchRanges,
         xmatches: &mut MatchRanges,
+        and_logic: bool,
     ) -> bool {
         if self.pat.is_empty() {
             return true;
         }
-        self.pat.iter().all(|pat| {
-            let found_s = find_and_insert_matches(
-                pat,
-                primary,
-                smatches,
-                &mut self.searcher,
-                self.k,
-                self.inexact,
-            );
-            let found_x = find_and_insert_matches(
-                pat,
-                secondary,
-                xmatches,
-                &mut self.searcher,
-                self.k,
-                self.inexact,
-            );
-            found_s || found_x
-        })
+        if and_logic {
+            self.pat.iter().all(|pat| {
+                let found_s = find_and_insert_matches(
+                    pat,
+                    primary,
+                    smatches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                );
+                let found_x = find_and_insert_matches(
+                    pat,
+                    secondary,
+                    xmatches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                );
+                found_s || found_x // still OR here because we want to match either primary or secondary
+            })
+        } else {
+            self.pat.iter().any(|pat| {
+                let found_s = find_and_insert_matches(
+                    pat,
+                    primary,
+                    smatches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                );
+                let found_x = find_and_insert_matches(
+                    pat,
+                    secondary,
+                    xmatches,
+                    &mut self.searcher,
+                    self.k,
+                    self.inexact,
+                );
+                found_s || found_x
+            })
+        }
     }
 }
