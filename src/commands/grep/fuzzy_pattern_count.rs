@@ -196,8 +196,16 @@ impl FuzzyPatternCountProcessor {
             .zip(self.global_pattern_count.iter())
             .try_for_each(|(re, count)| -> Result<()> {
                 let count = *count.lock();
-                let frac_matched = count as f64 / total_counts as f64;
-                let frac_total = count as f64 / total_records as f64;
+                let frac_matched = if total_counts > 0 {
+                    count as f64 / total_counts as f64
+                } else {
+                    0.0
+                };
+                let frac_total = if total_records > 0 {
+                    count as f64 / total_records as f64
+                } else {
+                    0.0
+                };
                 let pat_str = std::str::from_utf8(&re)?;
                 println!("{}\t{}\t{}\t{}", pat_str, count, frac_matched, frac_total);
                 Ok(())

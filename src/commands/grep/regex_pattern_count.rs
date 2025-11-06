@@ -123,8 +123,16 @@ impl GrepPatternCountProcessor {
             .zip(self.global_pattern_count.iter())
             .for_each(|(re, count)| {
                 let count = *count.lock();
-                let frac_matched = count as f64 / total_counts as f64;
-                let frac_total = count as f64 / total_records as f64;
+                let frac_matched = if total_counts > 0 {
+                    count as f64 / total_counts as f64
+                } else {
+                    0.0
+                };
+                let frac_total = if total_records > 0 {
+                    count as f64 / total_records as f64
+                } else {
+                    0.0
+                };
                 println!("{re}\t{count}\t{frac_matched}\t{frac_total}");
             });
     }
