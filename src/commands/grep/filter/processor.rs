@@ -1,23 +1,19 @@
-use std::{collections::HashSet, sync::Arc};
-
-use super::color::write_colored_record_pair;
 use crate::{
     cli::{FileFormat, Mate},
-    commands::decode::{write_record_pair, SplitWriter},
+    commands::{
+        decode::{write_record_pair, SplitWriter},
+        grep::color::write_colored_record_pair,
+    },
 };
-
 use binseq::prelude::*;
 use parking_lot::Mutex;
+use std::sync::Arc;
 
-type Expressions = Vec<regex::bytes::Regex>;
+use super::{MatchRanges, PatternMatcher};
 
 #[derive(Clone)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct GrepProcessor {
-    /// Regex expressions to match on
-    re1: Expressions, // in primary
-    re2: Expressions, // in secondary
-    re: Expressions,  // in either
+pub struct FilterProcessor<Pm: PatternMatcher> {
+    matcher: Pm,
 
     /// Match logic (true = AND, false = OR)
     and_logic: bool,
@@ -32,8 +28,8 @@ pub struct GrepProcessor {
     local_count: usize,
 
     /// Local primary/extended sequence match indices
-    smatches: HashSet<(usize, usize)>,
-    xmatches: HashSet<(usize, usize)>,
+    smatches: MatchRanges,
+    xmatches: MatchRanges,
 
     /// Local write buffers
     mixed: Vec<u8>, // General purpose, interleaved or singlets
@@ -63,12 +59,9 @@ pub struct GrepProcessor {
     global_writer: Arc<Mutex<SplitWriter>>,
     global_count: Arc<Mutex<usize>>,
 }
-impl GrepProcessor {
-    #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
+impl<Pm: PatternMatcher> FilterProcessor<Pm> {
     pub fn new(
-        re1: Expressions,
-        re2: Expressions,
-        re: Expressions,
+        matcher: Pm,
         and_logic: bool,
         invert: bool,
         count: bool,
@@ -87,12 +80,10 @@ impl GrepProcessor {
             xqual: Vec::new(),
             sheader: Vec::new(),
             xheader: Vec::new(),
-            smatches: HashSet::new(),
-            xmatches: HashSet::new(),
+            smatches: MatchRanges::default(),
+            xmatches: MatchRanges::default(),
             interval_buffer: Vec::new(),
-            re1,
-            re2,
-            re,
+            matcher,
             and_logic,
             invert,
             count,
@@ -111,57 +102,15 @@ impl GrepProcessor {
         self.smatches.clear();
         self.xmatches.clear();
     }
-
-    fn regex_primary(&mut self) -> bool {
-        if self.re1.is_empty() {
-            return true;
-        }
-        self.re1.iter().all(|reg| {
-            let mut found = false;
-            for index in reg.find_iter(&self.sbuf) {
-                self.smatches.insert((index.start(), index.end()));
-                found = true;
-            }
-            found
-        })
-    }
-
-    fn regex_secondary(&mut self) -> bool {
-        if self.re2.is_empty() || self.xbuf.is_empty() {
-            return true;
-        }
-        self.re2.iter().all(|reg| {
-            let mut found = false;
-            for index in reg.find_iter(&self.xbuf) {
-                self.xmatches.insert((index.start(), index.end()));
-                found = true;
-            }
-            found
-        })
-    }
-
-    fn regex_either(&mut self) -> bool {
-        if self.re.is_empty() {
-            return true;
-        }
-        self.re.iter().all(|reg| {
-            let mut found = false;
-            for index in reg.find_iter(&self.sbuf) {
-                self.smatches.insert((index.start(), index.end()));
-                found = true;
-            }
-            for index in reg.find_iter(&self.xbuf) {
-                self.xmatches.insert((index.start(), index.end()));
-                found = true;
-            }
-            found
-        })
-    }
-
     pub fn pattern_match(&mut self) -> bool {
-        let found_either = self.regex_either();
-        let found_primary = self.regex_primary();
-        let found_secondary = self.regex_secondary();
+        let found_either = self.matcher.match_either(
+            &self.sbuf,
+            &self.xbuf,
+            &mut self.smatches,
+            &mut self.xmatches,
+        );
+        let found_primary = self.matcher.match_primary(&self.sbuf, &mut self.smatches);
+        let found_secondary = self.matcher.match_secondary(&self.xbuf, &mut self.xmatches);
 
         let pred = if self.and_logic {
             found_either && found_primary && found_secondary
@@ -175,12 +124,12 @@ impl GrepProcessor {
             pred
         }
     }
-
     pub fn pprint_counts(&self) {
         println!("{}", self.global_count.lock());
     }
 }
-impl ParallelProcessor for GrepProcessor {
+
+impl<Pm: PatternMatcher> ParallelProcessor for FilterProcessor<Pm> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
         self.clear_buffers();
 
