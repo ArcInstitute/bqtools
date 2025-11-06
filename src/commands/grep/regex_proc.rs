@@ -281,6 +281,7 @@ impl ParallelProcessor for GrepProcessor {
         // Increment the global count and reset local
         *self.global_count.lock() += self.local_count;
         self.local_count = 0;
+
         Ok(())
     }
 }
