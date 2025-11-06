@@ -11,12 +11,12 @@ type Patterns = Vec<Vec<u8>>;
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzyPatternCountProcessor {
     /// Regex expressions to match on
-    re1: Patterns, // in primary
-    re2: Patterns, // in secondary
-    re: Patterns,  // in either
-    k: usize,      // maximum edit distance
-    inexact: bool, // only count inexact matches
-    invert: bool,  // invert the match
+    pat1: Patterns, // in primary
+    pat2: Patterns, // in secondary
+    pat: Patterns,  // in either
+    k: usize,       // maximum edit distance
+    inexact: bool,  // only count inexact matches
+    invert: bool,   // invert the match
 
     searcher: Searcher<Dna>,
 
@@ -35,25 +35,25 @@ pub struct FuzzyPatternCountProcessor {
 impl FuzzyPatternCountProcessor {
     #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
     pub fn new(
-        re1: Patterns,
-        re2: Patterns,
-        re: Patterns,
+        pat1: Patterns,
+        pat2: Patterns,
+        pat: Patterns,
         k: usize,
         inexact: bool,
         invert: bool,
     ) -> Self {
-        let local_pattern_count = vec![0; re1.len() + re2.len() + re.len()];
+        let local_pattern_count = vec![0; pat1.len() + pat2.len() + pat.len()];
         let global_pattern_count = Arc::new(
-            (0..re1.len() + re2.len() + re.len())
+            (0..pat1.len() + pat2.len() + pat.len())
                 .map(|_| Mutex::new(0))
                 .collect(),
         );
         Self {
             sbuf: Vec::new(),
             xbuf: Vec::new(),
-            re1,
-            re2,
-            re,
+            pat1,
+            pat2,
+            pat,
             k,
             inexact,
             invert,
@@ -69,11 +69,11 @@ impl FuzzyPatternCountProcessor {
         self.xbuf.clear();
     }
 
-    fn regex_primary(&mut self) {
-        if self.re1.is_empty() {
+    fn match_primary(&mut self) {
+        if self.pat1.is_empty() {
             return;
         }
-        self.re1.iter().enumerate().for_each(|(index, pat)| {
+        self.pat1.iter().enumerate().for_each(|(index, pat)| {
             let mut counted = false;
             self.searcher
                 .search(pat, &self.sbuf, self.k)
@@ -98,11 +98,11 @@ impl FuzzyPatternCountProcessor {
         });
     }
 
-    fn regex_secondary(&mut self) {
-        if self.re2.is_empty() || self.xbuf.is_empty() {
+    fn match_secondary(&mut self) {
+        if self.pat2.is_empty() || self.xbuf.is_empty() {
             return;
         }
-        self.re2.iter().enumerate().for_each(|(index, pat)| {
+        self.pat2.iter().enumerate().for_each(|(index, pat)| {
             let mut counted = false;
             self.searcher
                 .search(pat, &self.xbuf, self.k)
@@ -119,19 +119,19 @@ impl FuzzyPatternCountProcessor {
                 });
             if counted {
                 if !self.invert {
-                    self.local_pattern_count[self.re1.len() + index] += 1;
+                    self.local_pattern_count[self.pat1.len() + index] += 1;
                 }
             } else if self.invert {
-                self.local_pattern_count[self.re1.len() + index] += 1;
+                self.local_pattern_count[self.pat1.len() + index] += 1;
             }
         });
     }
 
-    fn regex_either(&mut self) {
-        if self.re.is_empty() {
+    fn match_either(&mut self) {
+        if self.pat.is_empty() {
             return;
         }
-        self.re.iter().enumerate().for_each(|(index, pat)| {
+        self.pat.iter().enumerate().for_each(|(index, pat)| {
             let mut counted = false;
             self.searcher
                 .search(pat, &self.sbuf, self.k)
@@ -163,18 +163,18 @@ impl FuzzyPatternCountProcessor {
 
             if counted {
                 if !self.invert {
-                    self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
+                    self.local_pattern_count[self.pat1.len() + self.pat2.len() + index] += 1;
                 }
             } else if self.invert {
-                self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
+                self.local_pattern_count[self.pat1.len() + self.pat2.len() + index] += 1;
             }
         })
     }
 
     pub fn pattern_match(&mut self) {
-        self.regex_either();
-        self.regex_primary();
-        self.regex_secondary();
+        self.match_either();
+        self.match_primary();
+        self.match_secondary();
     }
 
     fn total_counts(&self) -> usize {
@@ -189,10 +189,10 @@ impl FuzzyPatternCountProcessor {
         let total_records = *self.global_total.lock();
 
         println!("pattern\tcount\tfrac_matched\tfrac_total");
-        self.re1
+        self.pat1
             .iter()
-            .chain(self.re2.iter())
-            .chain(self.re.iter())
+            .chain(self.pat2.iter())
+            .chain(self.pat.iter())
             .zip(self.global_pattern_count.iter())
             .try_for_each(|(re, count)| -> Result<()> {
                 let count = *count.lock();
