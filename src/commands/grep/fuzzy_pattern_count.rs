@@ -16,6 +16,7 @@ pub struct FuzzyPatternCountProcessor {
     re: Patterns,  // in either
     k: usize,      // maximum edit distance
     inexact: bool, // only count inexact matches
+    invert: bool,  // invert the match
 
     searcher: Searcher<Dna>,
 
@@ -33,7 +34,14 @@ pub struct FuzzyPatternCountProcessor {
 }
 impl FuzzyPatternCountProcessor {
     #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-    pub fn new(re1: Patterns, re2: Patterns, re: Patterns, k: usize, inexact: bool) -> Self {
+    pub fn new(
+        re1: Patterns,
+        re2: Patterns,
+        re: Patterns,
+        k: usize,
+        inexact: bool,
+        invert: bool,
+    ) -> Self {
         let local_pattern_count = vec![0; re1.len() + re2.len() + re.len()];
         let global_pattern_count = Arc::new(
             (0..re1.len() + re2.len() + re.len())
@@ -48,6 +56,7 @@ impl FuzzyPatternCountProcessor {
             re,
             k,
             inexact,
+            invert,
             searcher: Searcher::new_fwd(),
             local_total: 0,
             local_pattern_count,
@@ -76,10 +85,16 @@ impl FuzzyPatternCountProcessor {
                         if self.inexact && mat.cost == 0 {
                             return;
                         }
-                        self.local_pattern_count[index] += 1;
                         counted = true;
                     }
-                })
+                });
+            if counted {
+                if !self.invert {
+                    self.local_pattern_count[index] += 1;
+                }
+            } else if self.invert {
+                self.local_pattern_count[index] += 1;
+            }
         });
     }
 
@@ -99,10 +114,16 @@ impl FuzzyPatternCountProcessor {
                         if self.inexact && mat.cost == 0 {
                             return;
                         }
-                        self.local_pattern_count[self.re1.len() + index] += 1;
                         counted = true;
                     }
-                })
+                });
+            if counted {
+                if !self.invert {
+                    self.local_pattern_count[self.re1.len() + index] += 1;
+                }
+            } else if self.invert {
+                self.local_pattern_count[self.re1.len() + index] += 1;
+            }
         });
     }
 
@@ -122,7 +143,6 @@ impl FuzzyPatternCountProcessor {
                         if self.inexact && mat.cost == 0 {
                             return;
                         }
-                        self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
                         counted = true;
                     }
                 });
@@ -137,10 +157,17 @@ impl FuzzyPatternCountProcessor {
                         if self.inexact && mat.cost == 0 {
                             return;
                         }
-                        self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
                         counted = true;
                     }
                 });
+
+            if counted {
+                if !self.invert {
+                    self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
+                }
+            } else if self.invert {
+                self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
+            }
         })
     }
 

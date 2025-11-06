@@ -41,6 +41,7 @@ fn run_fuzzy(
             args.grep.bytes_pat(),
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
+            args.grep.invert,
         );
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts()?;
@@ -80,6 +81,7 @@ fn run_regex(
             args.grep.bytes_reg1(),
             args.grep.bytes_reg2(),
             args.grep.bytes_reg(),
+            args.grep.invert,
         );
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts();

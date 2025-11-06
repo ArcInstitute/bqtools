@@ -61,7 +61,7 @@ pub struct GrepArgs {
     pub pattern_count: bool,
 
     /// use OR logic for multiple patterns (default=AND)
-    #[clap(long)]
+    #[clap(long, conflicts_with = "pattern_count")]
     pub or_logic: bool,
 
     /// Colorize output (auto, always, never)

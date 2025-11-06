@@ -12,6 +12,7 @@ pub struct GrepPatternCountProcessor {
     re1: Expressions, // in primary
     re2: Expressions, // in secondary
     re: Expressions,  // in either
+    invert: bool,
 
     /// Local count
     local_pattern_count: Vec<usize>,
@@ -27,7 +28,7 @@ pub struct GrepPatternCountProcessor {
 }
 impl GrepPatternCountProcessor {
     #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-    pub fn new(re1: Expressions, re2: Expressions, re: Expressions) -> Self {
+    pub fn new(re1: Expressions, re2: Expressions, re: Expressions, invert: bool) -> Self {
         let local_pattern_count = vec![0; re1.len() + re2.len() + re.len()];
         let global_pattern_count = Arc::new(
             (0..re1.len() + re2.len() + re.len())
@@ -40,6 +41,7 @@ impl GrepPatternCountProcessor {
             re1,
             re2,
             re,
+            invert,
             local_total: 0,
             local_pattern_count,
             global_pattern_count,
@@ -57,6 +59,10 @@ impl GrepPatternCountProcessor {
         }
         self.re1.iter().enumerate().for_each(|(index, reg)| {
             if reg.find(&self.sbuf).is_some() {
+                if !self.invert {
+                    self.local_pattern_count[index] += 1;
+                }
+            } else if self.invert {
                 self.local_pattern_count[index] += 1;
             }
         });
@@ -68,6 +74,10 @@ impl GrepPatternCountProcessor {
         }
         self.re2.iter().enumerate().for_each(|(index, reg)| {
             if reg.find(&self.xbuf).is_some() {
+                if !self.invert {
+                    self.local_pattern_count[self.re1.len() + index] += 1;
+                }
+            } else if self.invert {
                 self.local_pattern_count[self.re1.len() + index] += 1;
             }
         })
@@ -79,6 +89,10 @@ impl GrepPatternCountProcessor {
         }
         self.re.iter().enumerate().for_each(|(index, reg)| {
             if reg.find(&self.sbuf).is_some() || reg.find(&self.xbuf).is_some() {
+                if !self.invert {
+                    self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
+                }
+            } else if self.invert {
                 self.local_pattern_count[self.re1.len() + self.re2.len() + index] += 1;
             }
         })
