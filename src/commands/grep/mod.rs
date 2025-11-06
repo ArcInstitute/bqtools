@@ -1,20 +1,17 @@
 mod color;
-mod regex_pattern_count;
+mod pattern_count;
 mod regex_proc;
 
 #[cfg(feature = "fuzzy")]
 mod fuzzy_proc;
 
 #[cfg(feature = "fuzzy")]
-mod fuzzy_pattern_count;
-
-#[cfg(feature = "fuzzy")]
 use fuzzy_proc::GrepProcessor as FuzzyProcessor;
 
 #[cfg(feature = "fuzzy")]
-use fuzzy_pattern_count::FuzzyPatternCountProcessor;
+use pattern_count::FuzzyPatternCounter;
 
-use regex_pattern_count::GrepPatternCountProcessor;
+use pattern_count::{PatternCountProcessor, RegexPatternCounter};
 use regex_proc::GrepProcessor as RegexProcessor;
 
 use super::decode::build_writer;
@@ -35,7 +32,7 @@ fn run_fuzzy(
     mate: Option<Mate>,
 ) -> Result<()> {
     if args.grep.pattern_count {
-        let proc = FuzzyPatternCountProcessor::new(
+        let counter = FuzzyPatternCounter::new(
             args.grep.bytes_pat1(),
             args.grep.bytes_pat2(),
             args.grep.bytes_pat(),
@@ -43,6 +40,7 @@ fn run_fuzzy(
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
         );
+        let proc = PatternCountProcessor::new(counter);
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts()?;
     } else {
@@ -77,14 +75,15 @@ fn run_regex(
     mate: Option<Mate>,
 ) -> Result<()> {
     if args.grep.pattern_count {
-        let proc = GrepPatternCountProcessor::new(
+        let counter = RegexPatternCounter::new(
             args.grep.bytes_reg1(),
             args.grep.bytes_reg2(),
             args.grep.bytes_reg(),
             args.grep.invert,
         );
+        let proc = PatternCountProcessor::new(counter);
         reader.process_parallel(proc.clone(), args.output.threads())?;
-        proc.pprint_pattern_counts();
+        proc.pprint_pattern_counts()?;
     } else {
         let proc = RegexProcessor::new(
             args.grep.bytes_reg1(),
