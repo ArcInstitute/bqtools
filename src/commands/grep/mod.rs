@@ -92,7 +92,7 @@ fn run_regex(
             args.grep.bytes_reg(),
             args.grep.and_logic(),
             args.grep.invert,
-            args.grep.count | args.grep.pattern_count,
+            args.grep.count,
             writer,
             format,
             mate,
