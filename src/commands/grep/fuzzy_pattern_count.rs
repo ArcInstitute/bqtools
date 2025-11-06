@@ -74,20 +74,11 @@ impl FuzzyPatternCountProcessor {
             return;
         }
         self.pat1.iter().enumerate().for_each(|(index, pat)| {
-            let mut counted = false;
-            self.searcher
+            let counted = self
+                .searcher
                 .search(pat, &self.sbuf, self.k)
                 .iter()
-                .for_each(|mat| {
-                    // don't count multiple occurrences in a single line for a single pattern
-                    if !counted {
-                        // skip exact matches if necessary
-                        if self.inexact && mat.cost == 0 {
-                            return;
-                        }
-                        counted = true;
-                    }
-                });
+                .any(|mat| !self.inexact || mat.cost != 0);
             if counted != self.invert {
                 self.local_pattern_count[index] += 1;
             }
@@ -99,20 +90,11 @@ impl FuzzyPatternCountProcessor {
             return;
         }
         self.pat2.iter().enumerate().for_each(|(index, pat)| {
-            let mut counted = false;
-            self.searcher
+            let counted = self
+                .searcher
                 .search(pat, &self.xbuf, self.k)
                 .iter()
-                .for_each(|mat| {
-                    // don't count multiple occurrences in a single line for a single pattern
-                    if !counted {
-                        // skip exact matches if necessary
-                        if self.inexact && mat.cost == 0 {
-                            return;
-                        }
-                        counted = true;
-                    }
-                });
+                .any(|mat| !self.inexact || mat.cost != 0);
             if counted != self.invert {
                 self.local_pattern_count[self.pat1.len() + index] += 1;
             }
@@ -124,34 +106,12 @@ impl FuzzyPatternCountProcessor {
             return;
         }
         self.pat.iter().enumerate().for_each(|(index, pat)| {
-            let mut counted = false;
-            self.searcher
+            let counted = self
+                .searcher
                 .search(pat, &self.sbuf, self.k)
                 .iter()
-                .for_each(|mat| {
-                    // don't count multiple occurrences in a single line for a single pattern
-                    if !counted {
-                        // skip exact matches if necessary
-                        if self.inexact && mat.cost == 0 {
-                            return;
-                        }
-                        counted = true;
-                    }
-                });
-
-            self.searcher
-                .search(pat, &self.xbuf, self.k)
-                .iter()
-                .for_each(|mat| {
-                    // don't count multiple occurrences in a single line for a single pattern
-                    if !counted {
-                        // skip exact matches if necessary
-                        if self.inexact && mat.cost == 0 {
-                            return;
-                        }
-                        counted = true;
-                    }
-                });
+                .chain(self.searcher.search(pat, &self.xbuf, self.k).iter())
+                .any(|mat| !self.inexact || mat.cost != 0);
 
             if counted != self.invert {
                 self.local_pattern_count[self.pat1.len() + self.pat2.len() + index] += 1;
