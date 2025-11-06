@@ -53,12 +53,7 @@ impl RegexPatternCounter {
 }
 
 impl PatternCount for RegexPatternCounter {
-    fn count_patterns(
-        &mut self,
-        primary: &Vec<u8>,
-        secondary: &Vec<u8>,
-        pattern_count: &mut [usize],
-    ) {
+    fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]) {
         self.regex_primary(primary, pattern_count);
         self.regex_secondary(secondary, pattern_count);
         self.regex_either(primary, secondary, pattern_count);
@@ -73,7 +68,7 @@ impl PatternCount for RegexPatternCounter {
             .iter()
             .chain(self.re2.iter())
             .chain(self.re.iter())
-            .map(|reg| reg.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     }
 }

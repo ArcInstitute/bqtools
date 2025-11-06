@@ -36,14 +36,14 @@ impl FuzzyPatternCounter {
         }
     }
 
-    fn match_primary(&mut self, sequence: &Vec<u8>, pattern_counts: &mut [usize]) {
+    fn match_primary(&mut self, sequence: &[u8], pattern_counts: &mut [usize]) {
         if self.pat1.is_empty() {
             return;
         }
         self.pat1.iter().enumerate().for_each(|(index, pat)| {
             let counted = self
                 .searcher
-                .search(pat, sequence, self.k)
+                .search(pat, &sequence, self.k)
                 .iter()
                 .any(|mat| !self.inexact || mat.cost != 0);
             if counted != self.invert {
@@ -52,14 +52,14 @@ impl FuzzyPatternCounter {
         });
     }
 
-    fn match_secondary(&mut self, sequence: &Vec<u8>, pattern_counts: &mut [usize]) {
+    fn match_secondary(&mut self, sequence: &[u8], pattern_counts: &mut [usize]) {
         if self.pat2.is_empty() || sequence.is_empty() {
             return;
         }
         self.pat2.iter().enumerate().for_each(|(index, pat)| {
             let counted = self
                 .searcher
-                .search(pat, sequence, self.k)
+                .search(pat, &sequence, self.k)
                 .iter()
                 .any(|mat| !self.inexact || mat.cost != 0);
             if counted != self.invert {
@@ -68,21 +68,16 @@ impl FuzzyPatternCounter {
         });
     }
 
-    fn match_either(
-        &mut self,
-        primary: &Vec<u8>,
-        secondary: &Vec<u8>,
-        pattern_counts: &mut [usize],
-    ) {
+    fn match_either(&mut self, primary: &[u8], secondary: &[u8], pattern_counts: &mut [usize]) {
         if self.pat.is_empty() {
             return;
         }
         self.pat.iter().enumerate().for_each(|(index, pat)| {
             let counted = self
                 .searcher
-                .search(pat, primary, self.k)
+                .search(pat, &primary, self.k)
                 .iter()
-                .chain(self.searcher.search(pat, secondary, self.k).iter())
+                .chain(self.searcher.search(pat, &secondary, self.k).iter())
                 .any(|mat| !self.inexact || mat.cost != 0);
 
             if counted != self.invert {
@@ -93,12 +88,7 @@ impl FuzzyPatternCounter {
 }
 
 impl PatternCount for FuzzyPatternCounter {
-    fn count_patterns(
-        &mut self,
-        primary: &Vec<u8>,
-        secondary: &Vec<u8>,
-        pattern_count: &mut [usize],
-    ) {
+    fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]) {
         self.match_primary(primary, pattern_count);
         self.match_secondary(secondary, pattern_count);
         self.match_either(primary, secondary, pattern_count);

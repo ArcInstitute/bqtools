@@ -10,12 +10,7 @@ mod processor;
 pub use processor::PatternCountProcessor;
 
 pub trait PatternCount: Clone + Send + Sync {
-    fn count_patterns(
-        &mut self,
-        primary: &Vec<u8>,
-        secondary: &Vec<u8>,
-        pattern_count: &mut [usize],
-    );
+    fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]);
 
     fn num_patterns(&self) -> usize;
 
