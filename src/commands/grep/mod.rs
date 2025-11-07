@@ -1,6 +1,7 @@
 mod color;
 mod filter;
 mod pattern_count;
+mod range;
 
 #[cfg(feature = "fuzzy")]
 use filter::FuzzyMatcher;
@@ -9,6 +10,7 @@ use pattern_count::FuzzyPatternCounter;
 
 use filter::{FilterProcessor, RegexMatcher};
 use pattern_count::{PatternCountProcessor, RegexPatternCounter};
+pub use range::SimpleRange;
 
 use super::decode::build_writer;
 use crate::{
