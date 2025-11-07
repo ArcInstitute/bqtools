@@ -79,7 +79,7 @@ impl AhoCorasickPatternCounter {
         self.state.find_overlapping_iter(primary).for_each(|m| {
             self.bits.set(m.pattern().as_usize(), true);
         });
-        if secondary.len() > 0 {
+        if !secondary.is_empty() {
             self.state.find_overlapping_iter(secondary).for_each(|m| {
                 self.bits.set(m.pattern().as_usize(), true);
             });
