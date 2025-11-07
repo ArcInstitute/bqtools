@@ -114,8 +114,10 @@ impl GrepArgs {
             all_patterns.extend(self.file_args.read_file_patterns(filetype)?);
         }
 
-        // for AND logic all patterns are kept as is
-        if self.and_logic() {
+        // all patterns are kept separate for:
+        // 1. AND logic
+        // 2. Individual pattern counting
+        if self.and_logic() || self.pattern_count {
             Ok(all_patterns
                 .iter()
                 .map(|s| {
@@ -256,7 +258,10 @@ impl PatternFileArgs {
 
     fn read_file_patterns(&self, filetype: PatternFileType) -> Result<Vec<String>> {
         let contents = self.read_file(filetype)?;
-        Ok(contents.lines().map(std::string::ToString::to_string).collect())
+        Ok(contents
+            .lines()
+            .map(std::string::ToString::to_string)
+            .collect())
     }
 
     fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {
