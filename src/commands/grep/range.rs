@@ -60,12 +60,9 @@ impl FromStr for SimpleRange {
                 end: None,
             }
         } else {
-            let parts = s.split("..").collect::<Vec<_>>();
-            if parts.len() != 2 {
-                return Err("Invalid range");
-            }
-            let start = parts[0].parse().map_err(|_| "Invalid range")?;
-            let end = parts[1].parse().map_err(|_| "Invalid range")?;
+            let (start_str, end_str) = s.split_once("..").ok_or("Invalid range")?;
+            let start = start_str.parse().map_err(|_| "Invalid range")?;
+            let end = end_str.parse().map_err(|_| "Invalid range")?;
             Self {
                 start: Some(start),
                 end: Some(end),
