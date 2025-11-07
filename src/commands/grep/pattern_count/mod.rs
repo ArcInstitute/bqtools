@@ -13,6 +13,12 @@ mod processor;
 pub use processor::PatternCountProcessor;
 
 pub trait PatternCount: Clone + Send + Sync {
+    /// Counts the number of patterns in the given primary and secondary strings.
+    ///
+    /// Increments those specific pattern counts.
+    ///
+    /// Pattern counts are assumed to equal to the number of patterns found in (primary-only, secondary-only, either) expressions.
+    /// The counts are indexed in that order in a single array.
     fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]);
 
     fn num_patterns(&self) -> usize;
