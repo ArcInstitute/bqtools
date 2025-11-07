@@ -108,7 +108,7 @@ impl GrepArgs {
     ) -> Result<Vec<regex::bytes::Regex>> {
         let mut all_patterns = cli_patterns
             .iter()
-            .map(|s| s.to_owned())
+            .map(std::borrow::ToOwned::to_owned)
             .collect::<Vec<String>>();
         if !self.file_args.empty_file(filetype) {
             all_patterns.extend(self.file_args.read_file_patterns(filetype)?);
@@ -166,7 +166,7 @@ impl GrepArgs {
             Ok(bytes_iter.collect())
         } else {
             let patterns = self.file_args.patterns(filetype)?;
-            Ok(bytes_iter.chain(patterns.into_iter()).collect())
+            Ok(bytes_iter.chain(patterns).collect())
         }
     }
     pub fn bytes_pat1(&self) -> Result<Vec<Vec<u8>>> {
@@ -250,13 +250,13 @@ impl PatternFileArgs {
         if let Some(file) = file {
             Ok(std::fs::read_to_string(file)?)
         } else {
-            bail!("Specified file type {:?} not provided at CLI", filetype)
+            bail!("Specified file type {filetype:?} not provided at CLI")
         }
     }
 
     fn read_file_patterns(&self, filetype: PatternFileType) -> Result<Vec<String>> {
         let contents = self.read_file(filetype)?;
-        Ok(contents.lines().map(|line| line.to_string()).collect())
+        Ok(contents.lines().map(std::string::ToString::to_string).collect())
     }
 
     fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {

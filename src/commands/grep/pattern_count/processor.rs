@@ -101,7 +101,7 @@ impl<Pc: PatternCount> ParallelProcessor for PatternCountProcessor<Pc> {
         };
 
         self.counter
-            .count_patterns(&primary, &extended, &mut self.local_pattern_count);
+            .count_patterns(primary, extended, &mut self.local_pattern_count);
         self.local_total += 1;
         Ok(())
     }
