@@ -332,6 +332,7 @@ mod matcher_unit_tests {
         let result = matcher.match_either(primary, secondary, &mut smatches, &mut xmatches, true);
 
         assert!(result, "Should match pattern in either sequence");
+        assert!(smatches.is_empty(), "Should match in primary");
         assert!(!xmatches.is_empty(), "Should match in extended");
     }
 
