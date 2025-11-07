@@ -226,6 +226,7 @@ impl PatternFileArgs {
         }
     }
 
+    #[cfg(feature = "fuzzy")]
     fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {
         let contents = self.read_file(filetype)?;
         let mut patterns = Vec::new();
