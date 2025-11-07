@@ -48,7 +48,7 @@ impl AhoCorasickPatternCounter {
             self.bits1.set(m.pattern().as_usize(), true);
         });
 
-        increment_pattern(&self.bits1, pattern_counts, self.invert);
+        increment_pattern(&self.bits1, pattern_counts, self.invert, 0);
         self.bits1.clear();
     }
 
@@ -62,7 +62,12 @@ impl AhoCorasickPatternCounter {
             self.bits2.set(m.pattern().as_usize(), true);
         });
 
-        increment_pattern(&self.bits2, pattern_counts, self.invert);
+        increment_pattern(
+            &self.bits2,
+            pattern_counts,
+            self.invert,
+            self.state1.patterns_len(),
+        );
         self.bits2.clear();
     }
 
@@ -80,19 +85,29 @@ impl AhoCorasickPatternCounter {
             });
         }
 
-        increment_pattern(&self.bits, pattern_counts, self.invert);
+        increment_pattern(
+            &self.bits,
+            pattern_counts,
+            self.invert,
+            self.state1.patterns_len() + self.state2.patterns_len(),
+        );
         self.bits.clear();
     }
 }
 
-fn increment_pattern(bits: &FixedBitSet, pattern_counts: &mut [usize], invert: bool) {
+fn increment_pattern(
+    bits: &FixedBitSet,
+    pattern_counts: &mut [usize],
+    invert: bool,
+    offset: usize,
+) {
     if invert {
         bits.zeroes().for_each(|idx| {
-            pattern_counts[idx] += 1;
+            pattern_counts[offset + idx] += 1;
         });
     } else {
         bits.ones().for_each(|idx| {
-            pattern_counts[idx] += 1;
+            pattern_counts[offset + idx] += 1;
         });
     }
 }
