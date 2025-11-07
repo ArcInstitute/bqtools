@@ -2,7 +2,7 @@ use crate::{
     cli::{FileFormat, Mate},
     commands::{
         decode::{write_record_pair, SplitWriter},
-        grep::color::write_colored_record_pair,
+        grep::{color::write_colored_record_pair, SimpleRange},
     },
 };
 use binseq::prelude::*;
@@ -24,6 +24,9 @@ pub struct FilterProcessor<Pm: PatternMatcher> {
 
     /// Only count the number of matches
     count: bool,
+
+    /// Match within range
+    range: Option<SimpleRange>,
 
     /// Local count
     local_count: usize,
@@ -68,6 +71,7 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
         and_logic: bool,
         invert: bool,
         count: bool,
+        range: Option<SimpleRange>,
         writer: SplitWriter,
         format: FileFormat,
         mate: Option<Mate>,
@@ -90,6 +94,7 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
             and_logic,
             invert,
             count,
+            range,
             format,
             mate,
             color,
@@ -110,19 +115,25 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
     }
 
     pub fn pattern_match(&mut self) -> bool {
+        let (primary, extended) = if let Some(range) = self.range {
+            (range.slice(&self.sbuf), range.slice(&self.xbuf))
+        } else {
+            (self.sbuf.as_ref(), self.xbuf.as_ref())
+        };
+
         let found_either = self.matcher.match_either(
-            &self.sbuf,
-            &self.xbuf,
+            primary,
+            extended,
             &mut self.smatches,
             &mut self.xmatches,
             self.and_logic,
         );
-        let found_primary =
-            self.matcher
-                .match_primary(&self.sbuf, &mut self.smatches, self.and_logic);
+        let found_primary = self
+            .matcher
+            .match_primary(primary, &mut self.smatches, self.and_logic);
         let found_secondary =
             self.matcher
-                .match_secondary(&self.xbuf, &mut self.xmatches, self.and_logic);
+                .match_secondary(extended, &mut self.xmatches, self.and_logic);
 
         let pred = if self.and_logic {
             found_either && found_primary && found_secondary

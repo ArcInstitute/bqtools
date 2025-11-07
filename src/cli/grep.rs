@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 
-use crate::cli::FileFormat;
+use crate::{cli::FileFormat, commands::grep::SimpleRange};
 
 use super::{InputBinseq, OutputFile};
 
@@ -51,6 +51,15 @@ pub struct GrepArgs {
     /// Only count matches
     #[clap(short = 'C', long, conflicts_with = "pattern_count")]
     pub count: bool,
+
+    /// Only match patterns that are within this range.
+    ///
+    /// Will not match if the pattern is outside the range or if
+    /// the sequence cannot be sliced within the range (i.e. out of bounds).
+    ///
+    /// Examples: --range=0..100, --range=..30, --range=60..
+    #[clap(long)]
+    pub range: Option<SimpleRange>,
 
     /// Count number of matches per pattern
     ///
