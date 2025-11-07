@@ -286,6 +286,6 @@ bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pz
 # Count the number of records a pattern does not occur in
 bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pv
 
-# Count the number of occurences for each pattern from a file
+# Count the number of occurrences for each pattern from a file
 bqtools grep input.bq --file patterns.txt -P
 ```
