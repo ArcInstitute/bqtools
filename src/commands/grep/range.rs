@@ -18,7 +18,7 @@ impl SimpleRange {
     }
     pub fn slice<'a>(&self, buf: &'a [u8]) -> &'a [u8] {
         match (self.start, self.end) {
-            (None, None) => &buf[..],
+            (None, None) => buf,
             (None, Some(end)) => &buf[..end.min(buf.len())],
             (Some(start), None) => &buf[start.min(buf.len())..],
             (Some(start), Some(end)) => &buf[start.min(buf.len())..end.min(buf.len())],
@@ -32,9 +32,9 @@ impl Display for SimpleRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match (self.start, self.end) {
             (None, None) => write!(f, ".."),
-            (None, Some(end)) => write!(f, "..{}", end),
-            (Some(start), None) => write!(f, "{}..", start),
-            (Some(start), Some(end)) => write!(f, "{}..{}", start, end),
+            (None, Some(end)) => write!(f, "..{end}"),
+            (Some(start), None) => write!(f, "{start}.."),
+            (Some(start), Some(end)) => write!(f, "{start}..{end}"),
         }
     }
 }

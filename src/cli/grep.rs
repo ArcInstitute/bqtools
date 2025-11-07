@@ -106,14 +106,35 @@ impl GrepArgs {
         cli_patterns: &[String],
         filetype: PatternFileType,
     ) -> Result<Vec<regex::bytes::Regex>> {
-        let cli_iter = cli_patterns
+        let mut all_patterns = cli_patterns
             .iter()
-            .map(|s| regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}"));
-        if self.file_args.empty_file(filetype) {
-            Ok(cli_iter.collect())
+            .map(std::borrow::ToOwned::to_owned)
+            .collect::<Vec<String>>();
+        if !self.file_args.empty_file(filetype) {
+            all_patterns.extend(self.file_args.read_file_patterns(filetype)?);
+        }
+
+        // all patterns are kept separate for:
+        // 1. AND logic
+        // 2. Individual pattern counting
+        if self.and_logic() || self.pattern_count {
+            Ok(all_patterns
+                .iter()
+                .map(|s| {
+                    regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}")
+                })
+                .collect())
+
+        // for OR logic they can be compiled into a single regex for performance
         } else {
-            let patterns = self.file_args.regex(filetype)?;
-            Ok(cli_iter.chain(patterns.into_iter()).collect())
+            let global_pattern = all_patterns.join("|");
+            if global_pattern.is_empty() {
+                Ok(vec![])
+            } else {
+                Ok(vec![regex::bytes::Regex::new(&global_pattern).expect(
+                    "Could not build regex from pattern: {global_pattern}",
+                )])
+            }
         }
     }
     pub fn bytes_reg1(&self) -> Result<Vec<regex::bytes::Regex>> {
@@ -147,7 +168,7 @@ impl GrepArgs {
             Ok(bytes_iter.collect())
         } else {
             let patterns = self.file_args.patterns(filetype)?;
-            Ok(bytes_iter.chain(patterns.into_iter()).collect())
+            Ok(bytes_iter.chain(patterns).collect())
         }
     }
     pub fn bytes_pat1(&self) -> Result<Vec<Vec<u8>>> {
@@ -231,11 +252,18 @@ impl PatternFileArgs {
         if let Some(file) = file {
             Ok(std::fs::read_to_string(file)?)
         } else {
-            bail!("Specified file type {:?} not provided at CLI", filetype)
+            bail!("Specified file type {filetype:?} not provided at CLI")
         }
     }
 
-    #[cfg(feature = "fuzzy")]
+    fn read_file_patterns(&self, filetype: PatternFileType) -> Result<Vec<String>> {
+        let contents = self.read_file(filetype)?;
+        Ok(contents
+            .lines()
+            .map(std::string::ToString::to_string)
+            .collect())
+    }
+
     fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {
         let contents = self.read_file(filetype)?;
         let mut patterns = Vec::new();
@@ -243,19 +271,6 @@ impl PatternFileArgs {
             patterns.push(line.as_bytes().to_vec());
         }
         Ok(patterns)
-    }
-
-    fn regex(&self, filetype: PatternFileType) -> Result<Vec<regex::bytes::Regex>> {
-        let contents = self.read_file(filetype)?;
-        let mut regexes = Vec::new();
-        for line in contents.lines() {
-            if let Ok(regex) = regex::bytes::Regex::new(&line) {
-                regexes.push(regex);
-            } else {
-                eprintln!("Invalid regex pattern: {}", line);
-            }
-        }
-        Ok(regexes)
     }
 }
 

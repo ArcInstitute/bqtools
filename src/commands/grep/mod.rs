@@ -48,7 +48,7 @@ fn run_fuzzy(
             args.grep.bytes_pat()?,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
-            args.grep.range.map(|r| r.offset()).unwrap_or(0),
+            args.grep.range.map_or(0, |r| r.offset()),
         );
         let proc = FilterProcessor::new(
             matcher,
@@ -92,7 +92,7 @@ fn run_regex(
             args.grep.bytes_reg1()?,
             args.grep.bytes_reg2()?,
             args.grep.bytes_reg()?,
-            args.grep.range.map(|r| r.offset()).unwrap_or(0),
+            args.grep.range.map_or(0, |r| r.offset()),
         );
         let proc = FilterProcessor::new(
             matcher,
