@@ -11,17 +11,26 @@ pub struct FuzzyMatcher {
     pat: Patterns,
     k: usize,      // maximum edit distance to accept
     inexact: bool, // whether to only report inexact matches
+    offset: usize, // Left-offset relevant for range matching
     searcher: Searcher<Dna>,
 }
 
 impl FuzzyMatcher {
-    pub fn new(pat1: Patterns, pat2: Patterns, pat: Patterns, k: usize, inexact: bool) -> Self {
+    pub fn new(
+        pat1: Patterns,
+        pat2: Patterns,
+        pat: Patterns,
+        k: usize,
+        inexact: bool,
+        offset: usize,
+    ) -> Self {
         Self {
             pat1,
             pat2,
             pat,
             k,
             inexact,
+            offset,
             searcher: Searcher::new_fwd(),
         }
     }
@@ -34,19 +43,24 @@ fn find_and_insert_matches(
     searcher: &mut Searcher<Dna>,
     k: usize,
     inexact: bool,
+    offset: usize,
 ) -> bool {
     let mut found = false;
     for mat in searcher.search(pat, &sequence, k) {
         if inexact && mat.cost == 0 {
             continue;
         }
-        matches.insert((mat.text_start, mat.text_end));
+        matches.insert((mat.text_start + offset, mat.text_end + offset));
         found = true;
     }
     found
 }
 
 impl PatternMatcher for FuzzyMatcher {
+    fn offset(&self) -> usize {
+        self.offset
+    }
+
     fn match_primary(
         &mut self,
         sequence: &[u8],
@@ -56,6 +70,7 @@ impl PatternMatcher for FuzzyMatcher {
         if self.pat1.is_empty() {
             return true;
         }
+        let offset = self.offset();
         if and_logic {
             self.pat1.iter().all(|pat| {
                 find_and_insert_matches(
@@ -65,6 +80,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 )
             })
         } else {
@@ -76,6 +92,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 )
             })
         }
@@ -90,6 +107,7 @@ impl PatternMatcher for FuzzyMatcher {
         if self.pat2.is_empty() || sequence.is_empty() {
             return true;
         }
+        let offset = self.offset();
         if and_logic {
             self.pat2.iter().all(|pat| {
                 find_and_insert_matches(
@@ -99,6 +117,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 )
             })
         } else {
@@ -110,6 +129,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 )
             })
         }
@@ -126,6 +146,7 @@ impl PatternMatcher for FuzzyMatcher {
         if self.pat.is_empty() {
             return true;
         }
+        let offset = self.offset();
         if and_logic {
             self.pat.iter().all(|pat| {
                 let found_s = find_and_insert_matches(
@@ -135,6 +156,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 );
                 let found_x = find_and_insert_matches(
                     pat,
@@ -143,6 +165,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 );
                 found_s || found_x // still OR here because we want to match either primary or secondary
             })
@@ -155,6 +178,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 );
                 let found_x = find_and_insert_matches(
                     pat,
@@ -163,6 +187,7 @@ impl PatternMatcher for FuzzyMatcher {
                     &mut self.searcher,
                     self.k,
                     self.inexact,
+                    offset,
                 );
                 found_s || found_x
             })

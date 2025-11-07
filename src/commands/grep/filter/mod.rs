@@ -33,6 +33,8 @@ pub trait PatternMatcher: Clone + Send + Sync {
         xmatches: &mut MatchRanges,
         and_logic: bool,
     ) -> bool;
+
+    fn offset(&self) -> usize;
 }
 
 #[cfg(test)]
@@ -47,7 +49,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_primary() {
         let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let sequence = b"GGGGAAAATTTT";
         let mut matches = HashSet::new();
@@ -61,7 +63,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_secondary() {
         let re2 = vec![regex::bytes::Regex::new("TTTT").unwrap()];
-        let mut matcher = RegexMatcher::new(vec![], re2, vec![]);
+        let mut matcher = RegexMatcher::new(vec![], re2, vec![], 0);
 
         let sequence = b"GGGGAAAATTTT";
         let mut matches = HashSet::new();
@@ -75,7 +77,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_either() {
         let re = vec![regex::bytes::Regex::new("CCCC").unwrap()];
-        let mut matcher = RegexMatcher::new(vec![], vec![], re);
+        let mut matcher = RegexMatcher::new(vec![], vec![], re, 0);
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"GGGGCCCCTTTT";
@@ -95,7 +97,7 @@ mod matcher_unit_tests {
             regex::bytes::Regex::new("AAAA").unwrap(),
             regex::bytes::Regex::new("TTTT").unwrap(),
         ];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         // Sequence with both patterns
         let seq_both = b"GGGGAAAATTTT";
@@ -114,7 +116,7 @@ mod matcher_unit_tests {
             regex::bytes::Regex::new("AAAA").unwrap(),
             regex::bytes::Regex::new("TTTT").unwrap(),
         ];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         // Sequence with only one pattern
         let seq = b"GGGGAAAACCCC";
@@ -125,7 +127,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_no_match() {
         let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let sequence = b"GGGGCCCCTTTT";
         let mut matches = HashSet::new();
@@ -139,7 +141,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_multiple_matches() {
         let re1 = vec![regex::bytes::Regex::new("AA").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let sequence = b"AAGGAAGGAA";
         let mut matches = HashSet::new();
@@ -154,7 +156,7 @@ mod matcher_unit_tests {
     fn test_regex_matcher_anchors() {
         // Start anchor
         let re_start = vec![regex::bytes::Regex::new("^AAAA").unwrap()];
-        let mut matcher_start = RegexMatcher::new(re_start, vec![], vec![]);
+        let mut matcher_start = RegexMatcher::new(re_start, vec![], vec![], 0);
 
         let seq_match = b"AAAATTTT";
         let seq_no_match = b"GGGGAAAA";
@@ -166,7 +168,7 @@ mod matcher_unit_tests {
 
         // End anchor
         let re_end = vec![regex::bytes::Regex::new("TTTT$").unwrap()];
-        let mut matcher_end = RegexMatcher::new(re_end, vec![], vec![]);
+        let mut matcher_end = RegexMatcher::new(re_end, vec![], vec![], 0);
 
         let mut matches3 = HashSet::new();
         let mut matches4 = HashSet::new();
@@ -178,7 +180,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_character_classes() {
         let re1 = vec![regex::bytes::Regex::new("A[TC]G").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let seq1 = b"GGGGATGTTTTT";
         let seq2 = b"GGGGACGTTTTT";
@@ -192,7 +194,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_repetition() {
         let re1 = vec![regex::bytes::Regex::new("A{3,5}").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let seq_match = b"GGGGAAAATTTT";
         let seq_no_match = b"GGGGAATTTT";
@@ -206,7 +208,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_alternation() {
         let re1 = vec![regex::bytes::Regex::new("(AA|TT){2}").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let seq1 = b"GGGGAAAATTTT";
         let seq2 = b"GGGGTTTTCCCC";
@@ -222,7 +224,7 @@ mod matcher_unit_tests {
 
     #[test]
     fn test_regex_matcher_empty_patterns() {
-        let mut matcher = RegexMatcher::new(vec![], vec![], vec![]);
+        let mut matcher = RegexMatcher::new(vec![], vec![], vec![], 0);
 
         let sequence = b"GGGGAAAATTTT";
         let mut matches = HashSet::new();
@@ -235,7 +237,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_regex_matcher_empty_sequence() {
         let re2 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut matcher = RegexMatcher::new(vec![], re2, vec![]);
+        let mut matcher = RegexMatcher::new(vec![], re2, vec![], 0);
 
         let empty_seq = b"";
         let mut matches = HashSet::new();
@@ -248,7 +250,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_basic() {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false);
+        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, 0);
 
         // Exact match
         let seq_exact = b"GGGGAAAAAAAATTTT";
@@ -273,7 +275,7 @@ mod matcher_unit_tests {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
 
         // Test with k=0 (exact match only)
-        let mut matcher_k0 = FuzzyMatcher::new(pat1.clone(), vec![], vec![], 0, false);
+        let mut matcher_k0 = FuzzyMatcher::new(pat1.clone(), vec![], vec![], 0, false, 0);
         let seq_exact = b"GGGGAAAAAAAATTTT";
         let seq_mismatch = b"GGGGAAAAACAATTTT";
         let mut matches1 = HashSet::new();
@@ -283,7 +285,7 @@ mod matcher_unit_tests {
         assert!(!matcher_k0.match_primary(seq_mismatch, &mut matches2, true));
 
         // Test with k=2 (up to 2 edits)
-        let mut matcher_k2 = FuzzyMatcher::new(pat1, vec![], vec![], 2, false);
+        let mut matcher_k2 = FuzzyMatcher::new(pat1, vec![], vec![], 2, false, 0);
         let mut matches3 = HashSet::new();
 
         assert!(matcher_k2.match_primary(seq_mismatch, &mut matches3, true));
@@ -293,7 +295,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_inexact_only() {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 2, true);
+        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 2, true, 0);
 
         // Exact match should not be reported with inexact_only
         let seq_exact = b"GGGGAAAAAAAATTTT";
@@ -310,7 +312,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_secondary() {
         let pat2 = vec![b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(vec![], pat2, vec![], 1, false);
+        let mut matcher = FuzzyMatcher::new(vec![], pat2, vec![], 1, false, 0);
 
         let sequence = b"GGGGTTTTTTTTCCCC";
         let mut matches = HashSet::new();
@@ -322,7 +324,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_either() {
         let pat = vec![b"CCCCCCCC".to_vec()];
-        let mut matcher = FuzzyMatcher::new(vec![], vec![], pat, 1, false);
+        let mut matcher = FuzzyMatcher::new(vec![], vec![], pat, 1, false, 0);
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"GGGGCCCCCCCCTTTT";
@@ -332,15 +334,15 @@ mod matcher_unit_tests {
         let result = matcher.match_either(primary, secondary, &mut smatches, &mut xmatches, true);
 
         assert!(result, "Should match pattern in either sequence");
-        assert!(smatches.is_empty(), "Should match in primary");
         assert!(!xmatches.is_empty(), "Should match in extended");
+        assert!(smatches.is_empty(), "Should match in extended");
     }
 
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_matcher_and_logic() {
         let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false);
+        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, 0);
 
         // Sequence with both patterns
         let seq_both = b"AAAAAAAATTTTTTTT";
@@ -357,7 +359,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_or_logic() {
         let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false);
+        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, 0);
 
         // Sequence with only one pattern
         let seq = b"AAAAAAAACCCCCCCC";
@@ -368,7 +370,7 @@ mod matcher_unit_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_matcher_empty_patterns() {
-        let mut matcher = FuzzyMatcher::new(vec![], vec![], vec![], 1, false);
+        let mut matcher = FuzzyMatcher::new(vec![], vec![], vec![], 1, false, 0);
 
         let sequence = b"GGGGAAAATTTT";
         let mut matches = HashSet::new();
@@ -381,7 +383,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_match_location_tracking() {
         let re1 = vec![regex::bytes::Regex::new("AA").unwrap()];
-        let mut matcher = RegexMatcher::new(re1, vec![], vec![]);
+        let mut matcher = RegexMatcher::new(re1, vec![], vec![], 0);
 
         let sequence = b"GGGAAATTTAAACCC";
         let mut matches = HashSet::new();
@@ -408,7 +410,7 @@ mod matcher_unit_tests {
         let re2 = vec![regex::bytes::Regex::new("TTTT").unwrap()];
         let re = vec![regex::bytes::Regex::new("CCCC").unwrap()];
 
-        let mut matcher = RegexMatcher::new(re1, re2, re);
+        let mut matcher = RegexMatcher::new(re1, re2, re, 0);
 
         let primary = b"AAAAGGGGCCCCGGGG";
         let secondary = b"GGGGTTTTGGGGCCCC";
