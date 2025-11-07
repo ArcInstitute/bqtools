@@ -5,6 +5,8 @@ use binseq::{BinseqRecord, ParallelProcessor};
 use parking_lot::Mutex;
 use serde::Serialize;
 
+use crate::commands::grep::SimpleRange;
+
 use super::PatternCount;
 
 #[derive(Serialize)]
@@ -30,6 +32,7 @@ impl<'a> PatternCountResult<'a> {
 #[derive(Clone)]
 pub struct PatternCountProcessor<Pc: PatternCount> {
     counter: Pc,
+    range: Option<SimpleRange>,
 
     local_pattern_count: Vec<usize>,
     local_total: usize, // total number of reads processed (not just matches)
@@ -43,10 +46,11 @@ pub struct PatternCountProcessor<Pc: PatternCount> {
     global_total: Arc<Mutex<usize>>, // total number of reads processed
 }
 impl<Pc: PatternCount> PatternCountProcessor<Pc> {
-    pub fn new(counter: Pc) -> Self {
+    pub fn new(counter: Pc, range: Option<SimpleRange>) -> Self {
         let num_patterns = counter.num_patterns();
         Self {
             counter,
+            range,
             local_pattern_count: vec![0; num_patterns],
             local_total: 0,
             sbuf: Vec::new(),
@@ -89,8 +93,15 @@ impl<Pc: PatternCount> ParallelProcessor for PatternCountProcessor<Pc> {
         if record.is_paired() {
             record.decode_x(&mut self.xbuf)?;
         }
+
+        let (primary, extended) = if let Some(range) = self.range {
+            (range.slice(&self.sbuf), range.slice(&self.xbuf))
+        } else {
+            (self.sbuf.as_ref(), self.xbuf.as_ref())
+        };
+
         self.counter
-            .count_patterns(&self.sbuf, &self.xbuf, &mut self.local_pattern_count);
+            .count_patterns(&primary, &extended, &mut self.local_pattern_count);
         self.local_total += 1;
         Ok(())
     }

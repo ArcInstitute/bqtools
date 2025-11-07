@@ -38,7 +38,7 @@ fn run_fuzzy(
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
         );
-        let proc = PatternCountProcessor::new(counter);
+        let proc = PatternCountProcessor::new(counter, args.grep.range);
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts()?;
     } else {
@@ -84,7 +84,7 @@ fn run_regex(
             args.grep.bytes_reg()?,
             args.grep.invert,
         );
-        let proc = PatternCountProcessor::new(counter);
+        let proc = PatternCountProcessor::new(counter, args.grep.range);
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts()?;
     } else {
