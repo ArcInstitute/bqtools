@@ -232,6 +232,15 @@ bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A"
 
 # Search for multiple regular expressions (OR-logic)
 bqtools grep input.bq "ACGT[AG]TCCA" "AG(TTTT|CCCC)A" --or-logic
+
+# Only search for patterns within a specified range per sequence (basepairs 30-80)
+bqtools grep input.bq "ACGT[AG]TCCA" --range 30..80
+
+# Only search for patterns within a specified range per sequence (basepairs 0-80)
+bqtools grep input.bq "ACGT[AG]TCCA" --range ..80
+
+# Only search for patterns within a specified range per sequence (basepairs 80-max)
+bqtools grep input.bq "ACGT[AG]TCCA" --range 80..
 ```
 
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
