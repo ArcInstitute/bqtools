@@ -3,8 +3,29 @@ use std::{io::stdout, sync::Arc};
 use anyhow::Result;
 use binseq::{BinseqRecord, ParallelProcessor};
 use parking_lot::Mutex;
+use serde::Serialize;
 
 use super::PatternCount;
+
+#[derive(Serialize)]
+pub struct PatternCountResult<'a> {
+    pattern: &'a str,
+    count: usize,
+    frac_total: f64,
+}
+impl<'a> PatternCountResult<'a> {
+    pub fn new(pattern: &'a str, count: usize, total: usize) -> Result<Self> {
+        Ok(Self {
+            pattern,
+            count,
+            frac_total: if total > 0 {
+                count as f64 / total as f64
+            } else {
+                0.0
+            },
+        })
+    }
+}
 
 #[derive(Clone)]
 pub struct PatternCountProcessor<Pc: PatternCount> {
@@ -38,19 +59,12 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
         self.sbuf.clear();
         self.xbuf.clear();
     }
-    pub fn total_matched(&self) -> usize {
-        self.global_pattern_count
-            .iter()
-            .map(|count| *count.lock())
-            .sum()
-    }
     pub fn pprint_pattern_counts(&self) -> Result<()> {
         let mut writer = csv::WriterBuilder::new()
             .delimiter(b'\t')
-            .has_headers(false)
+            .has_headers(true)
             .from_writer(stdout());
 
-        let total_counts = self.total_matched();
         let total_records = *self.global_total.lock();
         let patterns = self.counter.pattern_strings();
 
@@ -58,18 +72,7 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
             .iter()
             .zip(self.global_pattern_count.iter())
             .try_for_each(|(pattern, count)| -> Result<()> {
-                let count = *count.lock();
-                let frac_matched = if total_counts > 0 {
-                    count as f64 / total_counts as f64
-                } else {
-                    0.0
-                };
-                let frac_total = if total_records > 0 {
-                    count as f64 / total_records as f64
-                } else {
-                    0.0
-                };
-                let record = (pattern, count, frac_matched, frac_total);
+                let record = PatternCountResult::new(pattern, *count.lock(), total_records)?;
                 writer.serialize(record)?;
                 Ok(())
             })?;
