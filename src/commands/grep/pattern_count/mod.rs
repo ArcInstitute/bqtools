@@ -1,6 +1,9 @@
 mod regex_pc;
 pub use regex_pc::RegexPatternCounter;
 
+mod ac_pc;
+pub use ac_pc::AhoCorasickPatternCounter;
+
 #[cfg(feature = "fuzzy")]
 mod fuzzy_pc;
 #[cfg(feature = "fuzzy")]

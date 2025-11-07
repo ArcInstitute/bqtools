@@ -15,7 +15,7 @@ pub use range::SimpleRange;
 use super::decode::build_writer;
 use crate::{
     cli::{FileFormat, GrepCommand, Mate},
-    commands::decode::SplitWriter,
+    commands::{decode::SplitWriter, grep::pattern_count::AhoCorasickPatternCounter},
 };
 
 use anyhow::Result;
@@ -78,15 +78,27 @@ fn run_regex(
     mate: Option<Mate>,
 ) -> Result<()> {
     if args.grep.pattern_count {
-        let counter = RegexPatternCounter::new(
-            args.grep.bytes_reg1()?,
-            args.grep.bytes_reg2()?,
-            args.grep.bytes_reg()?,
-            args.grep.invert,
-        );
-        let proc = PatternCountProcessor::new(counter, args.grep.range);
-        reader.process_parallel(proc.clone(), args.output.threads())?;
-        proc.pprint_pattern_counts()?;
+        if args.grep.fixed {
+            let counter = AhoCorasickPatternCounter::new(
+                args.grep.bytes_pat1()?,
+                args.grep.bytes_pat2()?,
+                args.grep.bytes_pat()?,
+                args.grep.invert,
+            )?;
+            let proc = PatternCountProcessor::new(counter, args.grep.range);
+            reader.process_parallel(proc.clone(), args.output.threads())?;
+            proc.pprint_pattern_counts()?;
+        } else {
+            let counter = RegexPatternCounter::new(
+                args.grep.bytes_reg1()?,
+                args.grep.bytes_reg2()?,
+                args.grep.bytes_reg()?,
+                args.grep.invert,
+            );
+            let proc = PatternCountProcessor::new(counter, args.grep.range);
+            reader.process_parallel(proc.clone(), args.output.threads())?;
+            proc.pprint_pattern_counts()?;
+        }
     } else {
         let matcher = RegexMatcher::new(
             args.grep.bytes_reg1()?,
