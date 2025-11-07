@@ -50,14 +50,11 @@ impl PatternMatcher for RegexMatcher {
         if self.re1.is_empty() {
             return true;
         }
+        let closure = |reg| find_and_insert_matches(reg, sequence, matches, self.offset());
         if and_logic {
-            self.re1
-                .iter()
-                .all(|reg| find_and_insert_matches(reg, sequence, matches, self.offset()))
+            self.re1.iter().all(closure)
         } else {
-            self.re1
-                .iter()
-                .any(|reg| find_and_insert_matches(reg, sequence, matches, self.offset()))
+            self.re1.iter().any(closure)
         }
     }
 
@@ -70,14 +67,11 @@ impl PatternMatcher for RegexMatcher {
         if self.re2.is_empty() || sequence.is_empty() {
             return true;
         }
+        let closure = |reg| find_and_insert_matches(reg, sequence, matches, self.offset());
         if and_logic {
-            self.re2
-                .iter()
-                .all(|reg| find_and_insert_matches(reg, sequence, matches, self.offset()))
+            self.re2.iter().all(closure)
         } else {
-            self.re2
-                .iter()
-                .any(|reg| find_and_insert_matches(reg, sequence, matches, self.offset()))
+            self.re2.iter().any(closure)
         }
     }
 
@@ -92,18 +86,15 @@ impl PatternMatcher for RegexMatcher {
         if self.re.is_empty() {
             return true;
         }
+        let closure = |reg| {
+            let found_s = find_and_insert_matches(reg, primary, smatches, self.offset());
+            let found_x = find_and_insert_matches(reg, secondary, xmatches, self.offset());
+            found_s || found_x // or because we want to match either
+        };
         if and_logic {
-            self.re.iter().all(|reg| {
-                let found_s = find_and_insert_matches(reg, primary, smatches, self.offset());
-                let found_x = find_and_insert_matches(reg, secondary, xmatches, self.offset());
-                found_s || found_x // still or because we want to match either
-            })
+            self.re.iter().all(closure)
         } else {
-            self.re.iter().any(|reg| {
-                let found_s = find_and_insert_matches(reg, primary, smatches, self.offset());
-                let found_x = find_and_insert_matches(reg, secondary, xmatches, self.offset());
-                found_s || found_x
-            })
+            self.re.iter().any(closure)
         }
     }
 }

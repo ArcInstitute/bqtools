@@ -71,30 +71,21 @@ impl PatternMatcher for FuzzyMatcher {
             return true;
         }
         let offset = self.offset();
+        let closure = |pat: &Vec<u8>| {
+            find_and_insert_matches(
+                pat,
+                sequence,
+                matches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+                offset,
+            )
+        };
         if and_logic {
-            self.pat1.iter().all(|pat| {
-                find_and_insert_matches(
-                    pat,
-                    sequence,
-                    matches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                )
-            })
+            self.pat1.iter().all(closure)
         } else {
-            self.pat1.iter().any(|pat| {
-                find_and_insert_matches(
-                    pat,
-                    sequence,
-                    matches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                )
-            })
+            self.pat1.iter().any(closure)
         }
     }
 
@@ -108,30 +99,21 @@ impl PatternMatcher for FuzzyMatcher {
             return true;
         }
         let offset = self.offset();
+        let closure = |pat: &Vec<u8>| {
+            find_and_insert_matches(
+                pat,
+                sequence,
+                matches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+                offset,
+            )
+        };
         if and_logic {
-            self.pat2.iter().all(|pat| {
-                find_and_insert_matches(
-                    pat,
-                    sequence,
-                    matches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                )
-            })
+            self.pat2.iter().all(closure)
         } else {
-            self.pat2.iter().any(|pat| {
-                find_and_insert_matches(
-                    pat,
-                    sequence,
-                    matches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                )
-            })
+            self.pat2.iter().any(closure)
         }
     }
 
@@ -147,50 +129,31 @@ impl PatternMatcher for FuzzyMatcher {
             return true;
         }
         let offset = self.offset();
+        let closure = |pat: &Vec<u8>| {
+            let found_s = find_and_insert_matches(
+                pat,
+                primary,
+                smatches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+                offset,
+            );
+            let found_x = find_and_insert_matches(
+                pat,
+                secondary,
+                xmatches,
+                &mut self.searcher,
+                self.k,
+                self.inexact,
+                offset,
+            );
+            found_s || found_x // OR here because we want to match either primary or secondary
+        };
         if and_logic {
-            self.pat.iter().all(|pat| {
-                let found_s = find_and_insert_matches(
-                    pat,
-                    primary,
-                    smatches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                );
-                let found_x = find_and_insert_matches(
-                    pat,
-                    secondary,
-                    xmatches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                );
-                found_s || found_x // still OR here because we want to match either primary or secondary
-            })
+            self.pat.iter().all(closure)
         } else {
-            self.pat.iter().any(|pat| {
-                let found_s = find_and_insert_matches(
-                    pat,
-                    primary,
-                    smatches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                );
-                let found_x = find_and_insert_matches(
-                    pat,
-                    secondary,
-                    xmatches,
-                    &mut self.searcher,
-                    self.k,
-                    self.inexact,
-                    offset,
-                );
-                found_s || found_x
-            })
+            self.pat.iter().any(closure)
         }
     }
 }
