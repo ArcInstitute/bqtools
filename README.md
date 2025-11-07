@@ -289,3 +289,5 @@ bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pv
 # Count the number of occurrences for each pattern from a file
 bqtools grep input.bq --file patterns.txt -P
 ```
+
+The output of pattern count is a TSV with three columns: [Pattern, Count, Fraction of Total]
