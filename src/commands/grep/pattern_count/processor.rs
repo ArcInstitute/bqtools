@@ -3,12 +3,36 @@ use std::{io::stdout, sync::Arc};
 use anyhow::Result;
 use binseq::{BinseqRecord, ParallelProcessor};
 use parking_lot::Mutex;
+use serde::Serialize;
+
+use crate::commands::grep::SimpleRange;
 
 use super::PatternCount;
+
+#[derive(Serialize)]
+pub struct PatternCountResult<'a> {
+    pattern: &'a str,
+    count: usize,
+    frac_total: f64,
+}
+impl<'a> PatternCountResult<'a> {
+    pub fn new(pattern: &'a str, count: usize, total: usize) -> Result<Self> {
+        Ok(Self {
+            pattern,
+            count,
+            frac_total: if total > 0 {
+                count as f64 / total as f64
+            } else {
+                0.0
+            },
+        })
+    }
+}
 
 #[derive(Clone)]
 pub struct PatternCountProcessor<Pc: PatternCount> {
     counter: Pc,
+    range: Option<SimpleRange>,
 
     local_pattern_count: Vec<usize>,
     local_total: usize, // total number of reads processed (not just matches)
@@ -22,10 +46,11 @@ pub struct PatternCountProcessor<Pc: PatternCount> {
     global_total: Arc<Mutex<usize>>, // total number of reads processed
 }
 impl<Pc: PatternCount> PatternCountProcessor<Pc> {
-    pub fn new(counter: Pc) -> Self {
+    pub fn new(counter: Pc, range: Option<SimpleRange>) -> Self {
         let num_patterns = counter.num_patterns();
         Self {
             counter,
+            range,
             local_pattern_count: vec![0; num_patterns],
             local_total: 0,
             sbuf: Vec::new(),
@@ -38,19 +63,12 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
         self.sbuf.clear();
         self.xbuf.clear();
     }
-    pub fn total_matched(&self) -> usize {
-        self.global_pattern_count
-            .iter()
-            .map(|count| *count.lock())
-            .sum()
-    }
     pub fn pprint_pattern_counts(&self) -> Result<()> {
         let mut writer = csv::WriterBuilder::new()
             .delimiter(b'\t')
-            .has_headers(false)
+            .has_headers(true)
             .from_writer(stdout());
 
-        let total_counts = self.total_matched();
         let total_records = *self.global_total.lock();
         let patterns = self.counter.pattern_strings();
 
@@ -58,18 +76,7 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
             .iter()
             .zip(self.global_pattern_count.iter())
             .try_for_each(|(pattern, count)| -> Result<()> {
-                let count = *count.lock();
-                let frac_matched = if total_counts > 0 {
-                    count as f64 / total_counts as f64
-                } else {
-                    0.0
-                };
-                let frac_total = if total_records > 0 {
-                    count as f64 / total_records as f64
-                } else {
-                    0.0
-                };
-                let record = (pattern, count, frac_matched, frac_total);
+                let record = PatternCountResult::new(pattern, *count.lock(), total_records)?;
                 writer.serialize(record)?;
                 Ok(())
             })?;
@@ -86,8 +93,15 @@ impl<Pc: PatternCount> ParallelProcessor for PatternCountProcessor<Pc> {
         if record.is_paired() {
             record.decode_x(&mut self.xbuf)?;
         }
+
+        let (primary, extended) = if let Some(range) = self.range {
+            (range.slice(&self.sbuf), range.slice(&self.xbuf))
+        } else {
+            (self.sbuf.as_ref(), self.xbuf.as_ref())
+        };
+
         self.counter
-            .count_patterns(&self.sbuf, &self.xbuf, &mut self.local_pattern_count);
+            .count_patterns(&primary, &extended, &mut self.local_pattern_count);
         self.local_total += 1;
         Ok(())
     }

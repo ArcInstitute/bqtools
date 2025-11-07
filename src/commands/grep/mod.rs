@@ -1,6 +1,7 @@
 mod color;
 mod filter;
 mod pattern_count;
+mod range;
 
 #[cfg(feature = "fuzzy")]
 use filter::FuzzyMatcher;
@@ -9,6 +10,7 @@ use pattern_count::FuzzyPatternCounter;
 
 use filter::{FilterProcessor, RegexMatcher};
 use pattern_count::{PatternCountProcessor, RegexPatternCounter};
+pub use range::SimpleRange;
 
 use super::decode::build_writer;
 use crate::{
@@ -36,7 +38,7 @@ fn run_fuzzy(
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
         );
-        let proc = PatternCountProcessor::new(counter);
+        let proc = PatternCountProcessor::new(counter, args.grep.range);
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts()?;
     } else {
@@ -46,12 +48,14 @@ fn run_fuzzy(
             args.grep.bytes_pat()?,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
+            args.grep.range.map(|r| r.offset()).unwrap_or(0),
         );
         let proc = FilterProcessor::new(
             matcher,
             args.grep.and_logic(),
             args.grep.invert,
             args.grep.count,
+            args.grep.range,
             writer,
             format,
             mate,
@@ -80,7 +84,7 @@ fn run_regex(
             args.grep.bytes_reg()?,
             args.grep.invert,
         );
-        let proc = PatternCountProcessor::new(counter);
+        let proc = PatternCountProcessor::new(counter, args.grep.range);
         reader.process_parallel(proc.clone(), args.output.threads())?;
         proc.pprint_pattern_counts()?;
     } else {
@@ -88,12 +92,14 @@ fn run_regex(
             args.grep.bytes_reg1()?,
             args.grep.bytes_reg2()?,
             args.grep.bytes_reg()?,
+            args.grep.range.map(|r| r.offset()).unwrap_or(0),
         );
         let proc = FilterProcessor::new(
             matcher,
             args.grep.and_logic(),
             args.grep.invert,
             args.grep.count,
+            args.grep.range,
             writer,
             format,
             mate,
