@@ -2,8 +2,8 @@ use std::{fmt::Display, str::FromStr};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SimpleRange {
-    pub start: Option<usize>,
-    pub end: Option<usize>,
+    start: Option<usize>,
+    end: Option<usize>,
 }
 impl SimpleRange {
     pub fn validate(&self) -> Result<(), &'static str> {
