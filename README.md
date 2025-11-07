@@ -244,4 +244,48 @@ bqtools grep input.bq "ACGTACGT" -z
 
 # Run fuzzy matching with an edit distance of 2
 bqtools grep input.bq "ACGTACGT" -z -k2
+
+# Run fuzzy matching but only write inexact matches
+bqtools grep input.bq "ACGTACGT" -zi
+```
+
+`bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
+You can provide files for either primary/extended, just primary, or just extended patterns with the relevant flags.
+Notably this will match *solely* with OR logic.
+This can be used also with fuzzy matching as well as with pattern counting described below.
+Regex is also fully supported and files can be additionally paired with CLI arguments.
+
+```bash
+# Run grep with patterns from a file
+bqtools grep input.bq --file patterns.txt
+
+# Run grep with patterns from a file (primary)
+bqtools grep input.bq --sfile patterns.txt
+
+# Run grep with patterns from a file (extended)
+bqtools grep input.bq --xfile patterns.txt
+```
+
+`bqtools` also introduces a new feature for the counting the occurrences of individual patterns.
+This is useful for seeing how many times each pattern occurs across a sequencing dataset without having to iterate over the dataset multiple times using traditional methods.
+
+Some important notes are:
+1. A pattern will only be counted once across a sequencing record (primary and secondary)
+2. A sequencing record may contribute to multiple patterns occurrences
+3. Providing multiple patterns will match records with `OR` logic (this is different behavior from `bqtools grep` default which uses `AND` logic when multiple patterns are provided)
+4. Regular expressions are supported and treated as a single pattern (e.g. `ACGT|TCGA` will return a single output row but match on both `ACGT` and `TCGA`).
+5. Invert is supported for counting patterns and will return the number of records a pattern does not occur in.
+
+```bash
+# Count the number of occurrences for each of three expressions
+bqtools grep input.bq "ACGTACGT" "TCGATCGA$" "AAA(TT|CC)AAA" -P
+
+# Count the number of occurrences for each of three patterns with fuzzy matching
+bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pz
+
+# Count the number of records a pattern does not occur in
+bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pv
+
+# Count the number of occurrences for each pattern from a file
+bqtools grep input.bq --file patterns.txt -P
 ```

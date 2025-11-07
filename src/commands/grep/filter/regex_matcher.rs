@@ -1,0 +1,98 @@
+use super::{MatchRanges, PatternMatcher};
+
+type Expressions = Vec<regex::bytes::Regex>;
+
+#[derive(Clone)]
+pub struct RegexMatcher {
+    /// Regex expressions to match on
+    re1: Expressions, // in primary
+    re2: Expressions, // in secondary
+    re: Expressions,  // in either
+}
+
+impl RegexMatcher {
+    pub fn new(re1: Expressions, re2: Expressions, re: Expressions) -> Self {
+        Self { re1, re2, re }
+    }
+}
+
+fn find_and_insert_matches(
+    reg: &regex::bytes::Regex,
+    sequence: &[u8],
+    matches: &mut MatchRanges,
+) -> bool {
+    let mut found = false;
+    for index in reg.find_iter(sequence) {
+        matches.insert((index.start(), index.end()));
+        found = true;
+    }
+    found
+}
+
+impl PatternMatcher for RegexMatcher {
+    fn match_primary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
+        if self.re1.is_empty() {
+            return true;
+        }
+        if and_logic {
+            self.re1
+                .iter()
+                .all(|reg| find_and_insert_matches(reg, sequence, matches))
+        } else {
+            self.re1
+                .iter()
+                .any(|reg| find_and_insert_matches(reg, sequence, matches))
+        }
+    }
+
+    fn match_secondary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
+        if self.re2.is_empty() || sequence.is_empty() {
+            return true;
+        }
+        if and_logic {
+            self.re2
+                .iter()
+                .all(|reg| find_and_insert_matches(reg, sequence, matches))
+        } else {
+            self.re2
+                .iter()
+                .any(|reg| find_and_insert_matches(reg, sequence, matches))
+        }
+    }
+
+    fn match_either(
+        &mut self,
+        primary: &[u8],
+        secondary: &[u8],
+        smatches: &mut MatchRanges,
+        xmatches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
+        if self.re.is_empty() {
+            return true;
+        }
+        if and_logic {
+            self.re.iter().all(|reg| {
+                let found_s = find_and_insert_matches(reg, primary, smatches);
+                let found_x = find_and_insert_matches(reg, secondary, xmatches);
+                found_s || found_x // still or because we want to match either
+            })
+        } else {
+            self.re.iter().any(|reg| {
+                let found_s = find_and_insert_matches(reg, primary, smatches);
+                let found_x = find_and_insert_matches(reg, secondary, xmatches);
+                found_s || found_x
+            })
+        }
+    }
+}
