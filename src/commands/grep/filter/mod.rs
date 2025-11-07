@@ -264,9 +264,7 @@ mod matcher_unit_tests {
         let seq_far = b"GGGGAAAACCAATTTT";
         let mut matches3 = HashSet::new();
         let result = matcher.match_primary(seq_far, &mut matches3, true);
-        // This might still match depending on the length and algorithm
-        // Just verify it doesn't panic
-        assert!(result || !result);
+        assert!(!result, "Unexpected match, >1 edit distance");
     }
 
     #[cfg(feature = "fuzzy")]
