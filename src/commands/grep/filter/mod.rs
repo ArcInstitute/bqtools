@@ -12,7 +12,7 @@ pub use regex_matcher::RegexMatcher;
 
 pub type MatchRanges = HashSet<(usize, usize)>;
 
-pub trait PatternMatcher: Clone + Send + Sync {
+pub trait PatternMatch: Clone + Send + Sync {
     fn match_primary(
         &mut self,
         sequence: &[u8],
@@ -37,11 +37,80 @@ pub trait PatternMatcher: Clone + Send + Sync {
     fn offset(&self) -> usize;
 }
 
+#[derive(Clone)]
+pub enum PatternMatcher {
+    Regex(RegexMatcher),
+    #[cfg(feature = "fuzzy")]
+    Fuzzy(FuzzyMatcher),
+}
+impl PatternMatch for PatternMatcher {
+    fn match_primary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
+        match self {
+            PatternMatcher::Regex(ref mut matcher) => {
+                matcher.match_primary(sequence, matches, and_logic)
+            }
+            #[cfg(feature = "fuzzy")]
+            PatternMatcher::Fuzzy(ref mut matcher) => {
+                matcher.match_primary(sequence, matches, and_logic)
+            }
+        }
+    }
+
+    fn match_secondary(
+        &mut self,
+        sequence: &[u8],
+        matches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
+        match self {
+            PatternMatcher::Regex(ref mut matcher) => {
+                matcher.match_secondary(sequence, matches, and_logic)
+            }
+            #[cfg(feature = "fuzzy")]
+            PatternMatcher::Fuzzy(ref mut matcher) => {
+                matcher.match_secondary(sequence, matches, and_logic)
+            }
+        }
+    }
+
+    fn match_either(
+        &mut self,
+        primary: &[u8],
+        secondary: &[u8],
+        smatches: &mut MatchRanges,
+        xmatches: &mut MatchRanges,
+        and_logic: bool,
+    ) -> bool {
+        match self {
+            PatternMatcher::Regex(ref mut matcher) => {
+                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            }
+            #[cfg(feature = "fuzzy")]
+            PatternMatcher::Fuzzy(ref mut matcher) => {
+                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            }
+        }
+    }
+
+    fn offset(&self) -> usize {
+        match self {
+            PatternMatcher::Regex(ref matcher) => matcher.offset(),
+            #[cfg(feature = "fuzzy")]
+            PatternMatcher::Fuzzy(ref matcher) => matcher.offset(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod matcher_unit_tests {
     use std::collections::HashSet;
 
-    use super::{PatternMatcher, RegexMatcher};
+    use super::{PatternMatch, RegexMatcher};
 
     #[cfg(feature = "fuzzy")]
     use super::FuzzyMatcher;

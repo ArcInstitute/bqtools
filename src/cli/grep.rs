@@ -69,6 +69,12 @@ pub struct GrepArgs {
     #[clap(short = 'P', long, conflicts_with = "count")]
     pub pattern_count: bool,
 
+    /// Denotes patterns are fixed strings (non-regex)
+    ///
+    /// Only used by pattern-count to use Aho-Corasick algorithm.
+    #[clap(short = 'x', long, requires = "pattern_count")]
+    pub fixed: bool,
+
     /// use OR logic for multiple patterns (default=AND)
     #[clap(long, conflicts_with = "pattern_count")]
     or_logic: bool,
@@ -156,7 +162,6 @@ impl GrepArgs {
     }
 }
 
-#[cfg(feature = "fuzzy")]
 impl GrepArgs {
     fn chain_bytes(
         &self,

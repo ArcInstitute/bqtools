@@ -1,6 +1,9 @@
 mod regex_pc;
 pub use regex_pc::RegexPatternCounter;
 
+mod ac_pc;
+pub use ac_pc::AhoCorasickPatternCounter;
+
 #[cfg(feature = "fuzzy")]
 mod fuzzy_pc;
 #[cfg(feature = "fuzzy")]
@@ -10,6 +13,12 @@ mod processor;
 pub use processor::PatternCountProcessor;
 
 pub trait PatternCount: Clone + Send + Sync {
+    /// Counts the number of patterns in the given primary and secondary strings.
+    ///
+    /// Increments those specific pattern counts.
+    ///
+    /// Pattern counts are assumed to equal to the number of patterns found in (primary-only, secondary-only, either) expressions.
+    /// The counts are indexed in that order in a single array.
     fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]);
 
     fn num_patterns(&self) -> usize;
@@ -17,9 +26,51 @@ pub trait PatternCount: Clone + Send + Sync {
     fn pattern_strings(&self) -> Vec<String>;
 }
 
+#[derive(Clone)]
+pub enum PatternCounter {
+    Regex(RegexPatternCounter),
+    AhoCorasick(AhoCorasickPatternCounter),
+    #[cfg(feature = "fuzzy")]
+    Fuzzy(FuzzyPatternCounter),
+}
+impl PatternCount for PatternCounter {
+    fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]) {
+        match self {
+            PatternCounter::Regex(counter) => {
+                counter.count_patterns(primary, secondary, pattern_count)
+            }
+            PatternCounter::AhoCorasick(counter) => {
+                counter.count_patterns(primary, secondary, pattern_count)
+            }
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => {
+                counter.count_patterns(primary, secondary, pattern_count)
+            }
+        }
+    }
+
+    fn num_patterns(&self) -> usize {
+        match self {
+            PatternCounter::Regex(counter) => counter.num_patterns(),
+            PatternCounter::AhoCorasick(counter) => counter.num_patterns(),
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => counter.num_patterns(),
+        }
+    }
+
+    fn pattern_strings(&self) -> Vec<String> {
+        match self {
+            PatternCounter::Regex(counter) => counter.pattern_strings(),
+            PatternCounter::AhoCorasick(counter) => counter.pattern_strings(),
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => counter.pattern_strings(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod pattern_count_tests {
-    use super::{PatternCount, RegexPatternCounter};
+    use super::{AhoCorasickPatternCounter, PatternCount, RegexPatternCounter};
 
     #[cfg(feature = "fuzzy")]
     use super::FuzzyPatternCounter;
@@ -392,5 +443,241 @@ mod pattern_count_tests {
         let mut counts2 = vec![0; counter.num_patterns()];
         counter.count_patterns(primary2, secondary2, &mut counts2);
         assert_eq!(counts2[0], 0);
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_single_pattern() {
+        let pat1 = vec![b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        assert_eq!(counter.num_patterns(), 1);
+
+        let primary = b"GGGGAAAATTTT";
+        let secondary = b"GGGGCCCCTTTT";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 1, "Pattern should be found in primary");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_multiple_patterns() {
+        let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec(), b"CCCC".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        assert_eq!(counter.num_patterns(), 3);
+
+        let primary = b"AAAAGGGGTTTT";
+        let secondary = b"GGGGCCCCGGGG";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 1, "First pattern found");
+        assert_eq!(counts[1], 1, "Second pattern found");
+        assert_eq!(counts[2], 0, "Third pattern not found in primary");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_secondary() {
+        let pat2 = vec![b"TTTT".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(vec![], pat2, vec![], false).unwrap();
+
+        let primary = b"GGGGAAAACCCC";
+        let secondary = b"GGGGTTTTCCCC";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 1, "Pattern should be found in secondary");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_either() {
+        let pat = vec![b"CCCC".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(vec![], vec![], pat, false).unwrap();
+
+        // Test match in primary
+        let primary1 = b"GGGGCCCCTTTT";
+        let secondary1 = b"GGGGAAAATTTT";
+        let mut counts1 = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary1, secondary1, &mut counts1);
+        assert_eq!(counts1[0], 1);
+
+        // Test match in secondary
+        let primary2 = b"GGGGAAAATTTT";
+        let secondary2 = b"GGGGCCCCTTTT";
+        let mut counts2 = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary2, secondary2, &mut counts2);
+        assert_eq!(counts2[0], 1);
+
+        // Test match in both (should still count as 1)
+        let primary3 = b"GGGGCCCCTTTT";
+        let secondary3 = b"GGGGCCCCTTTT";
+        let mut counts3 = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary3, secondary3, &mut counts3);
+        assert_eq!(counts3[0], 1);
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_no_match() {
+        let pat1 = vec![b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        let primary = b"GGGGCCCCTTTT";
+        let secondary = b"GGGGCCCCTTTT";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 0, "Pattern should not be found");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_invert() {
+        let pat1 = vec![b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], true).unwrap();
+
+        // Sequence without pattern (should count when inverted)
+        let primary1 = b"GGGGCCCCTTTT";
+        let secondary1 = b"GGGGCCCCTTTT";
+        let mut counts1 = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary1, secondary1, &mut counts1);
+        assert_eq!(counts1[0], 1, "Should count when pattern not found");
+
+        // Sequence with pattern (should not count when inverted)
+        let primary2 = b"GGGGAAAATTTT";
+        let secondary2 = b"GGGGCCCCTTTT";
+        let mut counts2 = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary2, secondary2, &mut counts2);
+        assert_eq!(counts2[0], 0, "Should not count when pattern found");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_combined_patterns() {
+        let pat1 = vec![b"AAAA".to_vec()];
+        let pat2 = vec![b"TTTT".to_vec()];
+        let pat = vec![b"CCCC".to_vec()];
+
+        let mut counter = AhoCorasickPatternCounter::new(pat1, pat2, pat, false).unwrap();
+
+        assert_eq!(counter.num_patterns(), 3);
+
+        let primary = b"AAAACCCCGGGG";
+        let secondary = b"GGGGTTTTCCCC";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 1, "Primary pattern found");
+        assert_eq!(counts[1], 1, "Secondary pattern found");
+        assert_eq!(counts[2], 1, "Either pattern found");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_pattern_strings() {
+        let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec()];
+        let counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        let patterns = counter.pattern_strings();
+        assert_eq!(patterns.len(), 2);
+        assert_eq!(patterns[0], "AAAA");
+        assert_eq!(patterns[1], "TTTT");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_multiple_records() {
+        let pat1 = vec![b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        let mut counts = vec![0; counter.num_patterns()];
+
+        // Process multiple records
+        let records = vec![
+            (b"GGGGAAAATTTT" as &[u8], b"" as &[u8]),
+            (b"GGGGCCCCTTTT", b""),
+            (b"AAAACCCCGGGG", b""),
+            (b"GGGGCCCCGGGG", b""),
+            (b"AAAAAAAAAAAA", b""),
+        ];
+
+        for (primary, secondary) in records {
+            counter.count_patterns(primary, secondary, &mut counts);
+        }
+
+        assert_eq!(
+            counts[0], 3,
+            "Pattern should be found in 3 out of 5 records"
+        );
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_empty_sequence() {
+        let pat2 = vec![b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(vec![], pat2, vec![], false).unwrap();
+
+        let primary = b"GGGGAAAATTTT";
+        let secondary = b"";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 0, "Should not count in empty secondary");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_overlapping_patterns() {
+        let pat1 = vec![b"AAA".to_vec(), b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        let primary = b"GGGGAAAAATTTT";
+        let secondary = b"";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 1, "AAA pattern found");
+        assert_eq!(counts[1], 1, "AAAA pattern found");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_multiple_occurrences() {
+        let pat1 = vec![b"AAA".to_vec(), b"AAAA".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        let primary = b"GGGGAAAAATTTT";
+        let secondary = b"";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        // Both patterns should be found (overlapping matches)
+        assert_eq!(counts[0], 1, "AAA pattern found");
+        assert_eq!(counts[1], 1, "AAAA pattern found");
+    }
+
+    #[test]
+    fn test_aho_corasick_pattern_counter_case_sensitive() {
+        let pat1 = vec![b"aaaa".to_vec()];
+        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+
+        // Different case should not match
+        let primary = b"GGGGAAAATTTT";
+        let secondary = b"";
+        let mut counts = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(counts[0], 0, "Case sensitive pattern should not match");
+
+        // Same case should match
+        let primary2 = b"ggggaaaatttt";
+        let secondary2 = b"";
+        let mut counts2 = vec![0; counter.num_patterns()];
+
+        counter.count_patterns(primary2, secondary2, &mut counts2);
+
+        assert_eq!(counts2[0], 1, "Same case should match");
     }
 }
