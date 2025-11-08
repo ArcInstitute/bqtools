@@ -1,4 +1,4 @@
-use aho_corasick::AhoCorasick;
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder, AhoCorasickKind};
 use anyhow::Result;
 use fixedbitset::FixedBitSet;
 
@@ -19,7 +19,13 @@ pub struct AhoCorasickPatternCounter {
     invert: bool,
 }
 impl AhoCorasickPatternCounter {
-    pub fn new(pat1: Patterns, pat2: Patterns, pat: Patterns, invert: bool) -> Result<Self> {
+    pub fn new(
+        pat1: Patterns,
+        pat2: Patterns,
+        pat: Patterns,
+        no_dfa: bool,
+        invert: bool,
+    ) -> Result<Self> {
         let all_patterns = pat1
             .iter()
             .chain(pat2.iter())
@@ -27,9 +33,9 @@ impl AhoCorasickPatternCounter {
             .cloned()
             .collect();
         Ok(Self {
-            state1: AhoCorasick::new(&pat1)?,
-            state2: AhoCorasick::new(&pat2)?,
-            state: AhoCorasick::new(&pat)?,
+            state1: corasick_builder(&pat1, no_dfa)?,
+            state2: corasick_builder(&pat2, no_dfa)?,
+            state: corasick_builder(&pat, no_dfa)?,
             bits1: FixedBitSet::with_capacity(pat1.len()),
             bits2: FixedBitSet::with_capacity(pat2.len()),
             bits: FixedBitSet::with_capacity(pat.len()),
@@ -93,6 +99,17 @@ impl AhoCorasickPatternCounter {
         );
         self.bits.clear();
     }
+}
+
+fn corasick_builder(patterns: &Patterns, no_dfa: bool) -> Result<AhoCorasick> {
+    Ok(AhoCorasickBuilder::new()
+        .ascii_case_insensitive(false)
+        .kind(if no_dfa {
+            None
+        } else {
+            Some(AhoCorasickKind::DFA)
+        })
+        .build(patterns)?)
 }
 
 fn increment_pattern(

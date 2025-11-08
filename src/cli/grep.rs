@@ -71,9 +71,15 @@ pub struct GrepArgs {
 
     /// Denotes patterns are fixed strings (non-regex)
     ///
-    /// Only used by pattern-count to use Aho-Corasick algorithm.
-    #[clap(short = 'x', long, requires = "pattern_count")]
+    /// Allows usage of Aho-Corasick algorithm for efficient matching.
+    #[clap(short = 'x', long)]
     pub fixed: bool,
+
+    /// Build Aho-Corasick automaton without DFA
+    ///
+    /// DFA uses more memory, but is significantly faster.
+    #[clap(long)]
+    pub no_dfa: bool,
 
     /// use OR logic for multiple patterns (default=AND)
     #[clap(long, conflicts_with = "pattern_count")]

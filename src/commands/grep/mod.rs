@@ -5,6 +5,7 @@ mod range;
 
 #[cfg(feature = "fuzzy")]
 use filter::FuzzyMatcher;
+use log::warn;
 #[cfg(feature = "fuzzy")]
 use pattern_count::FuzzyPatternCounter;
 
@@ -17,7 +18,7 @@ pub use range::SimpleRange;
 use super::decode::build_writer;
 use crate::{
     cli::{FileFormat, GrepCommand, Mate},
-    commands::decode::SplitWriter,
+    commands::{decode::SplitWriter, grep::filter::AhoCorasickMatcher},
 };
 
 use anyhow::Result;
@@ -42,6 +43,7 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
             args.grep.bytes_pat1()?,
             args.grep.bytes_pat2()?,
             args.grep.bytes_pat()?,
+            args.grep.no_dfa,
             args.grep.invert,
         )?;
         Ok(PatternCounter::AhoCorasick(counter))
@@ -78,13 +80,27 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         return Ok(PatternMatcher::Fuzzy(matcher));
     }
 
-    let matcher = RegexMatcher::new(
-        args.grep.bytes_reg1()?,
-        args.grep.bytes_reg2()?,
-        args.grep.bytes_reg()?,
-        args.grep.range.map_or(0, |r| r.offset()),
-    );
-    Ok(PatternMatcher::Regex(matcher))
+    if args.grep.fixed && !args.grep.and_logic() {
+        let matcher = AhoCorasickMatcher::new(
+            args.grep.bytes_pat1()?,
+            args.grep.bytes_pat2()?,
+            args.grep.bytes_pat()?,
+            args.grep.no_dfa,
+            args.grep.range.map_or(0, |r| r.offset()),
+        )?;
+        Ok(PatternMatcher::AhoCorasick(matcher))
+    } else {
+        if args.grep.fixed {
+            warn!("`-x/--fixed provided but ignored when using AND logic")
+        }
+        let matcher = RegexMatcher::new(
+            args.grep.bytes_reg1()?,
+            args.grep.bytes_reg2()?,
+            args.grep.bytes_reg()?,
+            args.grep.range.map_or(0, |r| r.offset()),
+        );
+        Ok(PatternMatcher::Regex(matcher))
+    }
 }
 
 fn run_grep(

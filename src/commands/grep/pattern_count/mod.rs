@@ -448,7 +448,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_single_pattern() {
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         assert_eq!(counter.num_patterns(), 1);
 
@@ -464,7 +465,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_multiple_patterns() {
         let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec(), b"CCCC".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -482,7 +484,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_secondary() {
         let pat2 = vec![b"TTTT".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(vec![], pat2, vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(vec![], pat2, vec![], false, false).unwrap();
 
         let primary = b"GGGGAAAACCCC";
         let secondary = b"GGGGTTTTCCCC";
@@ -496,7 +499,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_either() {
         let pat = vec![b"CCCC".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(vec![], vec![], pat, false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(vec![], vec![], pat, false, false).unwrap();
 
         // Test match in primary
         let primary1 = b"GGGGCCCCTTTT";
@@ -523,7 +527,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_no_match() {
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         let primary = b"GGGGCCCCTTTT";
         let secondary = b"GGGGCCCCTTTT";
@@ -537,7 +542,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_invert() {
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], true).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, true).unwrap();
 
         // Sequence without pattern (should count when inverted)
         let primary1 = b"GGGGCCCCTTTT";
@@ -560,7 +566,7 @@ mod pattern_count_tests {
         let pat2 = vec![b"TTTT".to_vec()];
         let pat = vec![b"CCCC".to_vec()];
 
-        let mut counter = AhoCorasickPatternCounter::new(pat1, pat2, pat, false).unwrap();
+        let mut counter = AhoCorasickPatternCounter::new(pat1, pat2, pat, false, false).unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -578,7 +584,7 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_pattern_strings() {
         let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec()];
-        let counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         let patterns = counter.pattern_strings();
         assert_eq!(patterns.len(), 2);
@@ -589,7 +595,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_multiple_records() {
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         let mut counts = vec![0; counter.num_patterns()];
 
@@ -615,7 +622,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_empty_sequence() {
         let pat2 = vec![b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(vec![], pat2, vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(vec![], pat2, vec![], false, false).unwrap();
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"";
@@ -629,7 +637,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_overlapping_patterns() {
         let pat1 = vec![b"AAA".to_vec(), b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         let primary = b"GGGGAAAAATTTT";
         let secondary = b"";
@@ -644,7 +653,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_multiple_occurrences() {
         let pat1 = vec![b"AAA".to_vec(), b"AAAA".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         let primary = b"GGGGAAAAATTTT";
         let secondary = b"";
@@ -660,7 +670,8 @@ mod pattern_count_tests {
     #[test]
     fn test_aho_corasick_pattern_counter_case_sensitive() {
         let pat1 = vec![b"aaaa".to_vec()];
-        let mut counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false).unwrap();
+        let mut counter =
+            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
 
         // Different case should not match
         let primary = b"GGGGAAAATTTT";

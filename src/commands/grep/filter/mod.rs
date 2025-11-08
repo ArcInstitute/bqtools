@@ -1,10 +1,12 @@
 use std::collections::HashSet;
 
+mod ac_matcher;
 #[cfg(feature = "fuzzy")]
 mod fuzzy_matcher;
 mod processor;
 mod regex_matcher;
 
+pub use ac_matcher::AhoCorasickMatcher;
 #[cfg(feature = "fuzzy")]
 pub use fuzzy_matcher::FuzzyMatcher;
 pub use processor::FilterProcessor;
@@ -40,6 +42,7 @@ pub trait PatternMatch: Clone + Send + Sync {
 #[derive(Clone)]
 pub enum PatternMatcher {
     Regex(RegexMatcher),
+    AhoCorasick(AhoCorasickMatcher),
     #[cfg(feature = "fuzzy")]
     Fuzzy(FuzzyMatcher),
 }
@@ -52,6 +55,9 @@ impl PatternMatch for PatternMatcher {
     ) -> bool {
         match self {
             PatternMatcher::Regex(ref mut matcher) => {
+                matcher.match_primary(sequence, matches, and_logic)
+            }
+            PatternMatcher::AhoCorasick(ref mut matcher) => {
                 matcher.match_primary(sequence, matches, and_logic)
             }
             #[cfg(feature = "fuzzy")]
@@ -69,6 +75,9 @@ impl PatternMatch for PatternMatcher {
     ) -> bool {
         match self {
             PatternMatcher::Regex(ref mut matcher) => {
+                matcher.match_secondary(sequence, matches, and_logic)
+            }
+            PatternMatcher::AhoCorasick(ref mut matcher) => {
                 matcher.match_secondary(sequence, matches, and_logic)
             }
             #[cfg(feature = "fuzzy")]
@@ -90,6 +99,9 @@ impl PatternMatch for PatternMatcher {
             PatternMatcher::Regex(ref mut matcher) => {
                 matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
+            PatternMatcher::AhoCorasick(ref mut matcher) => {
+                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            }
             #[cfg(feature = "fuzzy")]
             PatternMatcher::Fuzzy(ref mut matcher) => {
                 matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
@@ -100,6 +112,7 @@ impl PatternMatch for PatternMatcher {
     fn offset(&self) -> usize {
         match self {
             PatternMatcher::Regex(ref matcher) => matcher.offset(),
+            PatternMatcher::AhoCorasick(ref matcher) => matcher.offset(),
             #[cfg(feature = "fuzzy")]
             PatternMatcher::Fuzzy(ref matcher) => matcher.offset(),
         }
