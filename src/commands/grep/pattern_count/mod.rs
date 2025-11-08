@@ -26,6 +26,48 @@ pub trait PatternCount: Clone + Send + Sync {
     fn pattern_strings(&self) -> Vec<String>;
 }
 
+#[derive(Clone)]
+pub enum PatternCounter {
+    Regex(RegexPatternCounter),
+    AhoCorasick(AhoCorasickPatternCounter),
+    #[cfg(feature = "fuzzy")]
+    Fuzzy(FuzzyPatternCounter),
+}
+impl PatternCount for PatternCounter {
+    fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]) {
+        match self {
+            PatternCounter::Regex(counter) => {
+                counter.count_patterns(primary, secondary, pattern_count)
+            }
+            PatternCounter::AhoCorasick(counter) => {
+                counter.count_patterns(primary, secondary, pattern_count)
+            }
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => {
+                counter.count_patterns(primary, secondary, pattern_count)
+            }
+        }
+    }
+
+    fn num_patterns(&self) -> usize {
+        match self {
+            PatternCounter::Regex(counter) => counter.num_patterns(),
+            PatternCounter::AhoCorasick(counter) => counter.num_patterns(),
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => counter.num_patterns(),
+        }
+    }
+
+    fn pattern_strings(&self) -> Vec<String> {
+        match self {
+            PatternCounter::Regex(counter) => counter.pattern_strings(),
+            PatternCounter::AhoCorasick(counter) => counter.pattern_strings(),
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => counter.pattern_strings(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod pattern_count_tests {
     use super::{AhoCorasickPatternCounter, PatternCount, RegexPatternCounter};

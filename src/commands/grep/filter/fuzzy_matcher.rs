@@ -1,4 +1,4 @@
-use super::{MatchRanges, PatternMatcher};
+use super::{MatchRanges, PatternMatch};
 
 use sassy::{profiles::Dna, Searcher};
 
@@ -56,7 +56,7 @@ fn find_and_insert_matches(
     found
 }
 
-impl PatternMatcher for FuzzyMatcher {
+impl PatternMatch for FuzzyMatcher {
     fn offset(&self) -> usize {
         self.offset
     }

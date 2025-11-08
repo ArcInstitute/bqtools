@@ -9,11 +9,11 @@ use binseq::prelude::*;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use super::{MatchRanges, PatternMatcher};
+use super::{MatchRanges, PatternMatch};
 
 #[derive(Clone)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct FilterProcessor<Pm: PatternMatcher> {
+pub struct FilterProcessor<Pm: PatternMatch> {
     matcher: Pm,
 
     /// Match logic (true = AND, false = OR)
@@ -63,7 +63,7 @@ pub struct FilterProcessor<Pm: PatternMatcher> {
     global_writer: Arc<Mutex<SplitWriter>>,
     global_count: Arc<Mutex<usize>>,
 }
-impl<Pm: PatternMatcher> FilterProcessor<Pm> {
+impl<Pm: PatternMatch> FilterProcessor<Pm> {
     #[allow(clippy::fn_params_excessive_bools)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -153,7 +153,7 @@ impl<Pm: PatternMatcher> FilterProcessor<Pm> {
     }
 }
 
-impl<Pm: PatternMatcher> ParallelProcessor for FilterProcessor<Pm> {
+impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
         self.clear_buffers();
 
