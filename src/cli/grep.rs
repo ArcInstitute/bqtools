@@ -72,7 +72,7 @@ pub struct GrepArgs {
     /// Denotes patterns are fixed strings (non-regex)
     ///
     /// Only used by pattern-count to use Aho-Corasick algorithm.
-    #[clap(long, requires = "pattern_count")]
+    #[clap(short = 'x', long, requires = "pattern_count")]
     pub fixed: bool,
 
     /// use OR logic for multiple patterns (default=AND)
