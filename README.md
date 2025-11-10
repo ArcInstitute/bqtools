@@ -264,6 +264,9 @@ Notably this will match *solely* with OR logic.
 This can be used also with fuzzy matching as well as with pattern counting described below.
 Regex is also fully supported and files can be additionally paired with CLI arguments.
 
+If your patterns are all fixed strings (and not regex), you can improve performance by using the `-x/--fixed` flag.
+This will use the more efficient [Aho-Corasick algorithm](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) to match patterns.
+
 ```bash
 # Run grep with patterns from a file
 bqtools grep input.bq --file patterns.txt
@@ -284,6 +287,11 @@ Some important notes are:
 3. Providing multiple patterns will match records with `OR` logic (this is different behavior from `bqtools grep` default which uses `AND` logic when multiple patterns are provided)
 4. Regular expressions are supported and treated as a single pattern (e.g. `ACGT|TCGA` will return a single output row but match on both `ACGT` and `TCGA`).
 5. Invert is supported for counting patterns and will return the number of records a pattern does not occur in.
+
+If your patterns are all fixed strings (and not regex), you can improve performance by using the `-x/--fixed` flag.
+This will use the more efficient [Aho-Corasick algorithm](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) to match patterns.
+
+The throughput gains for this can be massive for pattern counting, especially when dealing with high numbers of patterns.
 
 ```bash
 # Count the number of occurrences for each of three expressions

@@ -1,4 +1,4 @@
-use super::{MatchRanges, PatternMatcher};
+use super::{MatchRanges, PatternMatch};
 
 type Expressions = Vec<regex::bytes::Regex>;
 
@@ -36,7 +36,7 @@ fn find_and_insert_matches(
     found
 }
 
-impl PatternMatcher for RegexMatcher {
+impl PatternMatch for RegexMatcher {
     fn offset(&self) -> usize {
         self.offset
     }
