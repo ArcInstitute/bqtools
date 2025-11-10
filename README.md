@@ -276,6 +276,9 @@ bqtools grep input.bq --sfile patterns.txt
 
 # Run grep with patterns from a file (extended)
 bqtools grep input.bq --xfile patterns.txt
+
+# Run grep with fixed-string patterns from a file
+bqtools grep input.bq --file patterns.txt -x
 ```
 
 `bqtools` also introduces a new feature for the counting the occurrences of individual patterns.
@@ -305,6 +308,9 @@ bqtools grep input.bq "ACGTACGT" "TCGATCGA" "AAAAAAAA" -Pv
 
 # Count the number of occurrences for each pattern from a file
 bqtools grep input.bq --file patterns.txt -P
+
+# Count the number of occurrences for each pattern from a file (fixed strings)
+bqtools grep input.bq --file patterns.txt -Px
 ```
 
 The output of pattern count is a TSV with three columns: [Pattern, Count, Fraction of Total]
