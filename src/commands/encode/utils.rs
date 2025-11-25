@@ -2,12 +2,11 @@ use std::{collections::HashMap, io::Read, path::PathBuf};
 
 use anyhow::{bail, Result};
 use log::{error, warn};
-use paraseq::{
-    fastx,
-    rust_htslib::{self, bam::Read as BamRead},
-    Record,
-};
+use paraseq::{fastx, Record};
 use regex::Regex;
+
+#[cfg(feature = "htslib")]
+use paraseq::rust_htslib::{self, bam::Read as BamRead};
 
 type BoxReader = Box<dyn Read + Send>;
 
@@ -27,6 +26,7 @@ pub fn get_sequence_len(reader: &mut fastx::Reader<BoxReader>) -> Result<u32> {
     Ok(slen as u32)
 }
 
+#[cfg(feature = "htslib")]
 pub fn get_sequence_len_htslib(path: &str, paired: bool) -> Result<(u32, u32)> {
     let mut reader = rust_htslib::bam::Reader::from_path(path)?;
     let mut slen = 0;

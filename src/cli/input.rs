@@ -5,6 +5,9 @@ use clap::Parser;
 use log::debug;
 use paraseq::fastx;
 
+#[cfg(not(feature = "gcs"))]
+use log::error;
+
 use crate::types::BoxedReader;
 
 use super::FileFormat;
@@ -122,15 +125,22 @@ impl InputFile {
 fn load_reader(
     path: Option<&str>,
     batch_size: Option<usize>,
-) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
+) -> Result<fastx::Reader<BoxedReader>> {
     if let Some(path) = path {
         if path.starts_with("gs://") {
-            load_gcs_reader(path, batch_size)
+            #[cfg(not(feature = "gcs"))]
+            {
+                error!("Missing feature flag - gcs. To process Google Cloud Storage files, enable the 'gcs' feature flag.");
+                bail!("Missing feature flag - gcs");
+            }
+
+            #[cfg(feature = "gcs")]
+            Ok(load_gcs_reader(path, batch_size)?)
         } else {
-            load_simple_reader(Some(path), batch_size)
+            Ok(load_simple_reader(Some(path), batch_size)?)
         }
     } else {
-        load_simple_reader(None, batch_size)
+        Ok(load_simple_reader(None, batch_size)?)
     }
 }
 
@@ -152,6 +162,7 @@ fn load_simple_reader(
     }
 }
 
+#[cfg(feature = "gcs")]
 fn load_gcs_reader(
     path: &str,
     batch_size: Option<usize>,

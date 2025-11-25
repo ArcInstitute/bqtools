@@ -4,23 +4,30 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use binseq::{bq, vbq, BitSize, Policy};
 use log::{debug, error, info, trace};
 use paraseq::{
     fastx::{self, Format},
-    htslib,
     prelude::*,
 };
+
 use regex::Regex;
 use walkdir::WalkDir;
+
+#[cfg(feature = "htslib")]
+use crate::commands::encode::utils::get_sequence_len_htslib;
+#[cfg(feature = "htslib")]
+use anyhow::Context;
+#[cfg(feature = "htslib")]
+use paraseq::htslib;
 
 use crate::{
     cli::{BinseqMode, EncodeCommand, FileFormat},
     commands::{
         encode::utils::{
-            generate_output_name, get_interleaved_sequence_len, get_sequence_len,
-            get_sequence_len_htslib, pair_r1_r2_files, pull_single_files,
+            generate_output_name, get_interleaved_sequence_len, get_sequence_len, pair_r1_r2_files,
+            pull_single_files,
         },
         utils::match_output,
     },
@@ -103,6 +110,7 @@ fn encode_single(
     Ok((num_records, num_skipped))
 }
 
+#[cfg(feature = "htslib")]
 #[allow(clippy::too_many_arguments)]
 fn encode_single_htslib(
     in_path: &str,
@@ -245,6 +253,7 @@ fn encode_interleaved(
     Ok((num_records, num_skipped))
 }
 
+#[cfg(feature = "htslib")]
 #[allow(clippy::too_many_arguments)]
 fn encode_interleaved_htslib(
     in_path: &str,
@@ -417,22 +426,31 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         )
     } else if args.input.interleaved {
         if let Some(FileFormat::Bam) = args.input.format() {
-            trace!("launching interleaved encoding (htslib)");
-            encode_interleaved_htslib(
-                args.input
-                    .single_path()?
-                    .context("Must provide an input path for HTSLib")?,
-                opath.as_deref(),
-                args.mode()?,
-                args.output.threads(),
-                args.output.compress(),
-                args.output.quality(),
-                args.output.block_size(),
-                args.input.batch_size,
-                args.output.policy.into(),
-                args.output.bitsize(),
-                args.output.headers,
-            )
+            #[cfg(not(feature = "htslib"))]
+            {
+                error!("Missing feature flag - htslib. Please compile with htslib feature flag enabled to process HTSlib files");
+                bail!("Missing feature flag - htslib");
+            }
+
+            #[cfg(feature = "htslib")]
+            {
+                trace!("launching interleaved encoding (htslib)");
+                encode_interleaved_htslib(
+                    args.input
+                        .single_path()?
+                        .context("Must provide an input path for HTSLib")?,
+                    opath.as_deref(),
+                    args.mode()?,
+                    args.output.threads(),
+                    args.output.compress(),
+                    args.output.quality(),
+                    args.output.block_size(),
+                    args.input.batch_size,
+                    args.output.policy.into(),
+                    args.output.bitsize(),
+                    args.output.headers,
+                )
+            }
         } else {
             trace!("launching interleaved encoding (fastx)");
             encode_interleaved(
@@ -449,21 +467,30 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             )
         }
     } else if let Some(FileFormat::Bam) = args.input.format() {
-        trace!("launching single encoding (htslib)");
-        encode_single_htslib(
-            args.input
-                .single_path()?
-                .context("Must provide an input path for HTSlib")?,
-            opath.as_deref(),
-            args.mode()?,
-            args.output.threads(),
-            args.output.compress(),
-            args.output.quality(),
-            args.output.block_size(),
-            args.output.policy.into(),
-            args.output.bitsize(),
-            args.output.headers,
-        )
+        #[cfg(not(feature = "htslib"))]
+        {
+            error!("Missing feature flag - htslib. Please compile with htslib feature flag enabled to process HTSlib files");
+            bail!("Missing feature flag - htslib");
+        }
+
+        #[cfg(feature = "htslib")]
+        {
+            trace!("launching single encoding (htslib)");
+            encode_single_htslib(
+                args.input
+                    .single_path()?
+                    .context("Must provide an input path for HTSlib")?,
+                opath.as_deref(),
+                args.mode()?,
+                args.output.threads(),
+                args.output.compress(),
+                args.output.quality(),
+                args.output.block_size(),
+                args.output.policy.into(),
+                args.output.bitsize(),
+                args.output.headers,
+            )
+        }
     } else {
         trace!("launching single encoding (fastx)");
         encode_single(
