@@ -58,10 +58,11 @@ bqtools --help
 
 bqtools supports the following feature flags:
 
+- `htslib`: Enable support for reading SAM/BAM/CRAM files using the [`htslib`](https://docs.rs/rust-htslib/latest/rust_htslib/) library (default).
+- `gcs`: Enable support for reading Google Cloud Storage files (default).
 - `fuzzy`: Enable fuzzy matching in the `grep` command using the [`sassy`](https://crates.io/crates/sassy) library
 
 To enable fuzzy matching, `bqtools` must be compiled using a `native` target cpu:
-
 
 ```bash
 # Install from source
@@ -69,6 +70,19 @@ cargo install --path . -F fuzzy;
 
 # Or install from crates but enforce native target cpu
 export RUSTFLAGS="-C target-cpu=native"; cargo install bqtools -F fuzzy;
+```
+
+To selectively enable/disable feature flags:
+
+```bash
+# (for fuzzy matching support sassy requires native target cpu)
+export RUSTFLAGS="-C target-cpu=native";
+
+# Install bqtools without htslib/gcs but with fuzzy matching
+cargo install bqtools --no-default-features -F fuzzy
+# 
+# Install bqtools without htslib but with fuzzy matching and gcs
+cargo install bqtools --no-default-features -F fuzzy,gcs
 ```
 
 
