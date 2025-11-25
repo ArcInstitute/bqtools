@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.4.10"
+version = "0.4.11"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
@@ -25,7 +25,7 @@ log = "0.4.28"
 memmap2 = "0.9.8"
 niffler = "3.0.0"
 num_cpus = "1.17.0"
-paraseq = { version = "0.4.3", features = ["htslib", "gcs"] }
+paraseq = "0.4.3"
 parking_lot = "0.12.5"
 rand = "0.9.2"
 regex = "1.12.2"
@@ -41,7 +41,10 @@ nucgen = "0.2.0"
 tempfile = "3.23.0"
 
 [features]
+default = ["htslib", "gcs"]
 fuzzy = ["sassy"]
+htslib = ["paraseq/htslib"]
+gcs = ["paraseq/gcs"]
 
 [profile.release]
 lto = true
