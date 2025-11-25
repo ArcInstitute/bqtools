@@ -91,7 +91,7 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         Ok(PatternMatcher::AhoCorasick(matcher))
     } else {
         if args.grep.fixed {
-            warn!("`-x/--fixed provided but ignored when using AND logic")
+            warn!("`-x/--fixed provided but ignored when using AND logic");
         }
         let matcher = RegexMatcher::new(
             args.grep.bytes_reg1()?,

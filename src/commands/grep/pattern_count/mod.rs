@@ -37,10 +37,10 @@ impl PatternCount for PatternCounter {
     fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]) {
         match self {
             PatternCounter::Regex(counter) => {
-                counter.count_patterns(primary, secondary, pattern_count)
+                counter.count_patterns(primary, secondary, pattern_count);
             }
             PatternCounter::AhoCorasick(counter) => {
-                counter.count_patterns(primary, secondary, pattern_count)
+                counter.count_patterns(primary, secondary, pattern_count);
             }
             #[cfg(feature = "fuzzy")]
             PatternCounter::Fuzzy(counter) => {
