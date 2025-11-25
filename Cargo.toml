@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.4.10"
+version = "0.4.11"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
