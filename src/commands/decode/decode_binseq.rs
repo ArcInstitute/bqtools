@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use binseq::prelude::*;
+use binseq::Context;
 use binseq::Result;
 use parking_lot::Mutex;
 
@@ -15,20 +16,11 @@ pub struct Decoder {
     left: Vec<u8>, // Used when writing pairs of files (R1/R2)
     right: Vec<u8>,
 
-    /// Local buffer for decoding primary
-    sbuf: Vec<u8>,
-    /// Local buffer for decoding secondary
-    xbuf: Vec<u8>,
+    /// Reusable buffers for decoding binseq records
+    ctx: Context,
+
     /// Local count of records
     local_count: usize,
-    /// Quality buffer (primary)
-    squal: Vec<u8>,
-    /// Quality buffer (extended)
-    xqual: Vec<u8>,
-    /// Header buffer (primary)
-    sheader: Vec<u8>,
-    /// Header buffer (extended)
-    xheader: Vec<u8>,
 
     /// Options
     format: FileFormat,
@@ -46,13 +38,8 @@ impl Decoder {
             mixed: Vec::new(),
             left: Vec::new(),
             right: Vec::new(),
-            sbuf: Vec::new(),
-            xbuf: Vec::new(),
             local_count: 0,
-            squal: Vec::new(),
-            xqual: Vec::new(),
-            sheader: Vec::new(),
-            xheader: Vec::new(),
+            ctx: Context::default(),
             format,
             mate,
             is_split: writer.is_split(),
@@ -68,39 +55,7 @@ impl Decoder {
 
 impl ParallelProcessor for Decoder {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> Result<()> {
-        // clear decoding buffers
-        self.sbuf.clear();
-        self.xbuf.clear();
-
-        // decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        record.sheader(&mut self.sheader);
-        let squal = if record.has_quality() {
-            record.squal()
-        } else {
-            if self.squal.len() < self.sbuf.len() {
-                self.squal.resize(self.sbuf.len(), b'?');
-            }
-            &self.squal
-        };
-
-        let xqual = if record.is_paired() {
-            record.decode_x(&mut self.xbuf)?;
-            record.xheader(&mut self.xheader);
-            if record.has_quality() {
-                record.xqual()
-            } else {
-                if self.xqual.len() < self.xbuf.len() {
-                    self.xqual.resize(self.xbuf.len(), b'?');
-                }
-                &self.xqual
-            }
-        } else {
-            if self.xqual.len() < self.xbuf.len() {
-                self.xqual.resize(self.xbuf.len(), b'?');
-            }
-            &self.xqual
-        };
+        self.ctx.fill(&record)?;
 
         write_record_pair(
             &mut self.left,
@@ -108,12 +63,12 @@ impl ParallelProcessor for Decoder {
             &mut self.mixed,
             self.mate,
             self.is_split,
-            &self.sbuf,
-            squal,
-            &self.sheader,
-            &self.xbuf,
-            xqual,
-            &self.xheader,
+            self.ctx.sbuf(),
+            self.ctx.squal(),
+            self.ctx.sheader(),
+            self.ctx.xbuf(),
+            self.ctx.xqual(),
+            self.ctx.xheader(),
             self.format,
         )?;
 
