@@ -1,4 +1,5 @@
 use anyhow::Result;
+use binseq::Context;
 
 use crate::cli::{FileFormat, Mate};
 
@@ -144,16 +145,10 @@ fn write_colored_record<W: Write>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn write_colored_record_pair<W: Write>(
     writer: &mut W,
     mate: Option<Mate>,
-    sbuf: &[u8],
-    squal: &[u8],
-    sheader: &[u8],
-    xbuf: &[u8],
-    xqual: &[u8],
-    xheader: &[u8],
+    ctx: &Context,
     smatch: &HashSet<Interval>,
     xmatch: &HashSet<Interval>,
     format: FileFormat,
@@ -163,18 +158,18 @@ pub fn write_colored_record_pair<W: Write>(
         Some(Mate::Both) => {
             write_colored_record(
                 writer,
-                sheader,
-                sbuf,
-                squal,
+                ctx.sheader(),
+                ctx.sbuf(),
+                ctx.squal(),
                 smatch,
                 format,
                 interval_buffer,
             )?;
             write_colored_record(
                 writer,
-                xheader,
-                xbuf,
-                xqual,
+                ctx.xheader(),
+                ctx.xbuf(),
+                ctx.xqual(),
                 xmatch,
                 format,
                 interval_buffer,
@@ -183,18 +178,18 @@ pub fn write_colored_record_pair<W: Write>(
         }
         Some(Mate::One) | None => write_colored_record(
             writer,
-            sheader,
-            sbuf,
-            squal,
+            ctx.sheader(),
+            ctx.sbuf(),
+            ctx.squal(),
             smatch,
             format,
             interval_buffer,
         ),
         Some(Mate::Two) => write_colored_record(
             writer,
-            xheader,
-            xbuf,
-            xqual,
+            ctx.xheader(),
+            ctx.xbuf(),
+            ctx.xqual(),
             xmatch,
             format,
             interval_buffer,

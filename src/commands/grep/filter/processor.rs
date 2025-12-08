@@ -156,12 +156,7 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
                 write_colored_record_pair(
                     &mut self.mixed,
                     self.mate,
-                    self.ctx.sbuf(),
-                    self.ctx.squal(),
-                    self.ctx.sheader(),
-                    self.ctx.xbuf(),
-                    self.ctx.xqual(),
-                    self.ctx.xheader(),
+                    &self.ctx,
                     &self.smatches,
                     &self.xmatches,
                     self.format,
