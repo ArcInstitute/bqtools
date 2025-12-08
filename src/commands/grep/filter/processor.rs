@@ -174,12 +174,7 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
                     &mut self.mixed,
                     self.mate,
                     self.is_split,
-                    self.ctx.sbuf(),
-                    self.ctx.squal(),
-                    self.ctx.sheader(),
-                    self.ctx.xbuf(),
-                    self.ctx.xqual(),
-                    self.ctx.xheader(),
+                    &self.ctx,
                     self.format,
                 )
             }?;

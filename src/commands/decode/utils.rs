@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use anyhow::Result;
+use binseq::Context;
 
 use super::Writer;
 use crate::cli::{FileFormat, Mate};
@@ -127,40 +128,34 @@ pub fn write_record<W: Write>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn write_record_pair<W: Write>(
     left: &mut W,
     right: &mut W,
     mixed: &mut W,
     mate: Option<Mate>,
     split: bool,
-    sbuf: &[u8],
-    squal: &[u8],
-    sheader: &[u8],
-    xbuf: &[u8],
-    xqual: &[u8],
-    xheader: &[u8],
+    ctx: &Context,
     format: FileFormat,
 ) -> Result<()> {
     match mate {
         Some(Mate::Both) => {
             if split {
-                write_record(left, sheader, sbuf, squal, format)?;
-                if !xbuf.is_empty() {
-                    write_record(right, xheader, xbuf, xqual, format)?;
+                write_record(left, ctx.sheader(), ctx.sbuf(), ctx.squal(), format)?;
+                if !ctx.xbuf().is_empty() {
+                    write_record(right, ctx.xheader(), ctx.xbuf(), ctx.xqual(), format)?;
                 }
             } else {
-                write_record(mixed, sheader, sbuf, squal, format)?;
-                if !xbuf.is_empty() {
-                    write_record(mixed, xheader, xbuf, xqual, format)?;
+                write_record(mixed, ctx.sheader(), ctx.sbuf(), ctx.squal(), format)?;
+                if !ctx.xbuf().is_empty() {
+                    write_record(mixed, ctx.xheader(), ctx.xbuf(), ctx.xqual(), format)?;
                 }
             }
         }
         Some(Mate::One) | None => {
-            write_record(mixed, sheader, sbuf, squal, format)?;
+            write_record(mixed, ctx.sheader(), ctx.sbuf(), ctx.squal(), format)?;
         }
         Some(Mate::Two) => {
-            write_record(mixed, xheader, xbuf, xqual, format)?;
+            write_record(mixed, ctx.xheader(), ctx.xbuf(), ctx.xqual(), format)?;
         }
     }
 

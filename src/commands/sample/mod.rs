@@ -65,12 +65,7 @@ impl ParallelProcessor for SampleProcessor {
                 &mut self.mixed,
                 self.mate,
                 self.is_split,
-                self.ctx.sbuf(),
-                self.ctx.squal(),
-                self.ctx.sheader(),
-                self.ctx.xbuf(),
-                self.ctx.xqual(),
-                self.ctx.xheader(),
+                &self.ctx,
                 self.format,
             )
             .map_err(binseq::Error::AnyhowError)
