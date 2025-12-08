@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::cli::{FileFormat, Mate, SampleCommand};
 use anyhow::Result;
-use binseq::prelude::*;
+use binseq::{prelude::*, Context};
 use parking_lot::Mutex;
 use rand::{Rng, SeedableRng};
 
@@ -20,16 +20,7 @@ struct SampleProcessor {
     right: Vec<u8>,
 
     /// Local decoding buffers
-    sbuf: Vec<u8>,
-    xbuf: Vec<u8>,
-
-    /// Quality buffers
-    squal: Vec<u8>,
-    xqual: Vec<u8>,
-
-    /// Header buffers
-    sheader: Vec<u8>,
-    xheader: Vec<u8>,
+    ctx: Context,
 
     /// Write Options
     format: FileFormat,
@@ -55,19 +46,10 @@ impl SampleProcessor {
             mixed: Vec::new(),
             left: Vec::new(),
             right: Vec::new(),
-            sbuf: Vec::new(),
-            xbuf: Vec::new(),
-            squal: Vec::new(),
-            xqual: Vec::new(),
-            sheader: Vec::new(),
-            xheader: Vec::new(),
+            ctx: Context::default(),
             is_split: writer.is_split(),
             global_writer: Arc::new(Mutex::new(writer)),
         }
-    }
-    pub fn clear_buffers(&mut self) {
-        self.sbuf.clear();
-        self.xbuf.clear();
     }
     pub fn include_record(&mut self) -> bool {
         self.rng.random_bool(self.fraction)
@@ -75,59 +57,26 @@ impl SampleProcessor {
 }
 impl ParallelProcessor for SampleProcessor {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        self.clear_buffers();
-
-        // Decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        record.sheader(&mut self.sheader);
-        if record.is_paired() {
-            record.decode_x(&mut self.xbuf)?;
-            record.xheader(&mut self.xheader);
-        }
-
         if self.include_record() {
-            let squal = if record.has_quality() {
-                record.squal()
-            } else {
-                if self.squal.len() < self.sbuf.len() {
-                    self.squal.resize(self.sbuf.len(), b'?');
-                }
-                &self.squal
-            };
-
-            let xqual = if record.is_paired() {
-                if record.has_quality() {
-                    record.xqual()
-                } else {
-                    if self.xqual.len() < self.xbuf.len() {
-                        self.xqual.resize(self.xbuf.len(), b'?');
-                    }
-                    &self.xqual
-                }
-            } else {
-                if self.xqual.len() < self.xbuf.len() {
-                    self.xqual.resize(self.xbuf.len(), b'?');
-                }
-                &self.xqual
-            };
-
+            self.ctx.fill(&record)?;
             write_record_pair(
                 &mut self.left,
                 &mut self.right,
                 &mut self.mixed,
                 self.mate,
                 self.is_split,
-                &self.sbuf,
-                squal,
-                &self.sheader,
-                &self.xbuf,
-                xqual,
-                &self.xheader,
+                self.ctx.sbuf(),
+                self.ctx.squal(),
+                self.ctx.sheader(),
+                self.ctx.xbuf(),
+                self.ctx.xqual(),
+                self.ctx.xheader(),
                 self.format,
-            )?;
+            )
+            .map_err(binseq::Error::AnyhowError)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn on_batch_complete(&mut self) -> binseq::Result<()> {

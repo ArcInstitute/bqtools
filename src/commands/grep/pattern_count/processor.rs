@@ -1,7 +1,7 @@
 use std::{io::stdout, sync::Arc};
 
 use anyhow::Result;
-use binseq::{BinseqRecord, ParallelProcessor};
+use binseq::{BinseqRecord, Context, ParallelProcessor};
 use parking_lot::Mutex;
 use serde::Serialize;
 
@@ -38,8 +38,7 @@ pub struct PatternCountProcessor<Pc: PatternCount> {
     local_total: usize, // total number of reads processed (not just matches)
 
     /// Local decoding buffers
-    sbuf: Vec<u8>,
-    xbuf: Vec<u8>,
+    ctx: Context,
 
     /// Global values
     global_pattern_count: Arc<Vec<Mutex<usize>>>,
@@ -53,15 +52,10 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
             range,
             local_pattern_count: vec![0; num_patterns],
             local_total: 0,
-            sbuf: Vec::new(),
-            xbuf: Vec::new(),
+            ctx: Context::default(),
             global_pattern_count: Arc::new((0..num_patterns).map(|_| Mutex::new(0)).collect()),
             global_total: Arc::new(Mutex::new(0)),
         }
-    }
-    pub fn clear_buffers(&mut self) {
-        self.sbuf.clear();
-        self.xbuf.clear();
     }
     pub fn pprint_pattern_counts(&self) -> Result<()> {
         let mut writer = csv::WriterBuilder::new()
@@ -87,17 +81,12 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
 }
 impl<Pc: PatternCount> ParallelProcessor for PatternCountProcessor<Pc> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        self.clear_buffers();
-        // Decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        if record.is_paired() {
-            record.decode_x(&mut self.xbuf)?;
-        }
+        self.ctx.fill_sequences(&record)?;
 
         let (primary, extended) = if let Some(range) = self.range {
-            (range.slice(&self.sbuf), range.slice(&self.xbuf))
+            (range.slice(&self.ctx.sbuf()), range.slice(&self.ctx.xbuf()))
         } else {
-            (self.sbuf.as_ref(), self.xbuf.as_ref())
+            (self.ctx.sbuf(), self.ctx.xbuf())
         };
 
         self.counter

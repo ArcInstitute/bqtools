@@ -5,7 +5,7 @@ use crate::{
         grep::{color::write_colored_record_pair, SimpleRange},
     },
 };
-use binseq::prelude::*;
+use binseq::{prelude::*, Context};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -41,17 +41,8 @@ pub struct FilterProcessor<Pm: PatternMatch> {
     right: Vec<u8>,
     interval_buffer: Vec<(usize, usize)>, // reused by colored writer for merging intervals
 
-    /// Local decoding buffers
-    sbuf: Vec<u8>,
-    xbuf: Vec<u8>,
-
-    /// Quality buffers
-    squal: Vec<u8>,
-    xqual: Vec<u8>,
-
-    /// Header buffers
-    sheader: Vec<u8>,
-    xheader: Vec<u8>,
+    /// Local decoding context
+    ctx: Context,
 
     /// Write Options
     format: FileFormat,
@@ -81,12 +72,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
             mixed: Vec::new(),
             left: Vec::new(),
             right: Vec::new(),
-            sbuf: Vec::new(),
-            xbuf: Vec::new(),
-            squal: Vec::new(),
-            xqual: Vec::new(),
-            sheader: Vec::new(),
-            xheader: Vec::new(),
+            ctx: Context::default(),
             smatches: MatchRanges::default(),
             xmatches: MatchRanges::default(),
             interval_buffer: Vec::new(),
@@ -105,8 +91,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
         }
     }
     pub fn clear_buffers(&mut self) {
-        self.sbuf.clear();
-        self.xbuf.clear();
+        self.ctx.clear();
         self.clear_matches();
     }
     pub fn clear_matches(&mut self) {
@@ -116,9 +101,9 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
 
     pub fn pattern_match(&mut self) -> bool {
         let (primary, extended) = if let Some(range) = self.range {
-            (range.slice(&self.sbuf), range.slice(&self.xbuf))
+            (range.slice(self.ctx.sbuf()), range.slice(self.ctx.xbuf()))
         } else {
-            (self.sbuf.as_ref(), self.xbuf.as_ref())
+            (self.ctx.sbuf(), self.ctx.xbuf())
         };
 
         let found_either = self.matcher.match_either(
@@ -158,12 +143,7 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
         self.clear_buffers();
 
         // Decode sequences
-        record.decode_s(&mut self.sbuf)?;
-        record.sheader(&mut self.sheader);
-        if record.is_paired() {
-            record.decode_x(&mut self.xbuf)?;
-            record.xheader(&mut self.xheader);
-        }
+        self.ctx.fill(&record)?;
 
         if self.pattern_match() {
             self.local_count += 1;
@@ -172,41 +152,16 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
                 return Ok(());
             }
 
-            let squal = if record.has_quality() {
-                record.squal()
-            } else {
-                if self.squal.len() < self.sbuf.len() {
-                    self.squal.resize(self.sbuf.len(), b'?');
-                }
-                &self.squal
-            };
-
-            let xqual = if record.is_paired() {
-                if record.has_quality() {
-                    record.xqual()
-                } else {
-                    if self.xqual.len() < self.xbuf.len() {
-                        self.xqual.resize(self.xbuf.len(), b'?');
-                    }
-                    &self.xqual
-                }
-            } else {
-                if self.xqual.len() < self.xbuf.len() {
-                    self.xqual.resize(self.xbuf.len(), b'?');
-                }
-                &self.xqual
-            };
-
             if self.color {
                 write_colored_record_pair(
                     &mut self.mixed,
                     self.mate,
-                    &self.sbuf,
-                    squal,
-                    &self.sheader,
-                    &self.xbuf,
-                    xqual,
-                    &self.xheader,
+                    self.ctx.sbuf(),
+                    self.ctx.squal(),
+                    self.ctx.sheader(),
+                    self.ctx.xbuf(),
+                    self.ctx.xqual(),
+                    self.ctx.xheader(),
                     &self.smatches,
                     &self.xmatches,
                     self.format,
@@ -219,12 +174,12 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
                     &mut self.mixed,
                     self.mate,
                     self.is_split,
-                    &self.sbuf,
-                    squal,
-                    &self.sheader,
-                    &self.xbuf,
-                    xqual,
-                    &self.xheader,
+                    self.ctx.sbuf(),
+                    self.ctx.squal(),
+                    self.ctx.sheader(),
+                    self.ctx.xbuf(),
+                    self.ctx.xqual(),
+                    self.ctx.xheader(),
                     self.format,
                 )
             }?;
