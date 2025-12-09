@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use anyhow::Result;
-use binseq::Context;
+use binseq::prelude::*;
 
 use super::Writer;
 use crate::cli::{FileFormat, Mate};
@@ -134,7 +134,7 @@ pub fn write_record_pair<W: Write>(
     mixed: &mut W,
     mate: Option<Mate>,
     split: bool,
-    ctx: &Context,
+    ctx: &Ctx,
     format: FileFormat,
 ) -> Result<()> {
     match mate {

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use binseq::Context;
+use binseq::prelude::*;
 
 use crate::cli::{FileFormat, Mate};
 
@@ -148,7 +148,7 @@ fn write_colored_record<W: Write>(
 pub fn write_colored_record_pair<W: Write>(
     writer: &mut W,
     mate: Option<Mate>,
-    ctx: &Context,
+    ctx: &Ctx,
     smatch: &HashSet<Interval>,
     xmatch: &HashSet<Interval>,
     format: FileFormat,

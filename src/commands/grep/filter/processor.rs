@@ -5,7 +5,7 @@ use crate::{
         grep::{color::write_colored_record_pair, SimpleRange},
     },
 };
-use binseq::{prelude::*, Context};
+use binseq::prelude::*;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ pub struct FilterProcessor<Pm: PatternMatch> {
     interval_buffer: Vec<(usize, usize)>, // reused by colored writer for merging intervals
 
     /// Local decoding context
-    ctx: Context,
+    ctx: Ctx,
 
     /// Write Options
     format: FileFormat,
@@ -72,7 +72,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
             mixed: Vec::new(),
             left: Vec::new(),
             right: Vec::new(),
-            ctx: Context::default(),
+            ctx: Ctx::default(),
             smatches: MatchRanges::default(),
             xmatches: MatchRanges::default(),
             interval_buffer: Vec::new(),
@@ -89,10 +89,6 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
             local_count: 0,
             global_count: Arc::new(Mutex::new(0)),
         }
-    }
-    pub fn clear_buffers(&mut self) {
-        self.ctx.clear();
-        self.clear_matches();
     }
     pub fn clear_matches(&mut self) {
         self.smatches.clear();
@@ -140,12 +136,15 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
 
 impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        self.clear_buffers();
+        self.clear_matches();
 
         // Decode sequences
-        self.ctx.fill(&record)?;
+        self.ctx.fill_sequences(&record)?;
 
         if self.pattern_match() {
+            self.ctx.fill_qualities(&record)?;
+            self.ctx.fill_headers(&record);
+
             self.local_count += 1;
             if self.count {
                 // No further processing needed

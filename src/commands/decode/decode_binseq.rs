@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use binseq::prelude::*;
-use binseq::Context;
 use binseq::Result;
 use parking_lot::Mutex;
 
@@ -17,7 +16,7 @@ pub struct Decoder {
     right: Vec<u8>,
 
     /// Reusable buffers for decoding binseq records
-    ctx: Context,
+    ctx: Ctx,
 
     /// Local count of records
     local_count: usize,
@@ -39,7 +38,7 @@ impl Decoder {
             left: Vec::new(),
             right: Vec::new(),
             local_count: 0,
-            ctx: Context::default(),
+            ctx: Ctx::default(),
             format,
             mate,
             is_split: writer.is_split(),

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::cli::{FileFormat, Mate, SampleCommand};
 use anyhow::Result;
-use binseq::{prelude::*, Context};
+use binseq::prelude::*;
 use parking_lot::Mutex;
 use rand::{Rng, SeedableRng};
 
@@ -20,7 +20,7 @@ struct SampleProcessor {
     right: Vec<u8>,
 
     /// Local decoding buffers
-    ctx: Context,
+    ctx: Ctx,
 
     /// Write Options
     format: FileFormat,
@@ -46,7 +46,7 @@ impl SampleProcessor {
             mixed: Vec::new(),
             left: Vec::new(),
             right: Vec::new(),
-            ctx: Context::default(),
+            ctx: Ctx::default(),
             is_split: writer.is_split(),
             global_writer: Arc::new(Mutex::new(writer)),
         }
