@@ -1,7 +1,7 @@
 use std::{io::stdout, sync::Arc};
 
 use anyhow::Result;
-use binseq::{context::SeqCtx, prelude::*};
+use binseq::prelude::*;
 use parking_lot::Mutex;
 use serde::Serialize;
 
