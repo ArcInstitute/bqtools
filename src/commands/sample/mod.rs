@@ -67,11 +67,9 @@ impl ParallelProcessor for SampleProcessor {
                 self.is_split,
                 &self.ctx,
                 self.format,
-            )
-            .map_err(binseq::Error::AnyhowError)
-        } else {
-            Ok(())
+            )?;
         }
+        Ok(())
     }
 
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
