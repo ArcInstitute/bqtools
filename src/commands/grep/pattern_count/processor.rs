@@ -84,7 +84,7 @@ impl<Pc: PatternCount> ParallelProcessor for PatternCountProcessor<Pc> {
         self.ctx.fill(&record)?;
 
         let (primary, extended) = if let Some(range) = self.range {
-            (range.slice(&self.ctx.sbuf()), range.slice(&self.ctx.xbuf()))
+            (range.slice(self.ctx.sbuf()), range.slice(self.ctx.xbuf()))
         } else {
             (self.ctx.sbuf(), self.ctx.xbuf())
         };
