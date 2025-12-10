@@ -166,14 +166,6 @@ pub struct VBinseqProcessor<W: Write + Send> {
     record_count: usize,
     /// Number of records skipped by this thread
     skipped_count: usize,
-    /// Buffer for decoding primary buffers (when recoding)
-    sbuf: Vec<u8>,
-    /// Buffer for decoding extended buffers (when recoding)
-    xbuf: Vec<u8>,
-    /// Buffer for decoding primary headers (when recoding)
-    sheader: Vec<u8>,
-    /// Buffer for decoding extended headers (when recoding)
-    xheader: Vec<u8>,
     /* Global fields */
     /// Global writer for the entire process
     global_writer: Arc<Mutex<VBinseqWriter<W>>>,
@@ -203,10 +195,6 @@ impl<W: Write + Send> VBinseqProcessor<W> {
             global_writer,
             record_count: 0,
             skipped_count: 0,
-            sbuf: Vec::default(),
-            xbuf: Vec::default(),
-            sheader: Vec::default(),
-            xheader: Vec::default(),
             global_record_count: Arc::new(Mutex::new(0)),
             global_skipped_count: Arc::new(Mutex::new(0)),
             debug_interval: Arc::new(Mutex::new(0)),
@@ -260,10 +248,6 @@ impl<W: Write + Send> Clone for VBinseqProcessor<W> {
             global_writer: self.global_writer.clone(),
             record_count: self.record_count,
             skipped_count: self.skipped_count,
-            sbuf: self.sbuf.clone(),
-            xbuf: self.xbuf.clone(),
-            sheader: self.sheader.clone(),
-            xheader: self.xheader.clone(),
             global_record_count: self.global_record_count.clone(),
             global_skipped_count: self.global_skipped_count.clone(),
             debug_interval: self.debug_interval.clone(),
@@ -343,35 +327,21 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for VBins
 
 impl<W: Write + Send> binseq::ParallelProcessor for VBinseqProcessor<W> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        // clear buffers before processing each record
-        self.sbuf.clear();
-        self.xbuf.clear();
-        self.sheader.clear();
-        self.xheader.clear();
-
         let write_status = if record.is_paired() {
-            record.decode_s(&mut self.sbuf)?;
-            record.decode_x(&mut self.xbuf)?;
-            record.sheader(&mut self.sheader);
-            record.xheader(&mut self.xheader);
-
             self.writer.write_paired_record(
                 record.flag(),
-                Some(&self.sheader),
-                &self.sbuf,
+                Some(record.sheader()),
+                record.sseq(),
                 Some(record.squal()),
-                Some(&self.xheader),
-                &self.xbuf,
+                Some(record.xheader()),
+                record.xseq(),
                 Some(record.xqual()),
             )
         } else {
-            record.decode_s(&mut self.sbuf)?;
-            record.sheader(&mut self.sheader);
-
             self.writer.write_record(
                 record.flag(),
-                Some(&self.sheader),
-                &self.sbuf,
+                Some(record.sheader()),
+                record.sseq(),
                 Some(record.squal()),
             )
         }?;
