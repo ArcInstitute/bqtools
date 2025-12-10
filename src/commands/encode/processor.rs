@@ -330,17 +330,17 @@ impl<W: Write + Send> binseq::ParallelProcessor for VBinseqProcessor<W> {
         let write_status = if record.is_paired() {
             self.writer.write_paired_record(
                 record.flag(),
-                Some(&record.sheader()),
+                Some(record.sheader()),
                 record.sseq(),
                 Some(record.squal()),
-                Some(&record.xheader()),
+                Some(record.xheader()),
                 record.xseq(),
                 Some(record.xqual()),
             )
         } else {
             self.writer.write_record(
                 record.flag(),
-                Some(&record.sheader()),
+                Some(record.sheader()),
                 record.sseq(),
                 Some(record.squal()),
             )

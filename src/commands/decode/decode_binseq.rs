@@ -93,10 +93,10 @@ impl ParallelProcessor for Decoder {
             self.is_split,
             sbuf,
             squal,
-            &record.sheader(),
+            record.sheader(),
             xbuf,
             xqual,
-            &record.xheader(),
+            record.xheader(),
             self.format,
         )?;
 
