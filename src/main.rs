@@ -42,6 +42,7 @@ fn main() -> Result<()> {
         Commands::Count(ref count) => commands::count::run(count),
         Commands::Grep(ref grep) => commands::grep::run(grep),
         Commands::Sample(ref sample) => commands::sample::run(sample),
+        Commands::Pipe(ref pipe) => commands::pipe::run(pipe),
     }?;
     trace!("done");
     Ok(())
