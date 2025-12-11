@@ -7,7 +7,7 @@ use std::thread;
 use std::{fs::File, io::Write};
 
 use anyhow::Result;
-use binseq::{BinseqReader, ParallelReader};
+use binseq::BinseqReader;
 use log::{info, trace};
 use nix::sys::stat;
 use nix::unistd;
@@ -19,23 +19,46 @@ pub type BoxedWriter = Box<dyn Write + Send>;
 
 pub fn run(args: &PipeCommand) -> Result<()> {
     let reader = BinseqReader::new(args.input.path())?;
+    let num_pipes = args.num_pipes();
     let num_threads = args.threads();
     let format = args.format()?;
 
     // Create all FIFOs first (don't open yet)
-    let fifo_paths = create_fifos(args.basepath(), reader.is_paired(), num_threads, format)?;
-
+    let basename = args.basepath();
+    let fifo_paths = create_fifos(basename, reader.is_paired(), num_pipes, format)?;
     info!(
         "{} FIFOs created. Waiting for readers to connect...",
         fifo_paths.len()
     );
 
-    // Now open them (will block until readers connect)
-    let writers = open_fifos(&fifo_paths)?;
+    let num_records = reader.num_records()?;
+    let records_per_pipe = num_records / num_pipes;
+    let threads_per_pipe = (num_threads / num_pipes).max(1);
 
-    info!("FIFOs opened - processing records");
-    let proc = PipeProcessor::new(writers, format, reader.is_paired());
-    reader.process_parallel(proc, num_threads)?;
+    let mut handles = Vec::new();
+    for pid in 0..num_pipes {
+        let pipe_basename = basename.to_string();
+        let pipe_reader_path = args.input.path().to_string();
+        let handle = thread::spawn(move || -> Result<()> {
+            let handle_reader = BinseqReader::new(&pipe_reader_path)?;
+            let rstart = records_per_pipe * pid;
+            let rend = if pid == num_pipes - 1 {
+                num_records
+            } else {
+                rstart + records_per_pipe
+            };
+
+            let proc = PipeProcessor::new(&pipe_basename, pid, format, handle_reader.is_paired())?;
+            handle_reader.process_parallel_range(proc, threads_per_pipe, rstart..rend)?;
+            Ok(())
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all threads to finish
+    for handle in handles {
+        handle.join().unwrap()?;
+    }
 
     // close all FIFOs
     info!("Closing FIFOs");
@@ -68,26 +91,6 @@ fn create_fifos(
         }
     }
     Ok(fifo_paths)
-}
-
-fn open_fifos(paths: &[String]) -> Result<Vec<BoxedWriter>> {
-    let mut writers = Vec::new();
-
-    let mut handles = Vec::new();
-    for path in paths {
-        let path = path.to_string();
-        let handle = thread::spawn(move || -> Result<BoxedWriter> {
-            let writer = open_fifo(&path)?;
-            Ok(Box::new(writer))
-        });
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        let writer = handle.join().unwrap()?;
-        writers.push(writer);
-    }
-    Ok(writers)
 }
 
 fn create_fifo(path: &str) -> Result<()> {

@@ -5,7 +5,7 @@ mod utils;
 
 use crate::cli::{DecodeCommand, Mate, OutputFile};
 use decode_binseq::Decoder;
-pub use utils::{write_record_pair, SplitWriter};
+pub use utils::{write_record, write_record_pair, SplitWriter};
 
 use anyhow::{bail, Result};
 use binseq::prelude::*;

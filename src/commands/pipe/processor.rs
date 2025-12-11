@@ -1,82 +1,93 @@
-use std::{io::Write, sync::Arc};
+use std::{io::Write, sync::Arc, thread};
 
+use anyhow::Result;
 use binseq::ParallelProcessor;
+use log::trace;
 use parking_lot::Mutex;
 
 use super::BoxedWriter;
-use crate::cli::FileFormat;
+use crate::{
+    cli::FileFormat,
+    commands::{decode::write_record, pipe::open_fifo},
+};
+
+type SharedWriter = Arc<Mutex<BoxedWriter>>;
 
 #[derive(Clone)]
 pub struct PipeProcessor {
-    writers: Arc<Vec<Mutex<BoxedWriter>>>,
+    w1: Option<SharedWriter>,
+    w2: Option<SharedWriter>,
+    local_w1: Vec<u8>,
+    local_w2: Vec<u8>,
     format: FileFormat,
     paired: bool,
+    pid: usize,
     tid: usize,
 }
 impl PipeProcessor {
-    pub fn new(writers: Vec<BoxedWriter>, format: FileFormat, paired: bool) -> Self {
-        let writers = Arc::new(
-            writers
-                .into_iter()
-                .map(|writer| Mutex::new(writer))
-                .collect(),
-        );
-        Self {
-            writers,
+    pub fn new(basename: &str, pid: usize, format: FileFormat, paired: bool) -> Result<Self> {
+        let (w1, w2) = if paired {
+            let path_r1 = format!("{}_{}_R1.fq", basename, pid);
+            let path_r2 = format!("{}_{}_R2.fq", basename, pid);
+
+            let w1_open_thread =
+                thread::spawn(move || -> Result<BoxedWriter> { open_fifo(&path_r1) });
+            let w2_open_thread =
+                thread::spawn(move || -> Result<BoxedWriter> { open_fifo(&path_r2) });
+
+            let w1 = w1_open_thread.join().unwrap()?;
+            let w2 = w2_open_thread.join().unwrap()?;
+
+            let w1 = Arc::new(Mutex::new(w1));
+            let w2 = Arc::new(Mutex::new(w2));
+
+            (Some(w1), Some(w2))
+        } else {
+            let path = format!("{}_{}.fq", basename, pid);
+            let w1 = Arc::new(Mutex::new(open_fifo(&path)?));
+            let w2 = None;
+            (Some(w1), w2)
+        };
+
+        Ok(Self {
+            w1,
+            w2,
+            local_w1: Vec::new(),
+            local_w2: Vec::new(),
             format,
             paired,
+            pid,
             tid: 0,
-        }
+        })
     }
 }
 impl ParallelProcessor for PipeProcessor {
     fn set_tid(&mut self, tid: usize) {
-        self.tid = tid
+        self.tid = tid;
     }
-
     fn get_tid(&self) -> Option<usize> {
         Some(self.tid)
     }
-
     fn process_record<R: binseq::BinseqRecord>(&mut self, record: R) -> binseq::Result<()> {
-        let tid = self.get_tid().expect("Error - unable to access thread ID");
         if self.paired {
-            let mut writer_r1 = self
-                .writers
-                .get(tid)
-                .expect("Unable to access R1 writer for thread")
-                .lock();
-
-            format_write(
-                &mut writer_r1,
+            write_record(
+                &mut self.local_w1,
                 record.sheader(),
                 record.sseq(),
                 record.squal(),
                 self.format,
             )?;
 
-            let mut writer_r2 = self
-                .writers
-                .get(tid + 1)
-                .expect("Unable to access R2 writer for thread")
-                .lock();
-
-            format_write(
-                &mut writer_r2,
+            write_record(
+                &mut self.local_w2,
                 record.xheader(),
                 record.xseq(),
                 record.xqual(),
                 self.format,
             )?;
         } else {
-            let mut writer = self
-                .writers
-                .get(tid)
-                .expect("Unable to access writer for thread")
-                .lock();
-
-            format_write(
-                &mut writer,
+            write_record(
+                &mut self.local_w1,
                 record.sheader(),
                 record.sseq(),
                 record.squal(),
@@ -86,71 +97,55 @@ impl ParallelProcessor for PipeProcessor {
         Ok(())
     }
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
-        let tid = self.get_tid().expect("Unable to access thread ID");
         if self.paired {
-            self.writers
-                .get(tid)
-                .expect("Unable to access R1 writer for thread")
-                .lock()
-                .flush()?;
-            self.writers
-                .get(tid + 1)
-                .expect("Unable to access R2 writer for thread")
-                .lock()
-                .flush()?;
+            let w1 = Arc::clone(&self.w1.as_ref().unwrap());
+            let w2 = Arc::clone(&self.w2.as_ref().unwrap());
+
+            let mut r1_data = Vec::with_capacity(self.local_w1.capacity());
+            let mut r2_data = Vec::with_capacity(self.local_w2.capacity());
+
+            std::mem::swap(&mut r1_data, &mut self.local_w1);
+            std::mem::swap(&mut r2_data, &mut self.local_w2);
+
+            // Write R1 and R2 in parallel so neither blocks the other
+            // let h1_pid = self.pid;
+            // let h1_tid = self.tid;
+            let h1 = thread::spawn(move || -> binseq::Result<()> {
+                let mut lock = w1.lock();
+                // trace!("Writing R1 data :: Pipe {} Thread {}...", h1_pid, h1_tid);
+                lock.write_all(&r1_data)?;
+                // trace!("Flushing R1 data :: Pipe {} Thread {}...", h1_pid, h1_tid);
+                lock.flush()?;
+                // trace!("R1 data flushed :: Pipe {} Thread {}...", h1_pid, h1_tid);
+                Ok(())
+            });
+
+            // let h2_pid = self.pid;
+            // let h2_tid = self.tid;
+            let h2 = thread::spawn(move || -> binseq::Result<()> {
+                let mut lock = w2.lock();
+                // trace!("Writing R2 data :: Pipe {} Thread {}...", h2_pid, h2_tid);
+                lock.write_all(&r2_data)?;
+                // trace!("Flushing R2 data :: Pipe {} Thread {}...", h2_pid, h2_tid);
+                lock.flush()?;
+                // trace!("R2 data flushed :: Pipe {} Thread {}...", h2_pid, h2_tid);
+                Ok(())
+            });
+
+            trace!("Joining R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
+            h1.join().unwrap()?;
+            trace!("Joined R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
+
+            trace!("Joining R2 writer :: Pipe {} Thread {}", self.pid, self.tid);
+            h2.join().unwrap()?;
+            trace!("Joined R2 writer :: Pipe {} Thread {}", self.pid, self.tid);
         } else {
-            self.writers
-                .get(tid)
-                .expect("Unable to access writer for thread")
-                .lock()
-                .flush()?;
+            let mut lock_w1 = self.w1.as_ref().unwrap().lock();
+            lock_w1.write_all(&self.local_w1)?;
+            lock_w1.flush()?;
         }
+        self.local_w1.clear();
+        self.local_w2.clear();
         Ok(())
-    }
-}
-
-fn write_fastq_parts(
-    writer: &mut BoxedWriter,
-    index: &[u8],
-    sequence: &[u8],
-    quality: &[u8],
-) -> std::io::Result<()> {
-    writer.write_all(b"@")?;
-    writer.write_all(index)?;
-    writer.write_all(b"\n")?;
-    writer.write_all(sequence)?;
-    writer.write_all(b"\n+\n")?;
-    writer.write_all(quality)?;
-    writer.write_all(b"\n")?;
-    Ok(())
-}
-
-fn write_fasta_parts(
-    writer: &mut BoxedWriter,
-    index: &[u8],
-    sequence: &[u8],
-) -> std::io::Result<()> {
-    writer.write_all(b">")?;
-    writer.write_all(index)?;
-    writer.write_all(b"\n")?;
-    writer.write_all(sequence)?;
-    writer.write_all(b"\n")?;
-    Ok(())
-}
-
-fn format_write(
-    writer: &mut BoxedWriter,
-    index: &[u8],
-    sequence: &[u8],
-    quality: &[u8],
-    format: FileFormat,
-) -> std::io::Result<()> {
-    match format {
-        FileFormat::Fastq => write_fastq_parts(writer, index, sequence, quality),
-        FileFormat::Fasta => write_fasta_parts(writer, index, sequence),
-        _ => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Unsupported format",
-        )),
     }
 }
