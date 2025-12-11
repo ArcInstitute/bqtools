@@ -5,7 +5,7 @@ use crate::cli::FileFormat;
 
 use super::InputBinseq;
 
-/// Decode BINSEQ files to FASTQ or FASTA.
+/// Split BINSEQ files into multiple named pipes.
 #[derive(Parser, Debug)]
 pub struct PipeCommand {
     #[clap(flatten)]
