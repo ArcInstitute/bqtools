@@ -12,11 +12,13 @@ use crate::{
 };
 
 type SharedWriter = Arc<Mutex<BoxedWriter>>;
+type Coord = Arc<Mutex<()>>;
 
 #[derive(Clone)]
 pub struct PipeProcessor {
     w1: Option<SharedWriter>,
     w2: Option<SharedWriter>,
+    coord: Coord,
     local_w1: Vec<u8>,
     local_w2: Vec<u8>,
     format: FileFormat,
@@ -58,6 +60,7 @@ impl PipeProcessor {
             paired,
             pid,
             tid: 0,
+            coord: Arc::new(Mutex::new(())),
         })
     }
 }
@@ -98,6 +101,8 @@ impl ParallelProcessor for PipeProcessor {
     }
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
         if self.paired {
+            let coord = self.coord.lock();
+
             let w1 = Arc::clone(&self.w1.as_ref().unwrap());
             let w2 = Arc::clone(&self.w2.as_ref().unwrap());
 
@@ -131,6 +136,9 @@ impl ParallelProcessor for PipeProcessor {
                 // trace!("R2 data flushed :: Pipe {} Thread {}...", h2_pid, h2_tid);
                 Ok(())
             });
+
+            // Drop the Coord lock to allow the other thread to proceed
+            drop(coord);
 
             trace!("Joining R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
             h1.join().unwrap()?;
