@@ -3,7 +3,6 @@ use std::{io::Write, sync::Arc};
 use anyhow::Result;
 use binseq::ParallelProcessor;
 use parking_lot::Mutex;
-// use log::{debug, trace};
 
 use super::BoxedWriter;
 use crate::{
@@ -19,8 +18,6 @@ pub struct PipeProcessor {
     local: Vec<u8>,
     format: FileFormat,
     primary: bool,
-    _pid: usize,
-    tid: usize,
 }
 impl PipeProcessor {
     pub fn new(
@@ -46,18 +43,10 @@ impl PipeProcessor {
             local: Vec::new(),
             format,
             primary,
-            _pid: pid,
-            tid: 0,
         })
     }
 }
 impl ParallelProcessor for PipeProcessor {
-    fn set_tid(&mut self, tid: usize) {
-        self.tid = tid;
-    }
-    fn get_tid(&self) -> Option<usize> {
-        Some(self.tid)
-    }
     fn process_record<R: binseq::BinseqRecord>(&mut self, record: R) -> binseq::Result<()> {
         if self.primary {
             write_record(
