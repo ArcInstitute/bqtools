@@ -21,6 +21,9 @@ pub struct PipeProcessor {
     local: Vec<u8>,
     format: FileFormat,
     pair: RecordPair,
+
+    squal: Vec<u8>,
+    xqual: Vec<u8>,
 }
 impl PipeProcessor {
     pub fn new(basename: &str, pid: usize, format: FileFormat, pair: RecordPair) -> Result<Self> {
@@ -31,6 +34,8 @@ impl PipeProcessor {
             local: Vec::new(),
             format,
             pair,
+            squal: Vec::new(),
+            xqual: Vec::new(),
         })
     }
 }
@@ -38,20 +43,39 @@ impl ParallelProcessor for PipeProcessor {
     fn process_record<R: binseq::BinseqRecord>(&mut self, record: R) -> binseq::Result<()> {
         match self.pair {
             RecordPair::Unpaired | RecordPair::R1 => {
+                // handle missing quality if record has no quality
+                let qual = if record.has_quality() {
+                    record.squal()
+                } else {
+                    if self.squal.len() != record.slen() as usize {
+                        self.squal.resize(record.slen() as usize, b'?');
+                    }
+                    &self.squal
+                };
+
                 write_record(
                     &mut self.local,
                     record.sheader(),
                     record.sseq(),
-                    record.squal(),
+                    qual,
                     self.format,
                 )?;
             }
             RecordPair::R2 => {
+                // handle missing quality if record has no quality
+                let qual = if record.has_quality() {
+                    record.xqual()
+                } else {
+                    if self.xqual.len() != record.xlen() as usize {
+                        self.xqual.resize(record.xlen() as usize, b'?');
+                    }
+                    &self.xqual
+                };
                 write_record(
                     &mut self.local,
                     record.xheader(),
                     record.xseq(),
-                    record.xqual(),
+                    qual,
                     self.format,
                 )?;
             }
