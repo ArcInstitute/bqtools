@@ -14,6 +14,14 @@ use utils::{close_fifos, create_fifos};
 
 pub type BoxedWriter = Box<dyn Write + Send>;
 
+/// Simple enum to represent the type of record pair to process.
+#[derive(Clone, Copy, Debug)]
+pub enum RecordPair {
+    R1,
+    R2,
+    Unpaired,
+}
+
 pub fn run(args: &PipeCommand) -> Result<()> {
     let format = args.format()?;
     let reader = BinseqReader::new(args.input.path())?;
@@ -57,7 +65,12 @@ pub fn run(args: &PipeCommand) -> Result<()> {
             let pipe_reader_path = args.input.path().to_string();
             let handle_r1 = thread::spawn(move || -> Result<()> {
                 let handle_reader = BinseqReader::new(&pipe_reader_path)?;
-                let proc = PipeProcessor::new(&pipe_basename, pid, format, true, is_paired)?;
+                let proc = PipeProcessor::new(
+                    &pipe_basename,
+                    pid,
+                    format,
+                    RecordPair::R1, // Specify the R1 explicitly
+                )?;
                 handle_reader.process_parallel_range(proc, 1, rstart..rend)?;
                 Ok(())
             });
@@ -68,7 +81,12 @@ pub fn run(args: &PipeCommand) -> Result<()> {
             let pipe_reader_path = args.input.path().to_string();
             let handle_r2 = thread::spawn(move || -> Result<()> {
                 let handle_reader = BinseqReader::new(&pipe_reader_path)?;
-                let proc = PipeProcessor::new(&pipe_basename, pid, format, false, is_paired)?;
+                let proc = PipeProcessor::new(
+                    &pipe_basename,
+                    pid,
+                    format,
+                    RecordPair::R2, // Specify the R2 explicitly
+                )?;
                 handle_reader.process_parallel_range(proc, 1, rstart..rend)?;
                 Ok(())
             });
@@ -79,7 +97,12 @@ pub fn run(args: &PipeCommand) -> Result<()> {
             let pipe_reader_path = args.input.path().to_string();
             let handle = thread::spawn(move || -> Result<()> {
                 let handle_reader = BinseqReader::new(&pipe_reader_path)?;
-                let proc = PipeProcessor::new(&pipe_basename, pid, format, true, is_paired)?;
+                let proc = PipeProcessor::new(
+                    &pipe_basename,
+                    pid,
+                    format,
+                    RecordPair::Unpaired, // Specify unpaired explicitly (writes primary)
+                )?;
                 handle_reader.process_parallel_range(proc, 1, rstart..rend)?;
                 Ok(())
             });

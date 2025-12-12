@@ -4,10 +4,13 @@ use anyhow::Result;
 use binseq::ParallelProcessor;
 use parking_lot::Mutex;
 
-use super::BoxedWriter;
+use super::{BoxedWriter, RecordPair};
 use crate::{
     cli::FileFormat,
-    commands::{decode::write_record, pipe::utils::open_fifo},
+    commands::{
+        decode::write_record,
+        pipe::utils::{name_fifo, open_fifo},
+    },
 };
 
 type SharedWriter = Arc<Mutex<BoxedWriter>>;
@@ -17,53 +20,41 @@ pub struct PipeProcessor {
     writer: SharedWriter,
     local: Vec<u8>,
     format: FileFormat,
-    primary: bool,
+    pair: RecordPair,
 }
 impl PipeProcessor {
-    pub fn new(
-        basename: &str,
-        pid: usize,
-        format: FileFormat,
-        primary: bool,
-        paired: bool,
-    ) -> Result<Self> {
-        let path = if paired {
-            format!(
-                "{}_{}_R{}.fq",
-                basename,
-                pid,
-                if primary { "1" } else { "2" }
-            )
-        } else {
-            format!("{}_{}.fq", basename, pid)
-        };
+    pub fn new(basename: &str, pid: usize, format: FileFormat, pair: RecordPair) -> Result<Self> {
+        let path = name_fifo(basename, pid, pair, format);
         let writer = Arc::new(Mutex::new(open_fifo(&path)?));
         Ok(Self {
             writer,
             local: Vec::new(),
             format,
-            primary,
+            pair,
         })
     }
 }
 impl ParallelProcessor for PipeProcessor {
     fn process_record<R: binseq::BinseqRecord>(&mut self, record: R) -> binseq::Result<()> {
-        if self.primary {
-            write_record(
-                &mut self.local,
-                record.sheader(),
-                record.sseq(),
-                record.squal(),
-                self.format,
-            )?;
-        } else {
-            write_record(
-                &mut self.local,
-                record.xheader(),
-                record.xseq(),
-                record.xqual(),
-                self.format,
-            )?;
+        match self.pair {
+            RecordPair::Unpaired | RecordPair::R1 => {
+                write_record(
+                    &mut self.local,
+                    record.sheader(),
+                    record.sseq(),
+                    record.squal(),
+                    self.format,
+                )?;
+            }
+            RecordPair::R2 => {
+                write_record(
+                    &mut self.local,
+                    record.xheader(),
+                    record.xseq(),
+                    record.xqual(),
+                    self.format,
+                )?;
+            }
         }
         Ok(())
     }
