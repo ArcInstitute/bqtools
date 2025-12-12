@@ -18,10 +18,6 @@ pub struct PipeCommand {
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "PIPE OPTIONS")]
 pub struct PipeOptions {
-    #[clap(short = 'T', long, default_value = "0")]
-    /// Number of threads to use for reading and decompressing BINSEQ file.
-    threads: usize,
-
     #[clap(short = 'p', long, default_value = "0")]
     /// Number of pipes to make [0: as many as threads]
     num_pipes: usize,
@@ -41,16 +37,10 @@ impl PipeCommand {
             _ => Err(anyhow::anyhow!("Unsupported output format")),
         }
     }
-    pub fn threads(&self) -> usize {
-        match self.pipe.threads {
-            0 => num_cpus::get(),
-            n => n.min(num_cpus::get()),
-        }
-    }
     pub fn num_pipes(&self) -> usize {
         match self.pipe.num_pipes {
-            0 => self.threads(),
-            n => n.min(self.threads()),
+            0 => num_cpus::get(),
+            n => n.min(num_cpus::get()),
         }
     }
     pub fn basepath(&self) -> &str {
