@@ -11,6 +11,9 @@ use nix::unistd;
 use super::BoxedWriter;
 use crate::cli::FileFormat;
 
+/// Creates many FIFOs (named-pipes) at the given basepath
+///
+/// Note: this does not open the FIFOs for writing
 pub fn create_fifos(
     basepath: &str,
     paired: bool,
@@ -37,6 +40,9 @@ pub fn create_fifos(
     Ok(fifo_paths)
 }
 
+/// Create a FIFO (named-pipe) at the given path
+///
+/// Note: this does not open the FIFO for writing
 pub fn create_fifo(path: &str) -> Result<()> {
     trace!("Creating FIFO at path: {}", path);
     match unistd::mkfifo(Path::new(path), stat::Mode::S_IRUSR | stat::Mode::S_IWUSR) {
@@ -49,12 +55,14 @@ pub fn create_fifo(path: &str) -> Result<()> {
     }
 }
 
+/// Open a FIFO for writing
 pub fn open_fifo(path: &str) -> Result<BoxedWriter> {
     let handle = File::options().write(true).open(path).map(BufWriter::new)?;
     trace!("Opened writer at FIFO path: {}", path);
     Ok(Box::new(handle))
 }
 
+/// Close many FIFOs (unlink the path)
 pub fn close_fifos(paths: &[String]) -> Result<()> {
     let mut result = Ok(());
     for path in paths {
@@ -65,7 +73,8 @@ pub fn close_fifos(paths: &[String]) -> Result<()> {
     result
 }
 
-fn close_fifo(path: &str) -> Result<()> {
+/// Close a FIFO (unlink the path)
+pub fn close_fifo(path: &str) -> Result<()> {
     trace!("Closing FIFO at path: {}", path);
     unistd::unlink(Path::new(path))?;
     Ok(())
