@@ -2,8 +2,8 @@ use std::{io::Write, sync::Arc, thread};
 
 use anyhow::Result;
 use binseq::ParallelProcessor;
-use log::trace;
 use parking_lot::Mutex;
+// use log::{debug, trace};
 
 use super::BoxedWriter;
 use crate::{
@@ -23,7 +23,7 @@ pub struct PipeProcessor {
     local_w2: Vec<u8>,
     format: FileFormat,
     paired: bool,
-    pid: usize,
+    _pid: usize,
     tid: usize,
 }
 impl PipeProcessor {
@@ -58,7 +58,7 @@ impl PipeProcessor {
             local_w2: Vec::new(),
             format,
             paired,
-            pid,
+            _pid: pid,
             tid: 0,
             coord: Arc::new(Mutex::new(())),
         })
@@ -103,8 +103,13 @@ impl ParallelProcessor for PipeProcessor {
         if self.paired {
             let coord = self.coord.lock();
 
-            let w1 = Arc::clone(&self.w1.as_ref().unwrap());
-            let w2 = Arc::clone(&self.w2.as_ref().unwrap());
+            // debug!(
+            //     "Pipe {} Thread {} :: {} bytes in R1, {} bytes in R2",
+            //     self.pid,
+            //     self.tid,
+            //     self.local_w1.len(),
+            //     self.local_w2.len()
+            // );
 
             let mut r1_data = Vec::with_capacity(self.local_w1.capacity());
             let mut r2_data = Vec::with_capacity(self.local_w2.capacity());
@@ -115,9 +120,15 @@ impl ParallelProcessor for PipeProcessor {
             // Write R1 and R2 in parallel so neither blocks the other
             // let h1_pid = self.pid;
             // let h1_tid = self.tid;
+            let w1 = Arc::clone(&self.w1.as_ref().unwrap());
             let h1 = thread::spawn(move || -> binseq::Result<()> {
                 let mut lock = w1.lock();
-                // trace!("Writing R1 data :: Pipe {} Thread {}...", h1_pid, h1_tid);
+                // trace!(
+                //     "Writing R1 data ({} bytes) :: Pipe {} Thread {}...",
+                //     r1_data.len(),
+                //     h1_pid,
+                //     h1_tid
+                // );
                 lock.write_all(&r1_data)?;
                 // trace!("Flushing R1 data :: Pipe {} Thread {}...", h1_pid, h1_tid);
                 lock.flush()?;
@@ -127,9 +138,15 @@ impl ParallelProcessor for PipeProcessor {
 
             // let h2_pid = self.pid;
             // let h2_tid = self.tid;
+            let w2 = Arc::clone(&self.w2.as_ref().unwrap());
             let h2 = thread::spawn(move || -> binseq::Result<()> {
                 let mut lock = w2.lock();
-                // trace!("Writing R2 data :: Pipe {} Thread {}...", h2_pid, h2_tid);
+                // trace!(
+                //     "Writing R2 data ({} bytes) :: Pipe {} Thread {}...",
+                //     r2_data.len(),
+                //     h2_pid,
+                //     h2_tid
+                // );
                 lock.write_all(&r2_data)?;
                 // trace!("Flushing R2 data :: Pipe {} Thread {}...", h2_pid, h2_tid);
                 lock.flush()?;
@@ -140,18 +157,21 @@ impl ParallelProcessor for PipeProcessor {
             // Drop the Coord lock to allow the other thread to proceed
             drop(coord);
 
-            trace!("Joining R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
+            // trace!("Joining R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
             h1.join().unwrap()?;
-            trace!("Joined R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
+            // trace!("Joined R1 writer :: Pipe {} Thread {}", self.pid, self.tid);
 
-            trace!("Joining R2 writer :: Pipe {} Thread {}", self.pid, self.tid);
+            // trace!("Joining R2 writer :: Pipe {} Thread {}", self.pid, self.tid);
             h2.join().unwrap()?;
-            trace!("Joined R2 writer :: Pipe {} Thread {}", self.pid, self.tid);
+            // trace!("Joined R2 writer :: Pipe {} Thread {}", self.pid, self.tid);
         } else {
             let mut lock_w1 = self.w1.as_ref().unwrap().lock();
             lock_w1.write_all(&self.local_w1)?;
             lock_w1.flush()?;
         }
+
+        // debug!("Pipe {} Thread {} :: Done with batch", self.pid, self.tid,);
+
         self.local_w1.clear();
         self.local_w2.clear();
         Ok(())
