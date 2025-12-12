@@ -27,6 +27,7 @@ For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/co
 - **Cat**: Concatenate multiple BINSEQ files
 - **Count**: Count records in a BINSEQ file
 - **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
+- **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ.
 
 ## Installation
 
@@ -328,3 +329,30 @@ bqtools grep input.bq --file patterns.txt -Px
 ```
 
 The output of pattern count is a TSV with three columns: [Pattern, Count, Fraction of Total]
+
+### Pipe
+
+Stream BINSEQ data to legacy tools through named pipes for parallel processing.
+
+Because BINSEQ is a new format, many tools don't support it yet. 
+`bqtools pipe` creates a server that splits a BINSEQ file into multiple named pipes,
+enabling parallel processing with tools that expect FASTQ/FASTA files.
+
+Importantly, if your tool supports multiple parallel threads (i.e. parallelizes input files), you can make use of this feature to significantly improve performance.
+
+```bash
+# Create 4 named pipes (8 files for paired-end data)
+# Pipes: fifo_0.fq, fifo_1.fq, fifo_2.fq, fifo_3.fq
+bqtools pipe input.vbq -p 4 -b fifo &
+
+# Process in parallel with tools that don't support BINSEQ
+ls fifo_*.fq | xargs -P 4 -I {} sh -c 'legacy-tool {} > {.}.out'
+```
+
+**Key features:**
+- Each pipe streams a portion of the BINSEQ file **sequentially**
+- No disk I/O for intermediate files - data flows through memory
+- Automatic paired-end handling (`_R1`/`_R2` pairs)
+- Blocks until all pipes are fully read (prevents data loss)
+- Auto-scales to CPU count with `-p0` (default)
+- Pipes can be read sequentially *or* in parallel without blocking.
