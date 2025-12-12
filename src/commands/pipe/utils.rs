@@ -44,9 +44,9 @@ pub fn create_fifos(
 ///
 /// Note: this does not open the FIFO for writing
 pub fn create_fifo(path: &str) -> Result<()> {
-    trace!("Creating FIFO at path: {}", path);
+    trace!("Creating FIFO at path: {path}");
     match unistd::mkfifo(Path::new(path), stat::Mode::S_IRUSR | stat::Mode::S_IWUSR) {
-        Ok(_) => Ok(()),
+        Ok(()) => Ok(()),
         Err(Errno::EEXIST) => {
             trace!("FIFO already exists at {path}, reconnecting...");
             Ok(())
@@ -58,7 +58,7 @@ pub fn create_fifo(path: &str) -> Result<()> {
 /// Open a FIFO for writing
 pub fn open_fifo(path: &str) -> Result<BoxedWriter> {
     let handle = File::options().write(true).open(path).map(BufWriter::new)?;
-    trace!("Opened writer at FIFO path: {}", path);
+    trace!("Opened writer at FIFO path: {path}");
     Ok(Box::new(handle))
 }
 
@@ -75,7 +75,7 @@ pub fn close_fifos(paths: &[String]) -> Result<()> {
 
 /// Close a FIFO (unlink the path)
 pub fn close_fifo(path: &str) -> Result<()> {
-    trace!("Closing FIFO at path: {}", path);
+    trace!("Closing FIFO at path: {path}");
     unistd::unlink(Path::new(path))?;
     Ok(())
 }
