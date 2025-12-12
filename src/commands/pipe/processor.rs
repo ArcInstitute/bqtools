@@ -23,13 +23,23 @@ pub struct PipeProcessor {
     tid: usize,
 }
 impl PipeProcessor {
-    pub fn new(basename: &str, pid: usize, format: FileFormat, primary: bool) -> Result<Self> {
-        let path = format!(
-            "{}_{}_R{}.fq",
-            basename,
-            pid,
-            if primary { "1" } else { "2" }
-        );
+    pub fn new(
+        basename: &str,
+        pid: usize,
+        format: FileFormat,
+        primary: bool,
+        paired: bool,
+    ) -> Result<Self> {
+        let path = if paired {
+            format!(
+                "{}_{}_R{}.fq",
+                basename,
+                pid,
+                if primary { "1" } else { "2" }
+            )
+        } else {
+            format!("{}_{}.fq", basename, pid)
+        };
         let writer = Arc::new(Mutex::new(open_fifo(&path)?));
         Ok(Self {
             writer,
