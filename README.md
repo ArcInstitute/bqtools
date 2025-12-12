@@ -356,3 +356,5 @@ ls fifo_*.fq | xargs -P 4 -I {} sh -c 'legacy-tool {} > {.}.out'
 - Blocks until all pipes are fully read (prevents data loss)
 - Auto-scales to CPU count with `-p0` (default)
 - Pipes can be read sequentially *or* in parallel without blocking.
+
+Note: This feature is not available on Windows.
