@@ -341,8 +341,9 @@ enabling parallel processing with tools that expect FASTQ/FASTA files.
 Importantly, if your tool supports multiple parallel threads (i.e. parallelizes input files), you can make use of this feature to significantly improve performance.
 
 ```bash
-# Create 4 named pipes (8 files for paired-end data)
-# Pipes: fifo_0.fq, fifo_1.fq, fifo_2.fq, fifo_3.fq
+# Create 4 named pipes (8 files for paired-end data, 4 files for single-end data)
+# Pipes (single): fifo_[1234].fq
+# Pipes (paired): fifo_[0123]_R[12].fq
 bqtools pipe input.vbq -p 4 -b fifo &
 
 # Process in parallel with tools that don't support BINSEQ
