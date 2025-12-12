@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.4.13"
+version = "0.4.14"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
@@ -24,6 +24,7 @@ libc = "0.2.178"
 log = "0.4.29"
 memmap2 = "0.9.9"
 niffler = "3.0.0"
+nix = { version = "0.30.1", features = ["fs"] }
 num_cpus = "1.17.0"
 paraseq = "0.4.3"
 parking_lot = "0.12.5"

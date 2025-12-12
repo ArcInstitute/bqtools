@@ -3,6 +3,7 @@ pub mod count;
 pub mod decode;
 pub mod encode;
 pub mod grep;
+pub mod pipe;
 pub mod sample;
 mod utils;
 
