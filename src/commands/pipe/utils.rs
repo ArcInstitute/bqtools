@@ -64,13 +64,10 @@ pub fn open_fifo(path: &str) -> Result<BoxedWriter> {
 
 /// Close many FIFOs (unlink the path)
 pub fn close_fifos(paths: &[String]) -> Result<()> {
-    let mut result = Ok(());
     for path in paths {
-        if let Err(err) = close_fifo(path) {
-            result = Err(err);
-        }
+        close_fifo(path)?;
     }
-    result
+    Ok(())
 }
 
 /// Close a FIFO (unlink the path)
