@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use super::BoxedWriter;
 use crate::{
     cli::FileFormat,
-    commands::{decode::write_record, pipe::open_fifo},
+    commands::{decode::write_record, pipe::utils::open_fifo},
 };
 
 type SharedWriter = Arc<Mutex<BoxedWriter>>;

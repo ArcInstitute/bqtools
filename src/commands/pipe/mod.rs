@@ -1,19 +1,16 @@
 pub mod processor;
+pub mod utils;
 
-use nix::errno::Errno;
-use std::io::BufWriter;
-use std::path::Path;
+use std::io::Write;
 use std::thread;
-use std::{fs::File, io::Write};
 
 use anyhow::Result;
 use binseq::BinseqReader;
-use log::{info, trace};
-use nix::sys::stat;
-use nix::unistd;
+use log::info;
 
-use crate::cli::{FileFormat, PipeCommand};
+use crate::cli::PipeCommand;
 use processor::PipeProcessor;
+use utils::{close_fifos, create_fifos};
 
 pub type BoxedWriter = Box<dyn Write + Send>;
 
@@ -99,65 +96,5 @@ pub fn run(args: &PipeCommand) -> Result<()> {
     info!("Closing FIFOs");
     close_fifos(&fifo_paths)?;
 
-    Ok(())
-}
-
-fn create_fifos(
-    basepath: &str,
-    paired: bool,
-    num_threads: usize,
-    format: FileFormat,
-) -> Result<Vec<String>> {
-    let mut fifo_paths = Vec::new();
-    if paired {
-        for idx in 0..num_threads {
-            let path_r1 = format!("{}_{}_R1.{}", basepath, idx, format.extension());
-            let path_r2 = format!("{}_{}_R2.{}", basepath, idx, format.extension());
-            create_fifo(&path_r1)?;
-            create_fifo(&path_r2)?;
-            fifo_paths.push(path_r1);
-            fifo_paths.push(path_r2);
-        }
-    } else {
-        for idx in 0..num_threads {
-            let path = format!("{}_{}.{}", basepath, idx, format.extension());
-            create_fifo(&path)?;
-            fifo_paths.push(path);
-        }
-    }
-    Ok(fifo_paths)
-}
-
-fn create_fifo(path: &str) -> Result<()> {
-    trace!("Creating FIFO at path: {}", path);
-    match unistd::mkfifo(Path::new(path), stat::Mode::S_IRUSR | stat::Mode::S_IWUSR) {
-        Ok(_) => Ok(()),
-        Err(Errno::EEXIST) => {
-            trace!("FIFO already exists at {path}, reconnecting...");
-            Ok(())
-        }
-        Err(err) => Err(err.into()),
-    }
-}
-
-fn open_fifo(path: &str) -> Result<BoxedWriter> {
-    let handle = File::options().write(true).open(path).map(BufWriter::new)?;
-    trace!("Opened writer at FIFO path: {}", path);
-    Ok(Box::new(handle))
-}
-
-fn close_fifos(paths: &[String]) -> Result<()> {
-    let mut result = Ok(());
-    for path in paths {
-        if let Err(err) = close_fifo(path) {
-            result = Err(err);
-        }
-    }
-    result
-}
-
-fn close_fifo(path: &str) -> Result<()> {
-    trace!("Closing FIFO at path: {}", path);
-    unistd::unlink(Path::new(path))?;
     Ok(())
 }
