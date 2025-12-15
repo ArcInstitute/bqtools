@@ -663,7 +663,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         let path_str = path.as_os_str().to_str().unwrap();
-        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() | path.is_file()) {
+        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
             fqueue.push(path.to_owned());
         }
     }
@@ -717,7 +717,7 @@ fn run_manifest(args: &EncodeCommand) -> Result<()> {
         let line = line?;
         let path = PathBuf::from(line);
         let path_str = path.as_os_str().to_str().unwrap();
-        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() | path.is_file()) {
+        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
             fqueue.push(path);
         }
     }
@@ -765,7 +765,7 @@ fn run_manifest_inline(args: &EncodeCommand) -> Result<()> {
     for path in &args.input.input {
         let path = PathBuf::from(path);
         let path_str = path.as_os_str().to_str().unwrap();
-        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() | path.is_file()) {
+        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
             fqueue.push(path);
         }
     }
