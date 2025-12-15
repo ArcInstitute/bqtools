@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader},
+    os::unix::fs::FileTypeExt,
     path::PathBuf,
 };
 
@@ -648,7 +649,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         let path_str = path.as_os_str().to_str().unwrap();
-        if path.is_file() && regex.is_match(path_str) {
+        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() | path.is_file()) {
             fqueue.push(path.to_owned());
         }
     }
@@ -696,7 +697,7 @@ fn run_manifest(args: &EncodeCommand) -> Result<()> {
         let line = line?;
         let path = PathBuf::from(line);
         let path_str = path.as_os_str().to_str().unwrap();
-        if path.is_file() && regex.is_match(path_str) {
+        if regex.is_match(path_str) && (path.metadata()?.file_type().is_fifo() | path.is_file()) {
             fqueue.push(path);
         }
     }
