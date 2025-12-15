@@ -32,6 +32,9 @@ impl EncodeCommand {
         } else if self.input.is_stdin() {
             error!("Output path must be provided if using stdin");
             bail!("Output path must be provided if using stdin")
+        } else if self.input.num_files() > 2 {
+            error!("Output path must be provided if collating multiple files");
+            bail!("Output path must be provided if collating multiple files")
         } else {
             let outpath = if self.input.paired() {
                 let (r1, r2) = self.input.paired_paths()?;

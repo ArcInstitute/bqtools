@@ -81,11 +81,10 @@ export RUSTFLAGS="-C target-cpu=native";
 
 # Install bqtools without htslib/gcs but with fuzzy matching
 cargo install bqtools --no-default-features -F fuzzy
-# 
+#
 # Install bqtools without htslib but with fuzzy matching and gcs
 cargo install bqtools --no-default-features -F fuzzy,gcs
 ```
-
 
 ## Usage
 
@@ -158,6 +157,29 @@ Available policies for handling non-ATCG nucleotides:
 - `t`: Set all Ns to T
 
 > Note: These are only applied when encoding with 2-bit.
+
+### Encoding multiple files at the same time
+
+Encoding FASTX files into BINSEQ is often IO-bound per-file and won't benefit much from parallelism.
+However, file-level parallelism is still possible.
+`bqtools` provides some options for making use of file-level parallelism by encoding into separate BINSEQ files or encoding many FASTX files into a single BINSEQ file.
+
+`bqtools` will automatically find the pairs in the input files and respect pairing if the `--paired` flag is used.
+To encode everything into a single BINSEQ file you can use the `--collate` flag.
+
+```bash
+# encodes all FASTX files into separate BINSEQ files
+bqtools encode /path/to/fastx/*.fastq.gz
+
+# encodes all paired FASTX files into separated paired-BINSEQ files
+bqtools encode /path/to/fastx/*.fastq.gz --paired
+
+# encodes all FASTX files into a single BINSEQ file
+bqtools encode /path/to/fastx/*.fastq.gz -o some.vbq --collate
+
+# encodes all FASTX files into a single paired-BINSEQ file
+bqtools encode /path/to/fastx/*.fastq.gz -o some.vbq --collate --paired
+```
 
 #### Recursive Encoding
 
@@ -275,7 +297,7 @@ bqtools grep input.bq "ACGTACGT" -zi
 
 `bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
 You can provide files for either primary/extended, just primary, or just extended patterns with the relevant flags.
-Notably this will match *solely* with OR logic.
+Notably this will match _solely_ with OR logic.
 This can be used also with fuzzy matching as well as with pattern counting described below.
 Regex is also fully supported and files can be additionally paired with CLI arguments.
 
@@ -300,6 +322,7 @@ bqtools grep input.bq --file patterns.txt -x
 This is useful for seeing how many times each pattern occurs across a sequencing dataset without having to iterate over the dataset multiple times using traditional methods.
 
 Some important notes are:
+
 1. A pattern will only be counted once across a sequencing record (primary and secondary)
 2. A sequencing record may contribute to multiple patterns occurrences
 3. Providing multiple patterns will match records with `OR` logic (this is different behavior from `bqtools grep` default which uses `AND` logic when multiple patterns are provided)
@@ -334,7 +357,7 @@ The output of pattern count is a TSV with three columns: [Pattern, Count, Fracti
 
 Stream BINSEQ data to legacy tools through named pipes for parallel processing.
 
-Because BINSEQ is a new format, many tools don't support it yet. 
+Because BINSEQ is a new format, many tools don't support it yet.
 `bqtools pipe` creates a server that splits a BINSEQ file into multiple named pipes,
 enabling parallel processing with tools that expect FASTQ/FASTA files.
 
@@ -351,11 +374,12 @@ ls fifo_*.fq | xargs -P 4 -I {} sh -c 'legacy-tool {} > {.}.out'
 ```
 
 **Key features:**
+
 - Each pipe streams a portion of the BINSEQ file **sequentially**
 - No disk I/O for intermediate files - data flows through memory
 - Automatic paired-end handling (`_R1`/`_R2` pairs)
 - Blocks until all pipes are fully read (prevents data loss)
 - Auto-scales to CPU count with `-p0` (default)
-- Pipes can be read sequentially *or* in parallel without blocking.
+- Pipes can be read sequentially _or_ in parallel without blocking.
 
 Note: This feature is not available on Windows.

@@ -196,6 +196,10 @@ pub fn pull_single_files(input_files: &[PathBuf]) -> Result<Vec<Vec<PathBuf>>> {
     Ok(pqueue)
 }
 
+pub fn collate_groups(pqueue: &[Vec<PathBuf>]) -> Vec<Vec<PathBuf>> {
+    vec![pqueue.iter().flatten().cloned().collect()]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
