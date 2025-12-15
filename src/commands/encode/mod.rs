@@ -588,9 +588,9 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                             .iter()
                             .map(|path| path.to_str().unwrap().to_string())
                             .collect();
-                        let outpath = thread_args
-                            .output_path()?
-                            .expect("Failed to generate output path");
+                        let outpath = thread_args.output_path()?.ok_or_else(|| {
+                            anyhow::anyhow!("Output path must be provided when collating files")
+                        })?;
 
                         file_args.input.input = inpaths;
                         file_args.output.output = Some(outpath.clone());
