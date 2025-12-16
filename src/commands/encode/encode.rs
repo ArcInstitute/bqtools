@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use binseq::{bq, vbq, BitSize, Policy};
+use log::trace;
 use paraseq::{
     fastx::{self, Format},
     prelude::{PairedParallelProcessor, ParallelProcessor},
@@ -58,6 +59,7 @@ fn encode_collection_bq(
     output: &mut BoxedWriter,
     config: Config,
 ) -> Result<(usize, usize)> {
+    trace!("Encoding collection into bq");
     // Get the sequence lengths
     let (slen, xlen) = match collection.collection_type() {
         fastx::CollectionType::Single => {
@@ -80,6 +82,7 @@ fn encode_collection_bq(
             bail!("Unsupported collection type found in `encode_collection_bq`");
         }
     };
+    trace!("sequence length: slen={slen}, xlen={xlen}");
 
     let header = bq::BinseqHeaderBuilder::new()
         .slen(slen)
@@ -142,12 +145,24 @@ where
 {
     match collection.collection_type() {
         fastx::CollectionType::Single => {
+            trace!(
+                "Processing single collection of size {}",
+                collection.inner().len()
+            );
             collection.process_parallel(processor, threads, None)?;
         }
         fastx::CollectionType::Paired => {
+            trace!(
+                "Processing paired collection of size {}",
+                collection.inner().len()
+            );
             collection.process_parallel_paired(processor, threads, None)?;
         }
         fastx::CollectionType::Interleaved => {
+            trace!(
+                "Processing interleaved collection of size {}",
+                collection.inner().len()
+            );
             collection.process_parallel_interleaved(processor, threads, None)?;
         }
         _ => bail!("Unsupported collection type"),
@@ -180,7 +195,10 @@ fn encode_htslib_bq(
     use super::utils::get_sequence_len_htslib;
     use paraseq::{htslib, prelude::*};
 
+    trace!("Encoding htslib {} into bq", inpath);
+
     let (slen, xlen) = get_sequence_len_htslib(inpath, paired)?;
+    trace!("sequence length: slen={slen}, xlen={xlen}");
     let header = bq::BinseqHeaderBuilder::new()
         .slen(slen)
         .xlen(xlen)
@@ -209,6 +227,7 @@ fn encode_htslib_vbq(
     paired: bool,
 ) -> Result<(usize, usize)> {
     use paraseq::{htslib, prelude::*};
+    trace!("Encoding htslib {} into vbq", inpath);
 
     let header = vbq::VBinseqHeaderBuilder::new()
         .block(config.block_size as u64)
