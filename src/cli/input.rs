@@ -120,20 +120,20 @@ impl InputFile {
         Ok(reader)
     }
 
+    /// Builds a vector of readers from the input paths.
+    fn build_readers_from_paths(&self) -> Result<Vec<fastx::Reader<BoxedReader>>> {
+        self.input
+            .iter()
+            .map(|path| load_reader(Some(path), self.batch_size))
+            .collect()
+    }
+
     pub fn build_single_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
-        let collection = if !self.input.is_empty() {
-            let mut readers = Vec::new();
-            for path in &self.input {
-                readers.push(load_reader(Some(path), self.batch_size)?);
-            }
-            fastx::Collection::new(readers, fastx::CollectionType::Single)
-        } else {
-            fastx::Collection::new(
-                vec![self.build_single_reader()?],
-                fastx::CollectionType::Single,
-            )
-        }?;
-        Ok(collection)
+        self.build_collection_with_optional_stdin(fastx::CollectionType::Single)
+    }
+
+    pub fn build_interleaved_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
+        self.build_collection_with_optional_stdin(fastx::CollectionType::Interleaved)
     }
 
     pub fn build_paired_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
@@ -143,26 +143,21 @@ impl InputFile {
         if !self.input.len().is_multiple_of(2) {
             bail!("Input must contain an even number of paths for paired collection");
         }
-        let mut readers = Vec::new();
-        for path in &self.input {
-            readers.push(load_reader(Some(path), self.batch_size)?);
-        }
-        let collection = fastx::Collection::new(readers, fastx::CollectionType::Paired)?;
+        let collection = fastx::Collection::new(
+            self.build_readers_from_paths()?,
+            fastx::CollectionType::Paired,
+        )?;
         Ok(collection)
     }
 
-    pub fn build_interleaved_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
+    fn build_collection_with_optional_stdin(
+        &self,
+        collection_type: fastx::CollectionType,
+    ) -> Result<fastx::Collection<BoxedReader>> {
         let collection = if !self.input.is_empty() {
-            let mut readers = Vec::new();
-            for path in &self.input {
-                readers.push(load_reader(Some(path), self.batch_size)?);
-            }
-            fastx::Collection::new(readers, fastx::CollectionType::Interleaved)
+            fastx::Collection::new(self.build_readers_from_paths()?, collection_type)
         } else {
-            fastx::Collection::new(
-                vec![self.build_single_reader()?],
-                fastx::CollectionType::Interleaved,
-            )
+            fastx::Collection::new(vec![self.build_single_reader()?], collection_type)
         }?;
         Ok(collection)
     }
