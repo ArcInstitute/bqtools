@@ -154,10 +154,10 @@ impl InputFile {
         &self,
         collection_type: fastx::CollectionType,
     ) -> Result<fastx::Collection<BoxedReader>> {
-        let collection = if !self.input.is_empty() {
-            fastx::Collection::new(self.build_readers_from_paths()?, collection_type)
-        } else {
+        let collection = if self.input.is_empty() {
             fastx::Collection::new(vec![self.build_single_reader()?], collection_type)
+        } else {
+            fastx::Collection::new(self.build_readers_from_paths()?, collection_type)
         }?;
         Ok(collection)
     }
