@@ -243,26 +243,16 @@ fn filter_valid_paths<I>(paths: I, regex: &Regex) -> Result<Vec<PathBuf>>
 where
     I: Iterator<Item = PathBuf>,
 {
-    paths
-        .filter(|path| {
-            let path_str = path.to_string_lossy();
-            if !regex.is_match(&path_str) {
-                return false;
+    let mut valid_paths = Vec::new();
+    for path in paths {
+        if regex.is_match(&path.to_string_lossy()) {
+            let metadata = path.metadata()?;
+            if metadata.file_type().is_file() || metadata.file_type().is_fifo() {
+                valid_paths.push(path);
             }
-
-            // Check if it's a regular file or FIFO
-            match path.metadata() {
-                Ok(metadata) => {
-                    let file_type = metadata.file_type();
-                    file_type.is_file() || file_type.is_fifo()
-                }
-                Err(_) => false,
-            }
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .map(Ok)
-        .collect()
+        }
+    }
+    Ok(valid_paths)
 }
 
 /// Common logic for processing a list of file paths into a queue and executing
