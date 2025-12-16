@@ -8,6 +8,7 @@ fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
     let bitsize: u8 = header.bits.into();
     println!("Format Version    : {}", header.format);
     println!("Bitsize           : {bitsize}");
+    println!("Paired            : {}", header.xlen > 0);
     println!("Flags             : {}", header.flags);
     println!("Sequence Length   : {}", header.slen);
     if header.xlen > 0 {
@@ -26,6 +27,7 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
         let bitsize: u8 = header.bits.into();
         println!("Format Version    : {}", header.format);
         println!("Bitsize           : {bitsize}");
+        println!("Paired            : {}", header.paired);
         println!("Compression:      : {}", header.compressed);
         println!("Quality:          : {}", header.qual);
         println!("Headers:          : {}", header.headers);
