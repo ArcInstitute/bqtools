@@ -18,7 +18,10 @@ pub struct InputFile {
     /// Input file [default: stdin]
     ///
     /// Can specify either zero (stdin), one, or two (paired) input files.
-    #[clap(help = "Input file [default: stdin]", num_args = 0..=2)]
+    ///
+    /// If more than two files are provided they will be collated into a single collection.
+    /// Use the `--paired` option to specify paired-end input (number of files must be even).
+    #[clap(help = "Input file [default: stdin]", num_args = 0..)]
     pub input: Vec<String>,
 
     #[clap(short, long, help = "Input file format")]
@@ -73,7 +76,12 @@ impl InputFile {
     }
 
     pub fn paired(&self) -> bool {
-        self.input.len() == 2
+        self.input.len() == 2 || self.batch_encoding_options.paired
+    }
+
+    /// Returns the number of input files.
+    pub fn num_files(&self) -> usize {
+        self.input.len()
     }
 
     pub fn format(&self) -> Option<FileFormat> {
@@ -112,13 +120,46 @@ impl InputFile {
         Ok(reader)
     }
 
-    pub fn build_paired_readers(
+    /// Builds a vector of readers from the input paths.
+    fn build_readers_from_paths(&self) -> Result<Vec<fastx::Reader<BoxedReader>>> {
+        self.input
+            .iter()
+            .map(|path| load_reader(Some(path), self.batch_size))
+            .collect()
+    }
+
+    pub fn build_single_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
+        self.build_collection_with_optional_stdin(fastx::CollectionType::Single)
+    }
+
+    pub fn build_interleaved_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
+        self.build_collection_with_optional_stdin(fastx::CollectionType::Interleaved)
+    }
+
+    pub fn build_paired_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
+        if self.input.is_empty() {
+            bail!("Cannot build paired collection from stdin");
+        }
+        if !self.input.len().is_multiple_of(2) {
+            bail!("Input must contain an even number of paths for paired collection");
+        }
+        let collection = fastx::Collection::new(
+            self.build_readers_from_paths()?,
+            fastx::CollectionType::Paired,
+        )?;
+        Ok(collection)
+    }
+
+    fn build_collection_with_optional_stdin(
         &self,
-    ) -> Result<(fastx::Reader<BoxedReader>, fastx::Reader<BoxedReader>)> {
-        let (path1, path2) = self.paired_paths()?;
-        let reader1 = load_reader(Some(path1), self.batch_size)?;
-        let reader2 = load_reader(Some(path2), self.batch_size)?;
-        Ok((reader1, reader2))
+        collection_type: fastx::CollectionType,
+    ) -> Result<fastx::Collection<BoxedReader>> {
+        let collection = if self.input.is_empty() {
+            fastx::Collection::new(vec![self.build_single_reader()?], collection_type)
+        } else {
+            fastx::Collection::new(self.build_readers_from_paths()?, collection_type)
+        }?;
+        Ok(collection)
     }
 }
 
@@ -190,6 +231,10 @@ pub struct BatchEncodingOptions {
     /// Encode *{_R1,_R2}* record pairs. Ignored unless `--manifest` or `--recursive` is specified.
     #[clap(short = 'P', long)]
     pub paired: bool,
+
+    /// Collate all input files into a single output file. Will respect paired records if `--paired` is specified.
+    #[clap(short = 'C', long)]
+    pub collate: bool,
 }
 
 #[derive(Parser, Debug)]
