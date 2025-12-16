@@ -64,7 +64,7 @@ pub fn run(args: &PipeCommand) -> Result<()> {
                 pid,
                 format,
                 RecordPair::R1,
-                rstart..rend.clone(),
+                rstart..rend,
             ));
             handles.push(spawn_pipe_thread(
                 basename.to_string(),
@@ -72,7 +72,7 @@ pub fn run(args: &PipeCommand) -> Result<()> {
                 pid,
                 format,
                 RecordPair::R2,
-                rstart..rend.clone(),
+                rstart..rend,
             ));
         } else {
             handles.push(spawn_pipe_thread(

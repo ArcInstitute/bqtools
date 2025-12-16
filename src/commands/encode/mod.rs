@@ -6,427 +6,39 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use binseq::{bq, vbq, BitSize, Policy};
-use log::{debug, error, info, trace};
-use paraseq::{
-    fastx::{self, Format},
-    prelude::*,
-};
+use log::{debug, error, info, trace, warn};
 
 use regex::Regex;
 use walkdir::WalkDir;
 
 #[cfg(feature = "htslib")]
-use crate::commands::encode::utils::get_sequence_len_htslib;
-#[cfg(feature = "htslib")]
 use anyhow::Context;
 #[cfg(feature = "htslib")]
-use paraseq::htslib;
+use encode::encode_htslib;
 
 use crate::{
-    cli::{BinseqMode, EncodeCommand, FileFormat},
-    commands::{
-        encode::utils::{
-            collate_groups, generate_output_name, get_interleaved_sequence_len, get_sequence_len,
-            pair_r1_r2_files, pull_single_files,
-        },
-        utils::match_output,
+    cli::{EncodeCommand, FileFormat},
+    commands::encode::utils::{
+        collate_groups, generate_output_name, pair_r1_r2_files, pull_single_files,
     },
-    types::BoxedReader,
 };
 
+mod encode;
 pub mod processor;
 pub mod utils;
 
-use processor::{BinseqProcessor, VBinseqProcessor};
-
-#[allow(clippy::too_many_arguments)]
-fn encode_single(
-    mut collection: fastx::Collection<BoxedReader>,
-    out_path: Option<&str>,
-    mode: BinseqMode,
-    num_threads: usize,
-    compress: bool,
-    quality: bool,
-    block_size: usize,
-    policy: Policy,
-    bitsize: BitSize,
-    headers: bool,
-) -> Result<(usize, usize)> {
-    // build writer
-    let out_handle = match_output(out_path)?;
-
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        trace!("converting to bq");
-
-        // Determine the sequence length
-        let inner = collection.inner_mut();
-        let slen = get_sequence_len(&mut inner[0])?;
-        trace!("sequence length: {slen}");
-
-        let header = bq::BinseqHeaderBuilder::new()
-            .slen(slen)
-            .bitsize(bitsize)
-            .flags(false)
-            .build()?;
-        let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        collection.process_parallel(&mut processor, num_threads, None)?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    } else {
-        trace!("converting to vbq");
-        let quality = match collection.unique_format() {
-            Some(Format::Fastq) | None => quality,
-            Some(Format::Fasta) => false, // never record fasta quality
-        };
-        trace!("quality: {quality}");
-        let header = vbq::VBinseqHeaderBuilder::new()
-            .block(block_size as u64)
-            .qual(quality)
-            .compressed(compress)
-            .bitsize(bitsize)
-            .headers(headers)
-            .flags(false)
-            .build();
-        let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        collection.process_parallel(&mut processor, num_threads, None)?;
-        processor.finish()?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    };
-
-    Ok((num_records, num_skipped))
-}
-
-#[cfg(feature = "htslib")]
-#[allow(clippy::too_many_arguments)]
-fn encode_single_htslib(
-    in_path: &str,
-    out_path: Option<&str>,
-    mode: BinseqMode,
-    num_threads: usize,
-    compress: bool,
-    quality: bool,
-    block_size: usize,
-    policy: Policy,
-    bitsize: BitSize,
-    headers: bool,
-) -> Result<(usize, usize)> {
-    // build reader
-    let reader = htslib::Reader::from_path(in_path)?;
-
-    // build writer
-    let out_handle = match_output(out_path)?;
-
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        trace!("converting to bq");
-
-        // Determine the sequence length
-        let (slen, _) = get_sequence_len_htslib(in_path, false)?;
-        trace!("sequence length: {slen}");
-
-        let header = bq::BinseqHeaderBuilder::new()
-            .slen(slen)
-            .bitsize(bitsize)
-            .flags(false)
-            .build()?;
-        let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        reader.process_parallel(&mut processor, num_threads)?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    } else {
-        trace!("converting to vbq");
-        let header = vbq::VBinseqHeaderBuilder::new()
-            .block(block_size as u64)
-            .qual(quality)
-            .compressed(compress)
-            .bitsize(bitsize)
-            .headers(headers)
-            .flags(false)
-            .build();
-        let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        reader.process_parallel(&mut processor, num_threads)?;
-        processor.finish()?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    };
-
-    Ok((num_records, num_skipped))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn encode_interleaved(
-    mut collection: fastx::Collection<BoxedReader>,
-    out_path: Option<&str>,
-    mode: BinseqMode,
-    num_threads: usize,
-    compress: bool,
-    quality: bool,
-    block_size: usize,
-    policy: Policy,
-    bitsize: BitSize,
-    headers: bool,
-) -> Result<(usize, usize)> {
-    // Prepare the processor
-    let out_handle = match_output(out_path)?;
-
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        trace!("converting to bq");
-
-        // Determine the sequence length
-        let inner = collection.inner_mut();
-        let (slen, xlen) = get_interleaved_sequence_len(&mut inner[0])?;
-        trace!("sequence length: slen={slen}, xlen={xlen}");
-
-        let header = bq::BinseqHeaderBuilder::new()
-            .slen(slen)
-            .xlen(xlen)
-            .bitsize(bitsize)
-            .flags(false)
-            .build()?;
-        let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        collection.process_parallel_interleaved(&mut processor, num_threads, None)?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    } else {
-        trace!("converting to vbq");
-
-        let quality = match collection.unique_format() {
-            Some(Format::Fastq) | None => quality,
-            Some(Format::Fasta) => false, // never record quality for fasta
-        };
-        trace!("quality: {quality}");
-        let header = vbq::VBinseqHeaderBuilder::new()
-            .block(block_size as u64)
-            .qual(quality)
-            .compressed(compress)
-            .paired(true)
-            .bitsize(bitsize)
-            .headers(headers)
-            .flags(false)
-            .build();
-        let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        collection.process_parallel_interleaved(&mut processor, num_threads, None)?;
-        processor.finish()?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    };
-
-    Ok((num_records, num_skipped))
-}
-
-#[cfg(feature = "htslib")]
-#[allow(clippy::too_many_arguments)]
-fn encode_interleaved_htslib(
-    in_path: &str,
-    out_path: Option<&str>,
-    mode: BinseqMode,
-    num_threads: usize,
-    compress: bool,
-    quality: bool,
-    block_size: usize,
-    _batch_size: Option<usize>,
-    policy: Policy,
-    bitsize: BitSize,
-    headers: bool,
-) -> Result<(usize, usize)> {
-    let reader = htslib::Reader::from_path(in_path)?;
-
-    // Prepare the processor
-    let out_handle = match_output(out_path)?;
-
-    let (num_records, num_skipped) = if mode == BinseqMode::Binseq {
-        trace!("converting to bq");
-
-        // Determine the sequence length
-        let (slen, xlen) = get_sequence_len_htslib(in_path, true)?;
-        trace!("sequence length: {slen}, xlen: {xlen}");
-
-        let header = bq::BinseqHeaderBuilder::new()
-            .slen(slen)
-            .xlen(xlen)
-            .bitsize(bitsize)
-            .flags(false)
-            .build()?;
-        let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        reader.process_parallel_interleaved(&mut processor, num_threads)?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    } else {
-        trace!("converting to vbq");
-        let header = vbq::VBinseqHeaderBuilder::new()
-            .block(block_size as u64)
-            .qual(quality)
-            .compressed(compress)
-            .paired(true)
-            .bitsize(bitsize)
-            .headers(headers)
-            .flags(false)
-            .build();
-        let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
-
-        // Process the records in parallel
-        trace!("processing records in parallel (T={num_threads})");
-        reader.process_parallel_interleaved(&mut processor, num_threads)?;
-        processor.finish()?;
-
-        // Update the number of records
-        let num_records = processor.get_global_record_count();
-        let num_skipped = processor.get_global_skipped_count();
-
-        (num_records, num_skipped)
-    };
-
-    Ok((num_records, num_skipped))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn encode_paired(
-    mut collection: fastx::Collection<BoxedReader>,
-    out_path: Option<&str>,
-    mode: BinseqMode,
-    num_threads: usize,
-    compress: bool,
-    quality: bool,
-    block_size: usize,
-    policy: Policy,
-    bitsize: BitSize,
-    headers: bool,
-) -> Result<(usize, usize)> {
-    // Prepare the output handle
-    let out_handle = match_output(out_path)?;
-
-    let (num_records, num_skipped) = match mode {
-        BinseqMode::Binseq => {
-            trace!("converting to bq");
-
-            // Determine the sequence length
-            let inner = collection.inner_mut();
-            let slen = get_sequence_len(&mut inner[0])?;
-            let xlen = get_sequence_len(&mut inner[1])?;
-            trace!("sequence length: slen={slen}, xlen={xlen}");
-
-            // Prepare the output HEADER
-            let header = bq::BinseqHeaderBuilder::new()
-                .slen(slen)
-                .xlen(xlen)
-                .bitsize(bitsize)
-                .flags(false)
-                .build()?;
-            let mut processor = BinseqProcessor::new(header, policy, out_handle)?;
-
-            // Process the records in parallel
-            trace!("processing records in parallel (T={num_threads})");
-            collection.process_parallel_paired(&mut processor, num_threads, None)?;
-
-            // Update the number of records
-            let num_records = processor.get_global_record_count();
-            let num_skipped = processor.get_global_skipped_count();
-
-            (num_records, num_skipped)
-        }
-        BinseqMode::VBinseq => {
-            trace!("converting to vbq");
-
-            let quality = match collection.unique_format() {
-                Some(Format::Fastq) | None => quality,
-                Some(Format::Fasta) => false, // never record quality for fasta
-            };
-
-            trace!("quality: {quality}");
-            let header = vbq::VBinseqHeaderBuilder::new()
-                .block(block_size as u64)
-                .qual(quality)
-                .compressed(compress)
-                .paired(true)
-                .bitsize(bitsize)
-                .headers(headers)
-                .flags(false)
-                .build();
-            let mut processor = VBinseqProcessor::new(header, policy, out_handle)?;
-
-            // Process the records in parallel
-            trace!("processing records in parallel (T={num_threads})");
-            collection.process_parallel_paired(&mut processor, num_threads, None)?;
-            processor.finish()?;
-
-            // Update the number of records
-            let num_records = processor.get_global_record_count();
-            let num_skipped = processor.get_global_skipped_count();
-
-            (num_records, num_skipped)
-        }
-    };
-
-    Ok((num_records, num_skipped))
-}
+use encode::encode_collection;
 
 /// Run the encoding process for an atomic single/paired input
 fn run_atomic(args: &EncodeCommand) -> Result<()> {
     let opath = args.output_path()?;
     let (num_records, num_skipped) = if args.input.paired() {
         trace!("launching paired encoding");
-        let collection = args.input.build_paired_collection()?;
-        encode_paired(
-            collection,
+        encode_collection(
+            args.input.build_paired_collection()?,
             opath.as_deref(),
             args.mode()?,
-            args.output.threads(),
-            args.output.compress(),
-            args.output.quality(),
-            args.output.block_size(),
-            args.output.policy.into(),
-            args.output.bitsize(),
-            args.output.headers,
+            args.output.clone().into(),
         )
     } else if args.input.interleaved {
         if let Some(FileFormat::Bam) = args.input.format() {
@@ -439,35 +51,23 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             #[cfg(feature = "htslib")]
             {
                 trace!("launching interleaved encoding (htslib)");
-                encode_interleaved_htslib(
+                encode_htslib(
                     args.input
                         .single_path()?
                         .context("Must provide an input path for HTSLib")?,
                     opath.as_deref(),
                     args.mode()?,
-                    args.output.threads(),
-                    args.output.compress(),
-                    args.output.quality(),
-                    args.output.block_size(),
-                    args.input.batch_size,
-                    args.output.policy.into(),
-                    args.output.bitsize(),
-                    args.output.headers,
+                    args.output.clone().into(),
+                    true,
                 )
             }
         } else {
             trace!("launching interleaved encoding (fastx)");
-            encode_interleaved(
+            encode_collection(
                 args.input.build_interleaved_collection()?,
                 opath.as_deref(),
                 args.mode()?,
-                args.output.threads(),
-                args.output.compress(),
-                args.output.quality(),
-                args.output.block_size(),
-                args.output.policy.into(),
-                args.output.bitsize(),
-                args.output.headers,
+                args.output.clone().into(),
             )
         }
     } else if let Some(FileFormat::Bam) = args.input.format() {
@@ -480,34 +80,23 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
         #[cfg(feature = "htslib")]
         {
             trace!("launching single encoding (htslib)");
-            encode_single_htslib(
+            encode_htslib(
                 args.input
                     .single_path()?
                     .context("Must provide an input path for HTSlib")?,
                 opath.as_deref(),
                 args.mode()?,
-                args.output.threads(),
-                args.output.compress(),
-                args.output.quality(),
-                args.output.block_size(),
-                args.output.policy.into(),
-                args.output.bitsize(),
-                args.output.headers,
+                args.output.clone().into(),
+                false,
             )
         }
     } else {
         trace!("launching single encoding (fastx)");
-        encode_single(
+        encode_collection(
             args.input.build_single_collection()?,
             opath.as_deref(),
             args.mode()?,
-            args.output.threads(),
-            args.output.compress(),
-            args.output.quality(),
-            args.output.block_size(),
-            args.output.policy.into(),
-            args.output.bitsize(),
-            args.output.headers,
+            args.output.clone().into(),
         )
     }?;
 
@@ -639,45 +228,53 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
     Ok(())
 }
 
-fn run_recursive(args: &EncodeCommand) -> Result<()> {
-    let args = args.to_owned();
-    let dir = args.input.as_directory()?;
-
-    let regex_str = if args.input.batch_encoding_options.paired {
+/// Build the regex pattern for filtering input files
+fn build_file_regex(paired: bool) -> Result<Regex> {
+    let regex_str = if paired {
         r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
     } else {
         r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
     };
+    Ok(Regex::new(regex_str)?)
+}
 
-    let regex = Regex::new(regex_str)?;
-
-    let mut fqueue = vec![];
-    info!("Processing files in directory: {}", dir.display());
-
-    let dir_walker = if let Some(max_depth) = args.input.recursion.depth {
-        WalkDir::new(dir).max_depth(max_depth)
-    } else {
-        WalkDir::new(dir)
-    };
-    for entry in dir_walker {
-        let entry = entry?;
-        let path = entry.path();
-        let path_str = path.to_string_lossy();
-        if regex.is_match(&path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
-            fqueue.push(path.to_owned());
+/// Filter paths based on regex and file type (regular file or FIFO)
+fn filter_valid_paths<I>(paths: I, regex: &Regex) -> Result<Vec<PathBuf>>
+where
+    I: Iterator<Item = PathBuf>,
+{
+    let mut valid_paths = Vec::new();
+    for path in paths {
+        if regex.is_match(&path.to_string_lossy()) {
+            let metadata = path.metadata()?;
+            if metadata.file_type().is_file() || metadata.file_type().is_fifo() {
+                valid_paths.push(path);
+            }
         }
     }
-    if fqueue.is_empty() {
+    Ok(valid_paths)
+}
+
+/// Common logic for processing a list of file paths into a queue and executing
+fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<()> {
+    if file_queue.is_empty() {
         bail!("No files found");
     }
-    fqueue.sort_unstable();
 
+    let mut sorted_queue = file_queue;
+    sorted_queue.sort_unstable();
+
+    // Build the regex for output naming
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
+
+    // Pair or pull single files
     let pqueue = if args.input.batch_encoding_options.paired {
-        pair_r1_r2_files(&fqueue)
+        pair_r1_r2_files(&sorted_queue)
     } else {
-        pull_single_files(&fqueue)
+        pull_single_files(&sorted_queue)
     }?;
 
+    // Optionally collate
     let pqueue = if args.input.batch_encoding_options.collate {
         collate_groups(&pqueue)
     } else {
@@ -688,15 +285,43 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         bail!("No files found matching the expected pattern.");
     }
 
+    // Log what we found
     if args.input.batch_encoding_options.paired {
         info!("Total file pairs found: {}", pqueue.len());
     } else {
         info!("Total files found: {}", pqueue.len());
     }
 
-    process_queue(&args, pqueue, &regex)?;
+    if pqueue.len() > 1 && args.output.output.is_some() {
+        warn!("Output path specified but ignored when batch encoding multiple files.");
+    }
 
-    Ok(())
+    process_queue(args, pqueue, &regex)
+}
+
+fn run_recursive(args: &EncodeCommand) -> Result<()> {
+    let args = args.to_owned();
+    let dir = args.input.as_directory()?;
+
+    info!("Processing files in directory: {}", dir.display());
+
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
+
+    let dir_walker = if let Some(max_depth) = args.input.recursion.depth {
+        WalkDir::new(dir).max_depth(max_depth)
+    } else {
+        WalkDir::new(dir)
+    };
+
+    let file_queue = filter_valid_paths(
+        dir_walker
+            .into_iter()
+            .filter_map(std::result::Result::ok)
+            .map(|e| e.path().to_owned()),
+        &regex,
+    )?;
+
+    process_file_list(&args, file_queue)
 }
 
 fn run_manifest(args: &EncodeCommand) -> Result<()> {
@@ -704,101 +329,21 @@ fn run_manifest(args: &EncodeCommand) -> Result<()> {
         bail!("No manifest file provided");
     };
 
-    let regex_str = if args.input.batch_encoding_options.paired {
-        r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
-    } else {
-        r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
-    };
-    let regex = Regex::new(regex_str)?;
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
 
     let handle = File::open(manifest).map(BufReader::new)?;
-    let mut fqueue = vec![];
-    for line in handle.lines() {
-        let line = line?;
-        let path = PathBuf::from(line);
-        let path_str = path.to_string_lossy();
-        if regex.is_match(&path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
-            fqueue.push(path);
-        }
-    }
-    if fqueue.is_empty() {
-        bail!("No files found");
-    }
-    fqueue.sort_unstable();
+    let lines = handle.lines().collect::<Result<Vec<_>, _>>()?;
+    let file_queue = filter_valid_paths(lines.into_iter().map(PathBuf::from), &regex)?;
 
-    let pqueue = if args.input.batch_encoding_options.paired {
-        pair_r1_r2_files(&fqueue)
-    } else {
-        pull_single_files(&fqueue)
-    }?;
-
-    let pqueue = if args.input.batch_encoding_options.collate {
-        collate_groups(&pqueue)
-    } else {
-        pqueue
-    };
-
-    if pqueue.is_empty() {
-        bail!("No files found matching the expected pattern.");
-    }
-
-    if args.input.batch_encoding_options.paired {
-        info!("Total file pairs found: {}", pqueue.len());
-    } else {
-        info!("Total files found: {}", pqueue.len());
-    }
-
-    process_queue(args, pqueue, &regex)?;
-
-    Ok(())
+    process_file_list(args, file_queue)
 }
 
 fn run_manifest_inline(args: &EncodeCommand) -> Result<()> {
-    let regex_str = if args.input.batch_encoding_options.paired {
-        r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
-    } else {
-        r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
-    };
-    let regex = Regex::new(regex_str)?;
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
 
-    let mut fqueue = vec![];
-    for path in &args.input.input {
-        let path = PathBuf::from(path);
-        let path_str = path.to_string_lossy();
-        if regex.is_match(&path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
-            fqueue.push(path);
-        }
-    }
-    if fqueue.is_empty() {
-        bail!("No files found");
-    }
-    fqueue.sort_unstable();
+    let file_queue = filter_valid_paths(args.input.input.iter().map(PathBuf::from), &regex)?;
 
-    let pqueue = if args.input.batch_encoding_options.paired {
-        pair_r1_r2_files(&fqueue)
-    } else {
-        pull_single_files(&fqueue)
-    }?;
-
-    let pqueue = if args.input.batch_encoding_options.collate {
-        collate_groups(&pqueue)
-    } else {
-        pqueue
-    };
-
-    if pqueue.is_empty() {
-        bail!("No files found matching the expected pattern.");
-    }
-
-    if args.input.batch_encoding_options.paired {
-        info!("Total file pairs found: {}", pqueue.len());
-    } else {
-        info!("Total files found: {}", pqueue.len());
-    }
-
-    process_queue(args, pqueue, &regex)?;
-
-    Ok(())
+    process_file_list(args, file_queue)
 }
 
 pub fn run(args: &EncodeCommand) -> Result<()> {
