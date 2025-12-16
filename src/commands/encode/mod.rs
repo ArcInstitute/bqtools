@@ -332,13 +332,8 @@ fn run_manifest(args: &EncodeCommand) -> Result<()> {
     let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
 
     let handle = File::open(manifest).map(BufReader::new)?;
-    let file_queue = filter_valid_paths(
-        handle
-            .lines()
-            .filter_map(|line| line.ok())
-            .map(PathBuf::from),
-        &regex,
-    )?;
+    let lines = handle.lines().collect::<Result<Vec<_>, _>>()?;
+    let file_queue = filter_valid_paths(lines.into_iter().map(PathBuf::from), &regex)?;
 
     process_file_list(args, file_queue)
 }
