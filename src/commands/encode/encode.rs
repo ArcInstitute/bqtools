@@ -195,7 +195,7 @@ fn encode_htslib_bq(
     use super::utils::get_sequence_len_htslib;
     use paraseq::{htslib, prelude::*};
 
-    trace!("Encoding htslib {} into bq", inpath);
+    trace!("Encoding htslib {inpath} into bq");
 
     let (slen, xlen) = get_sequence_len_htslib(inpath, paired)?;
     trace!("sequence length: slen={slen}, xlen={xlen}");
@@ -227,7 +227,7 @@ fn encode_htslib_vbq(
     paired: bool,
 ) -> Result<(usize, usize)> {
     use paraseq::{htslib, prelude::*};
-    trace!("Encoding htslib {} into vbq", inpath);
+    trace!("Encoding htslib {inpath} into vbq");
 
     let header = vbq::VBinseqHeaderBuilder::new()
         .block(config.block_size as u64)

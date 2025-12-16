@@ -293,7 +293,7 @@ fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<(
     }
 
     if pqueue.len() > 1 && args.output.output.is_some() {
-        warn!("Output path specified but ignored when batch encoding multiple files.")
+        warn!("Output path specified but ignored when batch encoding multiple files.");
     }
 
     process_queue(args, pqueue, &regex)
@@ -316,7 +316,7 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
     let file_queue = filter_valid_paths(
         dir_walker
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .map(|e| e.path().to_owned()),
         &regex,
     )?;

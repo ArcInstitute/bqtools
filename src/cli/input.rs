@@ -121,7 +121,7 @@ impl InputFile {
     }
 
     pub fn build_single_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
-        let collection = if self.input.len() >= 1 {
+        let collection = if !self.input.is_empty() {
             let mut readers = Vec::new();
             for path in &self.input {
                 readers.push(load_reader(Some(path), self.batch_size)?);
@@ -152,7 +152,7 @@ impl InputFile {
     }
 
     pub fn build_interleaved_collection(&self) -> Result<fastx::Collection<BoxedReader>> {
-        let collection = if self.input.len() >= 1 {
+        let collection = if !self.input.is_empty() {
             let mut readers = Vec::new();
             for path in &self.input {
                 readers.push(load_reader(Some(path), self.batch_size)?);
