@@ -228,45 +228,63 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
     Ok(())
 }
 
-fn run_recursive(args: &EncodeCommand) -> Result<()> {
-    let args = args.to_owned();
-    let dir = args.input.as_directory()?;
-
-    let regex_str = if args.input.batch_encoding_options.paired {
+/// Build the regex pattern for filtering input files
+fn build_file_regex(paired: bool) -> Result<Regex> {
+    let regex_str = if paired {
         r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
     } else {
         r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
     };
+    Ok(Regex::new(regex_str)?)
+}
 
-    let regex = Regex::new(regex_str)?;
+/// Filter paths based on regex and file type (regular file or FIFO)
+fn filter_valid_paths<I>(paths: I, regex: &Regex) -> Result<Vec<PathBuf>>
+where
+    I: Iterator<Item = PathBuf>,
+{
+    paths
+        .filter(|path| {
+            let path_str = path.to_string_lossy();
+            if !regex.is_match(&path_str) {
+                return false;
+            }
 
-    let mut fqueue = vec![];
-    info!("Processing files in directory: {}", dir.display());
+            // Check if it's a regular file or FIFO
+            match path.metadata() {
+                Ok(metadata) => {
+                    let file_type = metadata.file_type();
+                    file_type.is_file() || file_type.is_fifo()
+                }
+                Err(_) => false,
+            }
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(Ok)
+        .collect()
+}
 
-    let dir_walker = if let Some(max_depth) = args.input.recursion.depth {
-        WalkDir::new(dir).max_depth(max_depth)
-    } else {
-        WalkDir::new(dir)
-    };
-    for entry in dir_walker {
-        let entry = entry?;
-        let path = entry.path();
-        let path_str = path.to_string_lossy();
-        if regex.is_match(&path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
-            fqueue.push(path.to_owned());
-        }
-    }
-    if fqueue.is_empty() {
+/// Common logic for processing a list of file paths into a queue and executing
+fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<()> {
+    if file_queue.is_empty() {
         bail!("No files found");
     }
-    fqueue.sort_unstable();
 
+    let mut sorted_queue = file_queue;
+    sorted_queue.sort_unstable();
+
+    // Build the regex for output naming
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
+
+    // Pair or pull single files
     let pqueue = if args.input.batch_encoding_options.paired {
-        pair_r1_r2_files(&fqueue)
+        pair_r1_r2_files(&sorted_queue)
     } else {
-        pull_single_files(&fqueue)
+        pull_single_files(&sorted_queue)
     }?;
 
+    // Optionally collate
     let pqueue = if args.input.batch_encoding_options.collate {
         collate_groups(&pqueue)
     } else {
@@ -277,15 +295,39 @@ fn run_recursive(args: &EncodeCommand) -> Result<()> {
         bail!("No files found matching the expected pattern.");
     }
 
+    // Log what we found
     if args.input.batch_encoding_options.paired {
         info!("Total file pairs found: {}", pqueue.len());
     } else {
         info!("Total files found: {}", pqueue.len());
     }
 
-    process_queue(&args, pqueue, &regex)?;
+    process_queue(args, pqueue, &regex)
+}
 
-    Ok(())
+fn run_recursive(args: &EncodeCommand) -> Result<()> {
+    let args = args.to_owned();
+    let dir = args.input.as_directory()?;
+
+    info!("Processing files in directory: {}", dir.display());
+
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
+
+    let dir_walker = if let Some(max_depth) = args.input.recursion.depth {
+        WalkDir::new(dir).max_depth(max_depth)
+    } else {
+        WalkDir::new(dir)
+    };
+
+    let file_queue = filter_valid_paths(
+        dir_walker
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path().to_owned()),
+        &regex,
+    )?;
+
+    process_file_list(&args, file_queue)
 }
 
 fn run_manifest(args: &EncodeCommand) -> Result<()> {
@@ -293,101 +335,26 @@ fn run_manifest(args: &EncodeCommand) -> Result<()> {
         bail!("No manifest file provided");
     };
 
-    let regex_str = if args.input.batch_encoding_options.paired {
-        r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
-    } else {
-        r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
-    };
-    let regex = Regex::new(regex_str)?;
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
 
     let handle = File::open(manifest).map(BufReader::new)?;
-    let mut fqueue = vec![];
-    for line in handle.lines() {
-        let line = line?;
-        let path = PathBuf::from(line);
-        let path_str = path.to_string_lossy();
-        if regex.is_match(&path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
-            fqueue.push(path);
-        }
-    }
-    if fqueue.is_empty() {
-        bail!("No files found");
-    }
-    fqueue.sort_unstable();
+    let file_queue = filter_valid_paths(
+        handle
+            .lines()
+            .filter_map(|line| line.ok())
+            .map(PathBuf::from),
+        &regex,
+    )?;
 
-    let pqueue = if args.input.batch_encoding_options.paired {
-        pair_r1_r2_files(&fqueue)
-    } else {
-        pull_single_files(&fqueue)
-    }?;
-
-    let pqueue = if args.input.batch_encoding_options.collate {
-        collate_groups(&pqueue)
-    } else {
-        pqueue
-    };
-
-    if pqueue.is_empty() {
-        bail!("No files found matching the expected pattern.");
-    }
-
-    if args.input.batch_encoding_options.paired {
-        info!("Total file pairs found: {}", pqueue.len());
-    } else {
-        info!("Total files found: {}", pqueue.len());
-    }
-
-    process_queue(args, pqueue, &regex)?;
-
-    Ok(())
+    process_file_list(args, file_queue)
 }
 
 fn run_manifest_inline(args: &EncodeCommand) -> Result<()> {
-    let regex_str = if args.input.batch_encoding_options.paired {
-        r"_R[12](_[^.]*)?\.(?:fastq|fq|fasta|fa)(?:\.gz|\.zst)?$"
-    } else {
-        r"\.(fastq|fq|fasta|fa)(\.gz|\.zst)?$"
-    };
-    let regex = Regex::new(regex_str)?;
+    let regex = build_file_regex(args.input.batch_encoding_options.paired)?;
 
-    let mut fqueue = vec![];
-    for path in &args.input.input {
-        let path = PathBuf::from(path);
-        let path_str = path.to_string_lossy();
-        if regex.is_match(&path_str) && (path.metadata()?.file_type().is_fifo() || path.is_file()) {
-            fqueue.push(path);
-        }
-    }
-    if fqueue.is_empty() {
-        bail!("No files found");
-    }
-    fqueue.sort_unstable();
+    let file_queue = filter_valid_paths(args.input.input.iter().map(PathBuf::from), &regex)?;
 
-    let pqueue = if args.input.batch_encoding_options.paired {
-        pair_r1_r2_files(&fqueue)
-    } else {
-        pull_single_files(&fqueue)
-    }?;
-
-    let pqueue = if args.input.batch_encoding_options.collate {
-        collate_groups(&pqueue)
-    } else {
-        pqueue
-    };
-
-    if pqueue.is_empty() {
-        bail!("No files found matching the expected pattern.");
-    }
-
-    if args.input.batch_encoding_options.paired {
-        info!("Total file pairs found: {}", pqueue.len());
-    } else {
-        info!("Total files found: {}", pqueue.len());
-    }
-
-    process_queue(args, pqueue, &regex)?;
-
-    Ok(())
+    process_file_list(args, file_queue)
 }
 
 pub fn run(args: &EncodeCommand) -> Result<()> {
