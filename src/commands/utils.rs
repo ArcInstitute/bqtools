@@ -34,8 +34,12 @@ pub enum CompressionType {
     Zstd,
 }
 impl CompressionType {
-    pub fn is_compressed(self) -> bool {
-        !matches!(self, CompressionType::Uncompressed)
+    pub fn extension(&self) -> Option<&'static str> {
+        match self {
+            CompressionType::Uncompressed => None,
+            CompressionType::Gzip => Some("gz"),
+            CompressionType::Zstd => Some("zst"),
+        }
     }
 }
 

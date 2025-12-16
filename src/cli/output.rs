@@ -102,13 +102,13 @@ impl OutputFile {
         })?;
 
         // Construct the output file names
-        let r1_name = if self.compress.is_compressed() {
-            format!("{}_R1.{}.gz", prefix, format.extension())
+        let r1_name = if let Some(ext) = self.compress.extension() {
+            format!("{}_R1.{}.{}", prefix, format.extension(), ext)
         } else {
             format!("{}_R1.{}", prefix, format.extension())
         };
-        let r2_name = if self.compress.is_compressed() {
-            format!("{}_R2.{}.gz", prefix, format.extension())
+        let r2_name = if let Some(ext) = self.compress.extension() {
+            format!("{}_R2.{}.{}", prefix, format.extension(), ext)
         } else {
             format!("{}_R2.{}", prefix, format.extension())
         };
