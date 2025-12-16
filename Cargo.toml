@@ -30,7 +30,7 @@ paraseq = "0.4.7"
 parking_lot = "0.12.5"
 rand = "0.9.2"
 regex = "1.12.2"
-sassy = { version = "0.1.9", optional = true }
+sassy = { version = "0.1.10", optional = true }
 serde = { version = "1.0.228", features = ["derive"] }
 walkdir = "2.5.0"
 zstd = { version = "0.13.3", features = ["zstdmt"] }
