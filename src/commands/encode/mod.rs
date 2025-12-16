@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 
 use regex::Regex;
 use walkdir::WalkDir;
@@ -300,6 +300,10 @@ fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<(
         info!("Total file pairs found: {}", pqueue.len());
     } else {
         info!("Total files found: {}", pqueue.len());
+    }
+
+    if pqueue.len() > 1 && args.output.output.is_some() {
+        warn!("Output path specified but ignored when batch encoding multiple files.")
     }
 
     process_queue(args, pqueue, &regex)
