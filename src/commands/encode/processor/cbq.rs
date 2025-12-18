@@ -89,6 +89,10 @@ impl<W: Write + Send> CbqEncoder<W> {
         self.writer.header().has_headers()
     }
 
+    fn has_qualities(&self) -> bool {
+        self.writer.header().has_qualities()
+    }
+
     /// Finish the global writer
     pub fn finish(&self) -> anyhow::Result<()> {
         self.global_writer.lock().finish()
@@ -100,8 +104,14 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for CbqEncoder<
         let seq = &record.seq();
         let rec = SequencingRecordBuilder::default()
             .s_seq(seq)
-            .opt_s_qual(record.qual())
-            .opt_s_header(self.has_headers().then(|| record.id()))
+            .opt_s_qual(
+                self.has_qualities().then_some(
+                    record
+                        .qual()
+                        .expect("Missing quality scores when expecting them"),
+                ),
+            )
+            .opt_s_header(self.has_headers().then_some(record.id()))
             .build()?;
 
         self.writer.push(rec)?;
@@ -126,10 +136,16 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for CbqEn
         let rec = SequencingRecordBuilder::default()
             .s_seq(s_seq)
             .x_seq(x_seq)
-            .opt_s_qual(r1.qual())
-            .opt_x_qual(r2.qual())
-            .opt_s_header(self.has_headers().then(|| r1.id()))
-            .opt_x_header(self.has_headers().then(|| r2.id()))
+            .opt_s_qual(
+                self.has_qualities()
+                    .then_some(r1.qual().expect("Expecting quality for R1")),
+            )
+            .opt_x_qual(
+                self.has_qualities()
+                    .then_some(r2.qual().expect("Expecting quality for R2")),
+            )
+            .opt_s_header(self.has_headers().then_some(r1.id()))
+            .opt_x_header(self.has_headers().then_some(r2.id()))
             .build()?;
 
         self.writer.push(rec)?;
