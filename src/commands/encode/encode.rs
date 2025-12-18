@@ -10,7 +10,7 @@ use crate::{
     cli::{BinseqMode, OutputBinseq},
     commands::{
         encode::{
-            processor::{BinseqProcessor, VBinseqProcessor},
+            processor::{BqEncoder, VbqEncoder},
             utils::{get_interleaved_sequence_len, get_sequence_len},
         },
         match_output,
@@ -90,7 +90,7 @@ fn encode_collection_bq(
         .bitsize(config.bitsize)
         .flags(false)
         .build()?;
-    let mut processor = BinseqProcessor::new(header, config.policy, output)?;
+    let mut processor = BqEncoder::new(header, config.policy, output)?;
     process_collection(collection, &mut processor, config.threads)?;
 
     let num_records = processor.get_global_record_count();
@@ -124,7 +124,7 @@ fn encode_collection_vbq(
         .headers(config.headers)
         .flags(false)
         .build();
-    let mut processor = VBinseqProcessor::new(header, config.policy, output)?;
+    let mut processor = VbqEncoder::new(header, config.policy, output)?;
     process_collection(collection, &mut processor, config.threads)?;
     processor.finish()?;
 
@@ -206,7 +206,7 @@ fn encode_htslib_bq(
         .flags(false)
         .build()?;
     let reader = htslib::Reader::from_path(inpath)?;
-    let mut processor = BinseqProcessor::new(header, config.policy, output)?;
+    let mut processor = BqEncoder::new(header, config.policy, output)?;
     if paired {
         reader.process_parallel_interleaved(&mut processor, config.threads)
     } else {
@@ -239,7 +239,7 @@ fn encode_htslib_vbq(
         .flags(false)
         .build();
     let reader = htslib::Reader::from_path(inpath)?;
-    let mut processor = VBinseqProcessor::new(header, config.policy, output)?;
+    let mut processor = VbqEncoder::new(header, config.policy, output)?;
     if paired {
         reader.process_parallel_interleaved(&mut processor, config.threads)
     } else {

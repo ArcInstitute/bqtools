@@ -48,6 +48,9 @@ pub fn run(args: &CountCommand) -> Result<()> {
             BinseqReader::Vbq(ref vbq_reader) => {
                 log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?;
             }
+            BinseqReader::Cbq(_) => {
+                unimplemented!("Count is not implemented yet for CBQ")
+            }
         }
     }
     Ok(())

@@ -9,7 +9,7 @@ use binseq::{
 use log::{error, trace};
 use memmap2::MmapOptions;
 
-use crate::{cli::CatCommand, commands::encode::processor::VBinseqProcessor};
+use crate::{cli::CatCommand, commands::encode::processor::VbqEncoder};
 
 fn strip_header(path: &str) -> Result<BinseqHeader> {
     let reader = MmapReader::new(path)?;
@@ -39,6 +39,7 @@ fn is_all_bq(paths: &[String]) -> Result<bool> {
         match reader {
             BinseqReader::Bq(_) => all_vbq = false,
             BinseqReader::Vbq(_) => all_bq = false,
+            BinseqReader::Cbq(_) => unimplemented!("Cat is not implemented yet for CBQ"),
         }
     }
     match (all_bq, all_vbq) {
@@ -85,7 +86,7 @@ fn record_vbq_header(paths: &[String]) -> Result<VBinseqHeader> {
 fn run_vbq(args: CatCommand) -> Result<()> {
     let out_handle = args.output.as_writer()?;
     let header = record_vbq_header(&args.input.input)?;
-    let processor = VBinseqProcessor::new(header, args.output.policy.into(), out_handle)?;
+    let processor = VbqEncoder::new(header, args.output.policy.into(), out_handle)?;
     for path in args.input.input {
         let reader = vbq::MmapReader::new(&path)?;
         reader.process_parallel(processor.clone(), args.output.threads())?;
