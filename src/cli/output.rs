@@ -157,9 +157,9 @@ pub struct OutputBinseq {
     #[clap(short = 'S', long, default_value = "2")]
     bitsize: u8,
 
-    /// Include sequence names (headers) in the vbq file
+    /// Exclude sequence names (headers) in the vbq file
     #[clap(short = 'H', long)]
-    pub headers: bool,
+    skip_headers: bool,
 
     /// Skip ZSTD compression of VBQ blocks (default: compressed)
     ///
@@ -222,6 +222,14 @@ impl OutputBinseq {
         } else {
             // STDOUT
             Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn headers(&self) -> bool {
+        if self.archive {
+            true
+        } else {
+            !self.skip_headers
         }
     }
 
@@ -319,18 +327,21 @@ impl From<PolicyWrapper> for Policy {
 #[derive(Debug, Clone, Copy, ValueEnum, Default, PartialEq)]
 pub enum BinseqMode {
     #[clap(name = "bq")]
-    Binseq,
+    Bq,
     #[clap(name = "vbq")]
     #[default]
-    VBinseq,
+    Vbq,
+    #[clap(name = "cbq")]
+    Cbq,
 }
 impl BinseqMode {
     pub fn determine(path: &str) -> Result<Self> {
         let pathbuf = Path::new(path);
         if let Some(ext) = pathbuf.extension() {
             match ext.to_str() {
-                Some("bq") => Ok(Self::Binseq),
-                Some("vbq") => Ok(Self::VBinseq),
+                Some("bq") => Ok(Self::Bq),
+                Some("vbq") => Ok(Self::Vbq),
+                Some("cbq") => Ok(Self::Cbq),
                 _ => bail!("Could not determine BINSEQ output mode from path: {path}"),
             }
         } else {
@@ -339,8 +350,9 @@ impl BinseqMode {
     }
     pub fn extension(&self) -> &str {
         match self {
-            Self::Binseq => ".bq",
-            Self::VBinseq => ".vbq",
+            Self::Bq => ".bq",
+            Self::Vbq => ".vbq",
+            Self::Cbq => ".cbq",
         }
     }
 }

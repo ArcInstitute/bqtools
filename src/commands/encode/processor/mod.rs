@@ -3,6 +3,7 @@ mod cbq;
 mod vbq;
 
 pub use bq::BqEncoder;
+pub use cbq::CbqEncoder;
 pub use vbq::VbqEncoder;
 
 /// Default capacity for the buffer used by the processor.
