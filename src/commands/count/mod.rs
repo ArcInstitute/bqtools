@@ -19,51 +19,71 @@ fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
 
 fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: bool) -> Result<()> {
     let header = reader.header();
+    let index = reader.load_index()?;
 
     if print_index {
-        let index = reader.load_index()?;
         index.pprint();
     } else {
         let bitsize: u8 = header.bits.into();
-        println!("Format Version    : {}", header.format);
-        println!("Bitsize           : {bitsize}");
-        println!("Paired            : {}", header.paired);
-        println!("Compression:      : {}", header.compressed);
-        println!("Quality:          : {}", header.qual);
-        println!("Headers:          : {}", header.headers);
-        println!("Flags             : {}", header.flags);
-        println!("Number of records : {num_records}");
+        let block_size = pprint_block_size(header.block as f64);
+        println!("-------------------------------");
+        println!("             File              ");
+        println!("-------------------------------");
+        println!("Format              : VBQ");
+        println!("Version             : {}", header.format);
+        println!("-------------------------------");
+        println!("           Metadata            ");
+        println!("-------------------------------");
+        println!("Bits per Nucleotide : {}", bitsize);
+        println!("Paired              : {}", header.is_paired());
+        println!("Quality:            : {}", header.qual);
+        println!("Headers:            : {}", header.headers);
+        println!("Flags               : {}", header.flags);
+        println!("-------------------------------");
+        println!("          Compression          ");
+        println!("-------------------------------");
+        println!("Virtual Block Size  : {}", block_size);
+        println!("-------------------------------");
+        println!("            Data               ");
+        println!("-------------------------------");
+        println!("Number of blocks    : {}", index.n_blocks());
+        println!("Number of records   : {num_records}");
     }
     Ok(())
 }
 
-fn log_reader_cbq(reader: &cbq::MmapReader, num_records: usize) -> Result<()> {
+fn log_reader_cbq(reader: &cbq::MmapReader, num_records: usize, print_index: bool) -> Result<()> {
     let header = reader.header();
-    let block_size = pprint_block_size(header.block_size as f64);
-    let avg_block_size = pprint_block_size(reader.index().average_block_size());
-    println!("-------------------------------");
-    println!("             File              ");
-    println!("-------------------------------");
-    println!("Format              : CBQ");
-    println!("Version             : {}", header.version);
-    println!("-------------------------------");
-    println!("           Metadata            ");
-    println!("-------------------------------");
-    println!("Paired              : {}", header.is_paired());
-    println!("Quality:            : {}", header.has_qualities());
-    println!("Headers:            : {}", header.has_headers());
-    println!("Flags               : {}", header.has_flags());
-    println!("-------------------------------");
-    println!("          Compression          ");
-    println!("-------------------------------");
-    println!("Compression Level   : {}", header.compression_level);
-    println!("Virtual Block Size  : {block_size}");
-    println!("Mean Block Size     : {avg_block_size}");
-    println!("-------------------------------");
-    println!("            Data               ");
-    println!("-------------------------------");
-    println!("Number of blocks    : {}", reader.num_blocks());
-    println!("Number of records   : {num_records}");
+    if print_index {
+        let index = reader.index();
+        index.pprint();
+    } else {
+        let block_size = pprint_block_size(header.block_size as f64);
+        let avg_block_size = pprint_block_size(reader.index().average_block_size());
+        println!("-------------------------------");
+        println!("             File              ");
+        println!("-------------------------------");
+        println!("Format              : CBQ");
+        println!("Version             : {}", header.version);
+        println!("-------------------------------");
+        println!("           Metadata            ");
+        println!("-------------------------------");
+        println!("Paired              : {}", header.is_paired());
+        println!("Quality:            : {}", header.has_qualities());
+        println!("Headers:            : {}", header.has_headers());
+        println!("Flags               : {}", header.has_flags());
+        println!("-------------------------------");
+        println!("          Compression          ");
+        println!("-------------------------------");
+        println!("Compression Level   : {}", header.compression_level);
+        println!("Virtual Block Size  : {block_size}");
+        println!("Mean Block Size     : {avg_block_size}");
+        println!("-------------------------------");
+        println!("            Data               ");
+        println!("-------------------------------");
+        println!("Number of blocks    : {}", reader.num_blocks());
+        println!("Number of records   : {num_records}");
+    }
     Ok(())
 }
 
@@ -99,7 +119,7 @@ pub fn run(args: &CountCommand) -> Result<()> {
                 log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?;
             }
             BinseqReader::Cbq(ref cbq_reader) => {
-                log_reader_cbq(cbq_reader, num_records)?;
+                log_reader_cbq(cbq_reader, num_records, args.opts.show_index)?;
             }
         }
     }
