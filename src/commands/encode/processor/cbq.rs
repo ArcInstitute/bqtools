@@ -38,9 +38,10 @@ impl<W: Write + Send> Clone for CbqEncoder<W> {
 impl<W: Write + Send> CbqEncoder<W> {
     pub fn new(header: FileHeader, inner: W) -> binseq::Result<Self> {
         let writer =
-            ColumnarBlockWriter::new_headless(Vec::with_capacity(DEFAULT_CAPACITY), header);
+            ColumnarBlockWriter::new_headless(Vec::with_capacity(DEFAULT_CAPACITY), header)?;
         let global_writer =
             ColumnarBlockWriter::new(inner, header).map(|w| Arc::new(Mutex::new(w)))?;
+
         Ok(Self {
             writer,
             global_writer,
@@ -94,7 +95,7 @@ impl<W: Write + Send> CbqEncoder<W> {
     }
 
     /// Finish the global writer
-    pub fn finish(&self) -> anyhow::Result<()> {
+    pub fn finish(&self) -> binseq::Result<()> {
         self.global_writer.lock().finish()
     }
 }
@@ -104,17 +105,19 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for CbqEncoder<
         let seq = &record.seq();
         let rec = SequencingRecordBuilder::default()
             .s_seq(seq)
-            .opt_s_qual(
-                self.has_qualities().then_some(
-                    record
-                        .qual()
-                        .expect("Missing quality scores when expecting them"),
-                ),
-            )
+            .opt_s_qual(self.has_qualities().then(|| {
+                record
+                    .qual()
+                    .expect("Missing quality scores when expecting them")
+            }))
             .opt_s_header(self.has_headers().then_some(record.id()))
-            .build()?;
+            .build()
+            .map_err(IntoProcessError::into_process_error)?;
 
-        self.writer.push(rec)?;
+        self.writer
+            .push(rec)
+            .map_err(IntoProcessError::into_process_error)?;
+
         self.record_count += 1;
 
         Ok(())
@@ -138,17 +141,21 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for CbqEn
             .x_seq(x_seq)
             .opt_s_qual(
                 self.has_qualities()
-                    .then_some(r1.qual().expect("Expecting quality for R1")),
+                    .then(|| r1.qual().expect("Expecting quality for R1")),
             )
             .opt_x_qual(
                 self.has_qualities()
-                    .then_some(r2.qual().expect("Expecting quality for R2")),
+                    .then(|| r2.qual().expect("Expecting quality for R2")),
             )
             .opt_s_header(self.has_headers().then_some(r1.id()))
             .opt_x_header(self.has_headers().then_some(r2.id()))
-            .build()?;
+            .build()
+            .map_err(IntoProcessError::into_process_error)?;
 
-        self.writer.push(rec)?;
+        self.writer
+            .push(rec)
+            .map_err(IntoProcessError::into_process_error)?;
+
         self.record_count += 1;
 
         Ok(())

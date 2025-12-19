@@ -26,6 +26,7 @@ pub struct Config {
     bitsize: BitSize,
     headers: bool,
     threads: usize,
+    compression_level: i32,
 }
 impl From<OutputBinseq> for Config {
     fn from(output: OutputBinseq) -> Self {
@@ -37,6 +38,7 @@ impl From<OutputBinseq> for Config {
             bitsize: output.bitsize(),
             headers: output.headers(),
             threads: output.threads(),
+            compression_level: output.level,
         }
     }
 }
@@ -155,6 +157,8 @@ fn encode_collection_cbq(
         .with_qualities(quality)
         .is_paired(paired)
         .with_headers(config.headers)
+        .with_block_size(config.block_size)
+        .with_compression_level(config.compression_level as usize)
         .with_flags(false)
         .build();
     let mut processor = CbqEncoder::new(header, output)?;
@@ -301,6 +305,7 @@ fn encode_htslib_cbq(
         .with_qualities(config.quality)
         .is_paired(paired)
         .with_headers(config.headers)
+        .with_block_size(config.block_size)
         .with_flags(false)
         .build();
 
