@@ -8,15 +8,16 @@ A command-line utility for working with BINSEQ files.
 ## Overview
 
 bqtools provides tools to encode, decode, manipulate, and analyze [BINSEQ](https://github.com/arcinstitute/binseq) files.
-It supports both (`*.bq`) and (`*.vbq`) files and makes use of the [`binseq`](https://crates.io/crates/binseq) library.
+It supports all BINSEQ variants (`*.bq`, `*.cbq`, `*.vbq`) and makes use of the [`binseq`](https://crates.io/crates/binseq) library.
 
 BINSEQ is a binary file format family designed for high-performance processing of DNA sequences.
 It currently has two variants: BQ and VBQ.
 
-- **BQ (\*.bq)**: Optimized for _fixed-length_ DNA sequences **without** quality scores.
-- **VBQ (\*.vbq)**: Optimized for _variable-length_ DNA sequences **with optional** quality scores.
+- **BQ (\*.bq)**: Optimized for _fixed-length_ DNA sequences **without** quality scores (2bit/4bit).
+- **VBQ (\*.vbq)**: Optimized for _variable-length_ DNA sequences **with optional** quality scores, headers with 2bit/4bit.
+- **CBQ (\*.cbq)**: Optimized for _variable-length_ DNA sequences **with optional** quality scores, headers with 2bit + N.
 
-Both support single and paired sequences and make use of two-bit or four-bit encoding for efficient nucleotide packing using [`bitnuc`](https://crates.io/crates/bitnuc) and efficient parallel FASTX processing using [`paraseq`](https://crates.io/crates/paraseq).
+All support single and paired sequences and make use of two-bit or four-bit encoding for efficient nucleotide packing using [`bitnuc`](https://crates.io/crates/bitnuc) and efficient parallel FASTX processing using [`paraseq`](https://crates.io/crates/paraseq).
 
 For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/content/10.1101/2025.04.08.647863v1) where we describe the format family and its applications.
 
@@ -25,7 +26,7 @@ For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/co
 - **Encode**: Convert FASTA or FASTQ files to a BINSEQ format
 - **Decode**: Convert a BINSEQ file back to FASTA, FASTQ, or TSV format
 - **Cat**: Concatenate multiple BINSEQ files
-- **Count**: Count records in a BINSEQ file
+- **Info**: Show information and statistics about a BINSEQ file.
 - **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
 - **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ.
 
@@ -96,7 +97,9 @@ bqtools --help
 bqtools encode --help
 bqtools decode --help
 bqtools cat --help
-bqtools count --help
+bqtools info --help
+bqtools grep --help
+bqtools pipe --help
 ```
 
 ### Encoding
@@ -236,12 +239,18 @@ Combine multiple BINSEQ files:
 bqtools cat file1.bq file2.bq file3.bq -o combined.bq
 ```
 
-### Counting
+### Information and Statistics
 
-Count records in a BINSEQ file:
+Show information and statistics about a BINSEQ file.
 
 ```bash
-bqtools count input.bq
+bqtools info input.cbq
+
+# print out the VBQ index
+bqtools info input.vbq --show-index
+
+# print out the CBQ block headers
+bqtools info input.cbq --show-headers
 ```
 
 ### Grep
