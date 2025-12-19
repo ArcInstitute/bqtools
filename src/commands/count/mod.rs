@@ -1,5 +1,5 @@
 use anyhow::Result;
-use binseq::{bq, vbq, BinseqReader};
+use binseq::{bq, cbq, vbq, BinseqReader};
 
 use crate::cli::CountCommand;
 
@@ -37,6 +37,56 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
     Ok(())
 }
 
+fn log_reader_cbq(reader: &cbq::MmapReader, num_records: usize) -> Result<()> {
+    let header = reader.header();
+    let block_size = pprint_block_size(header.block_size as f64);
+    let avg_block_size = pprint_block_size(reader.index().average_block_size());
+    println!("-------------------------------");
+    println!("             File              ");
+    println!("-------------------------------");
+    println!("Format              : CBQ");
+    println!("Version             : {}", header.version);
+    println!("-------------------------------");
+    println!("           Metadata            ");
+    println!("-------------------------------");
+    println!("Paired              : {}", header.is_paired());
+    println!("Quality:            : {}", header.has_qualities());
+    println!("Headers:            : {}", header.has_headers());
+    println!("Flags               : {}", header.has_flags());
+    println!("-------------------------------");
+    println!("          Compression          ");
+    println!("-------------------------------");
+    println!("Compression Level   : {}", header.compression_level);
+    println!("Virtual Block Size  : {block_size}");
+    println!("Mean Block Size     : {avg_block_size}");
+    println!("-------------------------------");
+    println!("            Data               ");
+    println!("-------------------------------");
+    println!("Number of blocks    : {}", reader.num_blocks());
+    println!("Number of records   : {num_records}");
+    Ok(())
+}
+
+fn pprint_block_size<T>(block_size: T) -> String
+where
+    T: Into<f64> + Copy,
+{
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * KB;
+    const GB: f64 = MB * KB;
+
+    let block_size = block_size.into();
+    if block_size < KB {
+        format!("{block_size} bytes")
+    } else if block_size < MB {
+        format!("{:.2} KB", block_size / KB)
+    } else if block_size < GB {
+        format!("{:.2} MB", block_size / MB)
+    } else {
+        format!("{:.2} GB", block_size / GB)
+    }
+}
+
 pub fn run(args: &CountCommand) -> Result<()> {
     let reader = BinseqReader::new(args.input.path())?;
     let num_records = reader.num_records()?;
@@ -48,8 +98,8 @@ pub fn run(args: &CountCommand) -> Result<()> {
             BinseqReader::Vbq(ref vbq_reader) => {
                 log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?;
             }
-            BinseqReader::Cbq(_) => {
-                unimplemented!("Count is not implemented yet for CBQ")
+            BinseqReader::Cbq(ref cbq_reader) => {
+                log_reader_cbq(cbq_reader, num_records)?;
             }
         }
     }
