@@ -1,7 +1,7 @@
 use anyhow::Result;
 use binseq::{bq, cbq, vbq, BinseqReader};
 
-use crate::cli::CountCommand;
+use crate::cli::InfoCommand;
 
 fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
     let header = reader.header();
@@ -116,7 +116,7 @@ where
     }
 }
 
-pub fn run(args: &CountCommand) -> Result<()> {
+pub fn run(args: &InfoCommand) -> Result<()> {
     let reader = BinseqReader::new(args.input.path())?;
     let num_records = reader.num_records()?;
     if args.opts.num {

@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         Commands::Encode(ref encode) => commands::encode::run(encode),
         Commands::Decode(ref decode) => commands::decode::run(decode),
         Commands::Cat(cat) => commands::cat::run(cat),
-        Commands::Count(ref count) => commands::count::run(count),
+        Commands::Info(ref info) => commands::info::run(info),
         Commands::Grep(ref grep) => commands::grep::run(grep),
         Commands::Sample(ref sample) => commands::sample::run(sample),
         Commands::Pipe(ref pipe) => commands::pipe::run(pipe),

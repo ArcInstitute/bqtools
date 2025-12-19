@@ -1,10 +1,10 @@
 mod cat;
 mod cli;
-mod count;
 mod decode;
 mod encode;
 mod formats;
 mod grep;
+mod info;
 mod input;
 mod output;
 mod pipe;
@@ -12,11 +12,11 @@ mod sample;
 
 pub use cat::CatCommand;
 pub use cli::{Cli, Commands};
-pub use count::CountCommand;
 pub use decode::DecodeCommand;
 pub use encode::EncodeCommand;
 pub use formats::FileFormat;
 pub use grep::GrepCommand;
+pub use info::InfoCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
 pub use output::{BinseqMode, Mate, OutputBinseq, OutputFile};
 pub use pipe::PipeCommand;

@@ -1,8 +1,8 @@
 pub mod cat;
-pub mod count;
 pub mod decode;
 pub mod encode;
 pub mod grep;
+pub mod info;
 pub mod pipe;
 pub mod sample;
 mod utils;
