@@ -22,4 +22,8 @@ pub struct CountOpts {
     /// Print the index of the file
     #[clap(long)]
     pub show_index: bool,
+
+    /// Print the block headers of the file
+    #[clap(long, conflicts_with = "show_index")]
+    pub show_headers: bool,
 }
