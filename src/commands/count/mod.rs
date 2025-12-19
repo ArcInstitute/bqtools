@@ -52,11 +52,20 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
     Ok(())
 }
 
-fn log_reader_cbq(reader: &cbq::MmapReader, num_records: usize, print_index: bool) -> Result<()> {
+fn log_reader_cbq(
+    reader: &cbq::MmapReader,
+    num_records: usize,
+    print_index: bool,
+    print_block_headers: bool,
+) -> Result<()> {
     let header = reader.header();
     if print_index {
         let index = reader.index();
         index.pprint();
+    } else if print_block_headers {
+        for header in reader.iter_block_headers() {
+            println!("{:?}", header?);
+        }
     } else {
         let block_size = pprint_block_size(header.block_size as f64);
         let avg_block_size = pprint_block_size(reader.index().average_block_size());
@@ -119,7 +128,12 @@ pub fn run(args: &CountCommand) -> Result<()> {
                 log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?;
             }
             BinseqReader::Cbq(ref cbq_reader) => {
-                log_reader_cbq(cbq_reader, num_records, args.opts.show_index)?;
+                log_reader_cbq(
+                    cbq_reader,
+                    num_records,
+                    args.opts.show_index,
+                    args.opts.show_headers,
+                )?;
             }
         }
     }
