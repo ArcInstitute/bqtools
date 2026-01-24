@@ -329,9 +329,9 @@ pub enum BinseqMode {
     #[clap(name = "bq")]
     Bq,
     #[clap(name = "vbq")]
-    #[default]
     Vbq,
     #[clap(name = "cbq")]
+    #[default]
     Cbq,
 }
 impl BinseqMode {
