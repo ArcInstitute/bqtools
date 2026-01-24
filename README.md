@@ -21,6 +21,21 @@ All support single and paired sequences and make use of two-bit or four-bit enco
 
 For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/content/10.1101/2025.04.08.647863v1) where we describe the format family and its applications.
 
+### Description of variants
+
+> TL;DR: `*.cbq` is the recommended format for most applications.
+
+For most applications the BINSEQ variant of choice is `*.cbq`.
+This format is lossless by default and supports variable-length sequences.
+It achieves better compression than `*.vbq` and `*.bq` by using blocked-columnar compression of sequence attributes.
+It can optionally exclude quality scores and headers (but they are included by default).
+For an overview of the format check out the [BINSEQ docs](https://docs.rs/binseq/latest/binseq/cbq/index.html).
+
+If your application _only requires sequences_ and has _fixed-length_ reads then `*.bq` is the best choice.
+It is the _fastest_ variant but _is lossy_ by design.
+
+> Note: `*.vbq` was originally designed for variable-length sequences with quality scores and headers, but it is now deprecated in favor of `*.cbq` which is more compressable, lossless, and has faster decoding.
+
 ## Features
 
 - **Encode**: Convert FASTA or FASTQ files to a BINSEQ format
