@@ -1,22 +1,21 @@
 use std::{fs::File, io::Write};
 
 use anyhow::{bail, Result};
-use binseq::{
-    bq::{BinseqHeader, MmapReader, SIZE_HEADER},
-    vbq::{self, VBinseqHeader},
-    BinseqReader, ParallelReader,
-};
-use log::{error, trace};
+use binseq::{bq, cbq, vbq, BinseqReader, BinseqWriterBuilder, ParallelReader};
+use log::{error, trace, warn};
 use memmap2::MmapOptions;
 
-use crate::{cli::CatCommand, commands::encode::processor::VbqEncoder};
+use crate::{
+    cli::{BinseqMode, CatCommand},
+    commands::encode::processor::Encoder,
+};
 
-fn strip_header(path: &str) -> Result<BinseqHeader> {
-    let reader = MmapReader::new(path)?;
+fn strip_header(path: &str) -> Result<bq::FileHeader> {
+    let reader = bq::MmapReader::new(path)?;
     Ok(reader.header())
 }
 
-fn recover_header(paths: &[String]) -> Result<BinseqHeader> {
+fn recover_header(paths: &[String]) -> Result<bq::FileHeader> {
     let mut exp_header = None;
     for path in paths {
         let header = strip_header(path)?;
@@ -31,32 +30,30 @@ fn recover_header(paths: &[String]) -> Result<BinseqHeader> {
     exp_header.ok_or_else(|| anyhow::anyhow!("No input files."))
 }
 
-fn is_all_bq(paths: &[String]) -> Result<bool> {
-    let mut all_bq = true;
-    let mut all_vbq = true;
+fn determine_mode(paths: &[String]) -> Result<BinseqMode> {
+    let mut mode = None;
     for path in paths {
         let reader = BinseqReader::new(path)?;
-        match reader {
-            BinseqReader::Bq(_) => all_vbq = false,
-            BinseqReader::Vbq(_) => all_bq = false,
-            BinseqReader::Cbq(_) => unimplemented!("Cat is not implemented yet for CBQ"),
+        if mode.is_none() {
+            mode = match reader {
+                BinseqReader::Bq(_) => Some(BinseqMode::Bq),
+                BinseqReader::Vbq(_) => Some(BinseqMode::Vbq),
+                BinseqReader::Cbq(_) => Some(BinseqMode::Cbq),
+            };
+            trace!("Initializing Mode {:?} for path: {}", mode.unwrap(), path);
+        } else {
+            match (mode, reader) {
+                (Some(BinseqMode::Bq), BinseqReader::Bq(_)) => (),
+                (Some(BinseqMode::Vbq), BinseqReader::Vbq(_)) => (),
+                (Some(BinseqMode::Cbq), BinseqReader::Cbq(_)) => (),
+                _ => bail!(
+                    "Inconsistent modes found, expecting the same BINSEQ mode for all input files."
+                ),
+            }
+            trace!("Mode {:?} for path: {}", mode.unwrap(), path);
         }
     }
-    match (all_bq, all_vbq) {
-        (true, true) => bail!("No input files."),
-        (true, false) => {
-            trace!("All BQ files");
-            Ok(true)
-        } // all bq files
-        (false, true) => {
-            trace!("All VBQ files");
-            Ok(false)
-        } // all vbq files
-        (false, false) => {
-            error!("Inconsistent file types. Must provide either all BQ or all VBQ files.");
-            bail!("Inconsistent file types.")
-        }
-    }
+    mode.ok_or_else(|| anyhow::anyhow!("No input files."))
 }
 
 fn run_bq(args: CatCommand) -> Result<()> {
@@ -67,28 +64,77 @@ fn run_bq(args: CatCommand) -> Result<()> {
     for path in args.input.input {
         let file = File::open(path)?;
         let mmap = unsafe { MmapOptions::new().map(&file)? };
-        out_handle.write_all(&mmap[SIZE_HEADER..])?;
+        out_handle.write_all(&mmap[bq::SIZE_HEADER..])?;
     }
     out_handle.flush()?;
 
     Ok(())
 }
 
-fn record_vbq_header(paths: &[String]) -> Result<VBinseqHeader> {
+fn record_vbq_header(paths: &[String]) -> Result<vbq::FileHeader> {
     if paths.is_empty() {
         bail!("No input files.");
     }
     let reader = vbq::MmapReader::new(&paths[0])?;
     let header = reader.header();
+    for path in &paths[1..] {
+        let reader = vbq::MmapReader::new(path)?;
+        if reader.header() != header {
+            error!("Inconsistent header found for path: {}", path);
+            warn!("Note: The first VBQ used in `cat` will be considered as the reference header. All subsequent VBQs must have the same header.");
+            bail!("Inconsistent header found for path: {}", path);
+        }
+    }
+    Ok(header)
+}
+
+fn record_cbq_header(paths: &[String]) -> Result<cbq::FileHeader> {
+    if paths.is_empty() {
+        bail!("No paths provided");
+    }
+    let reader = cbq::MmapReader::new(&paths[0])?;
+    let header = reader.header();
+    for path in &paths[1..] {
+        let reader = cbq::MmapReader::new(path)?;
+        if reader.header() != header {
+            error!("Inconsistent header found for path: {}", path);
+            warn!("Note: The first CBQ used in `cat` will be considered as the reference header. All subsequent CBQs must have the same header.");
+            bail!("Inconsistent header found for path: {}", path);
+        }
+    }
     Ok(header)
 }
 
 fn run_vbq(args: CatCommand) -> Result<()> {
-    let out_handle = args.output.as_writer()?;
+    // Initialize the expected header from the first file
     let header = record_vbq_header(&args.input.input)?;
-    let processor = VbqEncoder::new(header, args.output.policy.into(), out_handle)?;
+
+    // Initialize the output handle and writer
+    let ohandle = args.output.as_writer()?;
+    let writer = BinseqWriterBuilder::from_vbq_header(header).build(ohandle)?;
+
+    // Concatenate
+    let mut processor = Encoder::new(writer)?;
     for path in args.input.input {
-        let reader = vbq::MmapReader::new(&path)?;
+        let reader = BinseqReader::new(&path)?;
+        reader.process_parallel(processor.clone(), args.output.threads())?;
+    }
+    processor.finish()?;
+    Ok(())
+}
+
+fn run_cbq(args: CatCommand) -> Result<()> {
+    // Initialize the expected header from the first file
+    let header = record_cbq_header(&args.input.input)?;
+
+    // Initialize the output handle and writer
+    let ohandle = args.output.as_writer()?;
+    let writer = BinseqWriterBuilder::from_cbq_header(header).build(ohandle)?;
+
+    // Concatenate
+    let mut processor = Encoder::new(writer)?;
+    for path in args.input.input {
+        let reader = BinseqReader::new(&path)?;
         reader.process_parallel(processor.clone(), args.output.threads())?;
     }
     processor.finish()?;
@@ -96,9 +142,9 @@ fn run_vbq(args: CatCommand) -> Result<()> {
 }
 
 pub fn run(args: CatCommand) -> Result<()> {
-    if is_all_bq(&args.input.input)? {
-        run_bq(args)
-    } else {
-        run_vbq(args)
+    match determine_mode(&args.input.input)? {
+        BinseqMode::Bq => run_bq(args),
+        BinseqMode::Vbq => run_vbq(args),
+        BinseqMode::Cbq => run_cbq(args),
     }
 }

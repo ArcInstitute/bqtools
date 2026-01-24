@@ -356,6 +356,15 @@ impl BinseqMode {
         }
     }
 }
+impl Into<binseq::write::Format> for BinseqMode {
+    fn into(self) -> binseq::write::Format {
+        match self {
+            Self::Bq => binseq::write::Format::Bq,
+            Self::Vbq => binseq::write::Format::Vbq,
+            Self::Cbq => binseq::write::Format::Cbq,
+        }
+    }
+}
 
 fn parse_memory_size(input: &str) -> Result<usize, String> {
     let input = input.trim().to_uppercase();

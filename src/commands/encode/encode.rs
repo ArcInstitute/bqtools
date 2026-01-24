@@ -1,8 +1,8 @@
 use anyhow::{bail, Result};
-use binseq::{bq, cbq, vbq, BitSize, Policy};
+use binseq::{BinseqWriterBuilder, BitSize, Policy};
 use log::trace;
 use paraseq::{
-    fastx::{self, Format},
+    fastx::{self},
     prelude::{PairedParallelProcessor, ParallelProcessor},
 };
 
@@ -10,12 +10,12 @@ use crate::{
     cli::{BinseqMode, OutputBinseq},
     commands::{
         encode::{
-            processor::{BqEncoder, CbqEncoder, VbqEncoder},
+            processor::Encoder,
             utils::{get_interleaved_sequence_len, get_sequence_len},
         },
         match_output,
     },
-    types::{BoxedReader, BoxedWriter},
+    types::BoxedReader,
 };
 
 pub struct Config {
@@ -44,131 +44,65 @@ impl From<OutputBinseq> for Config {
 }
 
 pub fn encode_collection(
-    collection: fastx::Collection<BoxedReader>,
+    mut collection: fastx::Collection<BoxedReader>,
     opath: Option<&str>,
     mode: BinseqMode,
-    config: Config,
+    mut config: Config,
 ) -> Result<(usize, usize)> {
-    let mut writer = match_output(opath)?;
-    match mode {
-        BinseqMode::Bq => encode_collection_bq(collection, &mut writer, config),
-        BinseqMode::Vbq => encode_collection_vbq(collection, &mut writer, config),
-        BinseqMode::Cbq => encode_collection_cbq(collection, &mut writer, config),
-    }
-}
-
-fn encode_collection_bq(
-    mut collection: fastx::Collection<BoxedReader>,
-    output: &mut BoxedWriter,
-    config: Config,
-) -> Result<(usize, usize)> {
-    trace!("Encoding collection into bq");
-    // Get the sequence lengths
-    let (slen, xlen) = match collection.collection_type() {
-        fastx::CollectionType::Single => {
-            let inner = collection.inner_mut();
-            let slen = get_sequence_len(&mut inner[0])?;
-            (slen, 0)
+    if let Some(infmt) = collection.unique_format() {
+        if infmt == fastx::Format::Fasta {
+            config.quality = false;
         }
-        fastx::CollectionType::Paired => {
-            let inner = collection.inner_mut();
-            let slen = get_sequence_len(&mut inner[0])?;
-            let xlen = get_sequence_len(&mut inner[1])?;
-            (slen, xlen)
-        }
-        fastx::CollectionType::Interleaved => {
-            let inner = collection.inner_mut();
-            let (slen, xlen) = get_interleaved_sequence_len(&mut inner[0])?;
-            (slen, xlen)
-        }
-        _ => {
-            bail!("Unsupported collection type found in `encode_collection_bq`");
-        }
+    } else {
+        bail!("All input files must have the same format.");
     };
-    trace!("sequence length: slen={slen}, xlen={xlen}");
-
-    let header = bq::BinseqHeaderBuilder::new()
-        .slen(slen)
-        .xlen(xlen)
-        .bitsize(config.bitsize)
-        .flags(false)
-        .build()?;
-    let mut processor = BqEncoder::new(header, config.policy, output)?;
-    process_collection(collection, &mut processor, config.threads)?;
-
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
-
-    Ok((num_records, num_skipped))
-}
-
-fn encode_collection_vbq(
-    collection: fastx::Collection<BoxedReader>,
-    output: &mut BoxedWriter,
-    config: Config,
-) -> Result<(usize, usize)> {
-    let quality = match collection.unique_format() {
-        Some(Format::Fastq) | None => config.quality,
-        Some(Format::Fasta) => false, // never record quality for fasta
-    };
-    let paired = match collection.collection_type() {
-        fastx::CollectionType::Single => false,
-        fastx::CollectionType::Paired | fastx::CollectionType::Interleaved => true,
-        _ => {
-            bail!("Unsupported collection type passed to `encode_collection_vbq`")
-        }
-    };
-    let header = vbq::VBinseqHeaderBuilder::new()
-        .block(config.block_size as u64)
-        .qual(quality)
-        .compressed(config.compress)
-        .paired(paired)
-        .bitsize(config.bitsize)
+    let ohandle = match_output(opath)?;
+    let mut builder = BinseqWriterBuilder::new(mode.into())
+        .block_size(config.block_size)
+        .compression(config.compress)
+        .compression_level(config.compression_level)
         .headers(config.headers)
-        .flags(false)
-        .build();
-    let mut processor = VbqEncoder::new(header, config.policy, output)?;
-    process_collection(collection, &mut processor, config.threads)?;
-    processor.finish()?;
+        .quality(config.quality)
+        .policy(config.policy)
+        .bitsize(config.bitsize);
 
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
+    if !matches!(collection.collection_type(), fastx::CollectionType::Single) {
+        builder = builder.paired(true);
+    }
 
-    Ok((num_records, num_skipped))
-}
-
-fn encode_collection_cbq(
-    collection: fastx::Collection<BoxedReader>,
-    output: &mut BoxedWriter,
-    config: Config,
-) -> Result<(usize, usize)> {
-    let quality = match collection.unique_format() {
-        Some(Format::Fastq) | None => config.quality,
-        Some(Format::Fasta) => false, // never record quality for fasta
-    };
-    let paired = match collection.collection_type() {
-        fastx::CollectionType::Single => false,
-        fastx::CollectionType::Paired | fastx::CollectionType::Interleaved => true,
-        _ => {
-            bail!("Unsupported collection type passed to `encode_collection_cbq`")
+    // insert the slen and xlen on the builder for BQ
+    if matches!(mode, BinseqMode::Bq) {
+        match collection.collection_type() {
+            fastx::CollectionType::Single => {
+                let inner = collection.inner_mut();
+                let slen = get_sequence_len(&mut inner[0])?;
+                builder = builder.slen(slen as u32);
+            }
+            fastx::CollectionType::Paired => {
+                let inner = collection.inner_mut();
+                let slen = get_sequence_len(&mut inner[0])?;
+                let xlen = get_sequence_len(&mut inner[1])?;
+                builder = builder.slen(slen as u32).xlen(xlen as u32)
+            }
+            fastx::CollectionType::Interleaved => {
+                let inner = collection.inner_mut();
+                let (slen, xlen) = get_interleaved_sequence_len(&mut inner[0])?;
+                builder = builder.slen(slen as u32).xlen(xlen as u32)
+            }
+            _ => {
+                bail!("Unsupported collection type found in `encode_collection_bq`");
+            }
         }
-    };
-    let header = cbq::FileHeaderBuilder::default()
-        .with_qualities(quality)
-        .is_paired(paired)
-        .with_headers(config.headers)
-        .with_block_size(config.block_size)
-        .with_compression_level(config.compression_level as usize)
-        .with_flags(false)
-        .build();
-    let mut processor = CbqEncoder::new(header, output)?;
+    }
+    let writer = builder.build(ohandle)?;
+    let mut processor = super::processor::Encoder::new(writer)?;
     process_collection(collection, &mut processor, config.threads)?;
     processor.finish()?;
 
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
-
-    Ok((num_records, num_skipped))
+    Ok((
+        processor.get_global_record_count(),
+        processor.get_global_skip_count(),
+    ))
 }
 
 fn process_collection<P>(
@@ -215,69 +149,26 @@ pub fn encode_htslib(
     config: Config,
     paired: bool,
 ) -> Result<(usize, usize)> {
-    let mut writer = match_output(opath)?;
-    match mode {
-        BinseqMode::Bq => encode_htslib_bq(inpath, &mut writer, config, paired),
-        BinseqMode::Vbq => encode_htslib_vbq(inpath, &mut writer, config, paired),
-        BinseqMode::Cbq => encode_htslib_cbq(inpath, &mut writer, config, paired),
-    }
-}
-
-#[cfg(feature = "htslib")]
-fn encode_htslib_bq(
-    inpath: &str,
-    output: &mut BoxedWriter,
-    config: Config,
-    paired: bool,
-) -> Result<(usize, usize)> {
     use super::utils::get_sequence_len_htslib;
     use paraseq::{htslib, prelude::*};
 
-    trace!("Encoding htslib {inpath} into bq");
-
-    let (slen, xlen) = get_sequence_len_htslib(inpath, paired)?;
-    trace!("sequence length: slen={slen}, xlen={xlen}");
-    let header = bq::BinseqHeaderBuilder::new()
-        .slen(slen)
-        .xlen(xlen)
-        .bitsize(config.bitsize)
-        .flags(false)
-        .build()?;
-    let reader = htslib::Reader::from_path(inpath)?;
-    let mut processor = BqEncoder::new(header, config.policy, output)?;
-    if paired {
-        reader.process_parallel_interleaved(&mut processor, config.threads)
-    } else {
-        reader.process_parallel(&mut processor, config.threads)
-    }?;
-
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
-
-    Ok((num_records, num_skipped))
-}
-
-#[cfg(feature = "htslib")]
-fn encode_htslib_vbq(
-    inpath: &str,
-    output: &mut BoxedWriter,
-    config: Config,
-    paired: bool,
-) -> Result<(usize, usize)> {
-    use paraseq::{htslib, prelude::*};
-    trace!("Encoding htslib {inpath} into vbq");
-
-    let header = vbq::VBinseqHeaderBuilder::new()
-        .block(config.block_size as u64)
-        .qual(config.quality)
-        .compressed(config.compress)
-        .paired(paired)
-        .bitsize(config.bitsize)
+    let ohandle = match_output(opath)?;
+    let mut builder = BinseqWriterBuilder::new(mode.into())
+        .block_size(config.block_size)
+        .compression_level(config.compression_level)
         .headers(config.headers)
-        .flags(false)
-        .build();
+        .quality(config.quality)
+        .policy(config.policy)
+        .bitsize(config.bitsize)
+        .paired(paired);
+
+    if matches!(mode, BinseqMode::Bq) {
+        let (slen, xlen) = get_sequence_len_htslib(inpath, paired)?;
+        builder = builder.slen(slen).xlen(xlen);
+    }
     let reader = htslib::Reader::from_path(inpath)?;
-    let mut processor = VbqEncoder::new(header, config.policy, output)?;
+    let writer = builder.build(ohandle)?;
+    let mut processor = Encoder::new(writer)?;
     if paired {
         reader.process_parallel_interleaved(&mut processor, config.threads)
     } else {
@@ -285,41 +176,109 @@ fn encode_htslib_vbq(
     }?;
     processor.finish()?;
 
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
-
-    Ok((num_records, num_skipped))
+    Ok((
+        processor.get_global_record_count(),
+        processor.get_global_skip_count(),
+    ))
 }
 
-#[cfg(feature = "htslib")]
-fn encode_htslib_cbq(
-    inpath: &str,
-    output: &mut BoxedWriter,
-    config: Config,
-    paired: bool,
-) -> Result<(usize, usize)> {
-    use paraseq::{htslib, prelude::*};
-    trace!("Encoding htslib {inpath} into cbq");
+// #[cfg(feature = "htslib")]
+// fn encode_htslib_bq(
+//     inpath: &str,
+//     output: &mut BoxedWriter,
+//     config: Config,
+//     paired: bool,
+// ) -> Result<(usize, usize)> {
+//     use super::utils::get_sequence_len_htslib;
+//     use paraseq::{htslib, prelude::*};
 
-    let header = cbq::FileHeaderBuilder::default()
-        .with_qualities(config.quality)
-        .is_paired(paired)
-        .with_headers(config.headers)
-        .with_block_size(config.block_size)
-        .with_flags(false)
-        .build();
+//     trace!("Encoding htslib {inpath} into bq");
 
-    let reader = htslib::Reader::from_path(inpath)?;
-    let mut processor = CbqEncoder::new(header, output)?;
-    if paired {
-        reader.process_parallel_interleaved(&mut processor, config.threads)
-    } else {
-        reader.process_parallel(&mut processor, config.threads)
-    }?;
-    processor.finish()?;
+//     let (slen, xlen) = get_sequence_len_htslib(inpath, paired)?;
+//     trace!("sequence length: slen={slen}, xlen={xlen}");
+//     let header = bq::BinseqHeaderBuilder::new()
+//         .slen(slen)
+//         .xlen(xlen)
+//         .bitsize(config.bitsize)
+//         .flags(false)
+//         .build()?;
+//     let reader = htslib::Reader::from_path(inpath)?;
+//     let mut processor = BqEncoder::new(header, config.policy, output)?;
+//     if paired {
+//         reader.process_parallel_interleaved(&mut processor, config.threads)
+//     } else {
+//         reader.process_parallel(&mut processor, config.threads)
+//     }?;
 
-    let num_records = processor.get_global_record_count();
-    let num_skipped = processor.get_global_skipped_count();
+//     let num_records = processor.get_global_record_count();
+//     let num_skipped = processor.get_global_skipped_count();
 
-    Ok((num_records, num_skipped))
-}
+//     Ok((num_records, num_skipped))
+// }
+
+// #[cfg(feature = "htslib")]
+// fn encode_htslib_vbq(
+//     inpath: &str,
+//     output: &mut BoxedWriter,
+//     config: Config,
+//     paired: bool,
+// ) -> Result<(usize, usize)> {
+//     use paraseq::{htslib, prelude::*};
+//     trace!("Encoding htslib {inpath} into vbq");
+
+//     let header = vbq::VBinseqHeaderBuilder::new()
+//         .block(config.block_size as u64)
+//         .qual(config.quality)
+//         .compressed(config.compress)
+//         .paired(paired)
+//         .bitsize(config.bitsize)
+//         .headers(config.headers)
+//         .flags(false)
+//         .build();
+//     let reader = htslib::Reader::from_path(inpath)?;
+//     let mut processor = VbqEncoder::new(header, config.policy, output)?;
+//     if paired {
+//         reader.process_parallel_interleaved(&mut processor, config.threads)
+//     } else {
+//         reader.process_parallel(&mut processor, config.threads)
+//     }?;
+//     processor.finish()?;
+
+//     let num_records = processor.get_global_record_count();
+//     let num_skipped = processor.get_global_skipped_count();
+
+//     Ok((num_records, num_skipped))
+// }
+
+// #[cfg(feature = "htslib")]
+// fn encode_htslib_cbq(
+//     inpath: &str,
+//     output: &mut BoxedWriter,
+//     config: Config,
+//     paired: bool,
+// ) -> Result<(usize, usize)> {
+//     use paraseq::{htslib, prelude::*};
+//     trace!("Encoding htslib {inpath} into cbq");
+
+//     let header = cbq::FileHeaderBuilder::default()
+//         .with_qualities(config.quality)
+//         .is_paired(paired)
+//         .with_headers(config.headers)
+//         .with_block_size(config.block_size)
+//         .with_flags(false)
+//         .build();
+
+//     let reader = htslib::Reader::from_path(inpath)?;
+//     let mut processor = CbqEncoder::new(header, output)?;
+//     if paired {
+//         reader.process_parallel_interleaved(&mut processor, config.threads)
+//     } else {
+//         reader.process_parallel(&mut processor, config.threads)
+//     }?;
+//     processor.finish()?;
+
+//     let num_records = processor.get_global_record_count();
+//     let num_skipped = processor.get_global_skipped_count();
+
+//     Ok((num_records, num_skipped))
+// }
