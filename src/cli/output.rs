@@ -150,14 +150,20 @@ pub struct OutputBinseq {
     pub mode: Option<BinseqMode>,
 
     /// Policy for handling Ns in sequences
+    ///
+    /// Used by bq+vbq
     #[clap(short = 'p', long, default_value = "r")]
     pub policy: PolicyWrapper,
 
     /// Encoding bitsize (2 or 4 bits per nucleotide)
+    ///
+    /// Used by bq+vbq
     #[clap(short = 'S', long, default_value = "2")]
     bitsize: u8,
 
-    /// Exclude sequence names (headers) in the vbq file
+    /// Exclude sequence names (headers) in the binseq file
+    ///
+    /// Used by vbq+cbq
     #[clap(short = 'H', long)]
     skip_headers: bool,
 
@@ -169,13 +175,13 @@ pub struct OutputBinseq {
 
     /// Skip inclusion of quality scores (default: included)
     ///
-    /// Only used by vbq.
+    /// Used by vbq+cbq
     #[clap(short = 'Q', long)]
     pub skip_quality: bool,
 
-    /// VBQ virtual block size (in bytes)
+    /// Virtual block size (in bytes)
     ///
-    /// Only used by vbq
+    /// Used by vbq+cbq
     #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
     block_size: usize,
 
