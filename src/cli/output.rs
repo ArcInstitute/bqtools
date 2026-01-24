@@ -195,6 +195,8 @@ pub struct OutputBinseq {
     /// The compression level is between 1 and 22, with 3 being the default.
     /// Higher levels provide better compression at the cost of speed.
     /// Level 0 disables compression.
+    ///
+    /// Used by vbq+cbq
     #[clap(short, long, default_value = "3")]
     pub level: i32,
 
