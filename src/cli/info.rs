@@ -3,7 +3,7 @@ use clap::Parser;
 use super::InputBinseq;
 
 #[derive(Parser, Debug)]
-/// Count the number of records in a BINSEQ file.
+/// Show information about a BINSEQ file.
 pub struct InfoCommand {
     #[clap(flatten)]
     pub input: InputBinseq,
