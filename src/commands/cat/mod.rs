@@ -105,31 +105,18 @@ fn record_cbq_header(paths: &[String]) -> Result<cbq::FileHeader> {
     Ok(header)
 }
 
-fn run_vbq(args: CatCommand) -> Result<()> {
-    // Initialize the expected header from the first file
-    let header = record_vbq_header(&args.input.input)?;
-
-    // Initialize the output handle and writer
+fn run_cat(args: CatCommand, mode: BinseqMode) -> Result<()> {
+    // initialize output handle
     let ohandle = args.output.as_writer()?;
-    let writer = BinseqWriterBuilder::from_vbq_header(header).build(ohandle)?;
 
-    // Concatenate
-    let mut processor = Encoder::new(writer)?;
-    for path in args.input.input {
-        let reader = BinseqReader::new(&path)?;
-        reader.process_parallel(processor.clone(), args.output.threads())?;
-    }
-    processor.finish()?;
-    Ok(())
-}
-
-fn run_cbq(args: CatCommand) -> Result<()> {
-    // Initialize the expected header from the first file
-    let header = record_cbq_header(&args.input.input)?;
-
-    // Initialize the output handle and writer
-    let ohandle = args.output.as_writer()?;
-    let writer = BinseqWriterBuilder::from_cbq_header(header).build(ohandle)?;
+    // initialize writer
+    let writer = if matches!(mode, BinseqMode::Vbq) {
+        let header = record_vbq_header(&args.input.input)?;
+        BinseqWriterBuilder::from_vbq_header(header).build(ohandle)
+    } else {
+        let header = record_cbq_header(&args.input.input)?;
+        BinseqWriterBuilder::from_cbq_header(header).build(ohandle)
+    }?;
 
     // Concatenate
     let mut processor = Encoder::new(writer)?;
@@ -144,7 +131,7 @@ fn run_cbq(args: CatCommand) -> Result<()> {
 pub fn run(args: CatCommand) -> Result<()> {
     match determine_mode(&args.input.input)? {
         BinseqMode::Bq => run_bq(args),
-        BinseqMode::Vbq => run_vbq(args),
-        BinseqMode::Cbq => run_cbq(args),
+        BinseqMode::Vbq => run_cat(args, BinseqMode::Vbq),
+        BinseqMode::Cbq => run_cat(args, BinseqMode::Cbq),
     }
 }
