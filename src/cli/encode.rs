@@ -19,7 +19,7 @@ impl EncodeCommand {
         if let Some(mode) = self.output.mode {
             Ok(mode)
         } else if self.input.recursive {
-            Ok(BinseqMode::VBinseq)
+            Ok(BinseqMode::default())
         } else {
             self.output.mode()
         }

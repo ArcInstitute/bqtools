@@ -1,363 +1,182 @@
-use std::io::Write;
-use std::sync::Arc;
+use std::{io::Write, ops::AddAssign, sync::Arc};
 
-use anyhow::anyhow;
-use binseq::{
-    bq::{BinseqHeader, BinseqWriter, BinseqWriterBuilder},
-    vbq::{VBinseqHeader, VBinseqWriter, VBinseqWriterBuilder},
-    BinseqRecord, Policy,
-};
+use binseq::{BinseqWriter, SequencingRecordBuilder};
 use log::trace;
-use paraseq::{prelude::*, ProcessError};
+use paraseq::prelude::{IntoProcessError, PairedParallelProcessor, ParallelProcessor};
 use parking_lot::Mutex;
 
-/// Default capacity for the buffer used by the processor.
-const DEFAULT_CAPACITY: usize = 128 * 1024;
-
-/// Default debug interval for logging progress
+/// Default debug interval for logging progress (batches)
 const DEBUG_INTERVAL: usize = 1024;
 
-pub struct BinseqProcessor<W: Write + Send> {
-    /* Thread-local fields */
-    /// Encoder for the current thread
-    writer: BinseqWriter<Vec<u8>>,
-    /// Number of records written by this thread
-    record_count: usize,
-    /// Number of records skipped by this thread
-    skipped_count: usize,
-    /* Global fields */
-    /// Global writer for the entire process
-    global_writer: Arc<Mutex<BinseqWriter<W>>>,
-    /// Global counter for records written by all threads
-    global_record_count: Arc<Mutex<usize>>,
-    /// Global counter for records skipped by all threads
-    global_skipped_count: Arc<Mutex<usize>>,
+pub struct Encoder<W: Write + Send> {
+    /// Thread-local writer for the encoder.
+    t_writer: BinseqWriter<Vec<u8>>,
+    /// Thread-local record count for the encoder.
+    t_count: usize,
+    /// Thread-local skip count for the encoder.
+    t_skip: usize,
+
+    /// Global writer for the encoder.
+    writer: Arc<Mutex<BinseqWriter<W>>>,
+    /// Global record count for the encoder.
+    count: Arc<Mutex<usize>>,
+    /// Global skip count for the encoder.
+    skip: Arc<Mutex<usize>>,
     /// Debug interval for logging progress
     debug_interval: Arc<Mutex<usize>>,
 }
-
-impl<W: Write + Send> BinseqProcessor<W> {
-    pub fn new(header: BinseqHeader, policy: Policy, inner: W) -> binseq::Result<Self> {
-        let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
-        let writer = BinseqWriterBuilder::default()
-            .header(header)
-            .policy(policy)
-            .headless(true)
-            .build(local_inner)?;
-        let global_writer = BinseqWriterBuilder::default()
-            .header(header)
-            .policy(policy)
-            .build(inner)
-            .map(|w| Arc::new(Mutex::new(w)))?;
-        Ok(Self {
-            writer,
-            global_writer,
-            record_count: 0,
-            skipped_count: 0,
-            global_record_count: Arc::new(Mutex::new(0)),
-            global_skipped_count: Arc::new(Mutex::new(0)),
-            debug_interval: Arc::new(Mutex::new(0)),
-        })
-    }
-
-    /// Writes the current batch to the global writer.
-    ///
-    /// This function acquires a lock on the global writer and ingests the local buffer.
-    fn write_batch(&mut self) -> binseq::Result<()> {
-        // Aquire lock on global writer
-        let mut global = self.global_writer.lock();
-
-        // Ingestion clears the local buffer
-        global.ingest(&mut self.writer)?;
-
-        // Flush the global writer to avoid thread contention
-        global.flush()
-    }
-
-    /// Updates global counters
-    fn update_global_counters(&mut self) {
-        *self.global_record_count.lock() += self.record_count;
-        *self.global_skipped_count.lock() += self.skipped_count;
-        *self.debug_interval.lock() += 1;
-        self.record_count = 0;
-        self.skipped_count = 0;
-        if (*self.debug_interval.lock()).is_multiple_of(DEBUG_INTERVAL) {
-            trace!("Processed {} records", self.global_record_count.lock());
-        }
-    }
-
-    /// Get global number of records processed
-    pub fn get_global_record_count(&self) -> usize {
-        *self.global_record_count.lock()
-    }
-
-    /// Get global number of records skipped
-    pub fn get_global_skipped_count(&self) -> usize {
-        *self.global_skipped_count.lock()
-    }
-}
-impl<W: Write + Send> Clone for BinseqProcessor<W> {
+impl<W: Write + Send> Clone for Encoder<W> {
     fn clone(&self) -> Self {
         Self {
+            t_writer: self.t_writer.clone(),
+            t_count: self.t_count.clone(),
+            t_skip: self.t_skip.clone(),
             writer: self.writer.clone(),
-            global_writer: self.global_writer.clone(),
-            record_count: self.record_count,
-            skipped_count: self.skipped_count,
-            global_record_count: self.global_record_count.clone(),
-            global_skipped_count: self.global_skipped_count.clone(),
+            count: self.count.clone(),
+            skip: self.skip.clone(),
             debug_interval: self.debug_interval.clone(),
         }
     }
 }
-
-impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for BinseqProcessor<W> {
-    fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
-        if self
-            .writer
-            .write_record(None, &record.seq())
-            .map_err(IntoProcessError::into_process_error)?
-        {
-            self.record_count += 1;
-        } else {
-            self.skipped_count += 1;
-        }
-
-        // implicitly skip the record if encoding fails
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
-        self.update_global_counters();
-        self.write_batch()
-            .map_err(IntoProcessError::into_process_error)?;
-        Ok(())
-    }
-}
-
-impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for BinseqProcessor<W> {
-    fn process_record_pair(&mut self, record1: Rf, record2: Rf) -> paraseq::Result<()> {
-        if self
-            .writer
-            .write_paired_record(None, &record1.seq(), &record2.seq())
-            .map_err(IntoProcessError::into_process_error)?
-        {
-            self.record_count += 1;
-        } else {
-            self.skipped_count += 1;
-        }
-
-        // implicitly skip the record if encoding fails
-        Ok(())
-    }
-
-    fn on_batch_complete(&mut self) -> paraseq::Result<()> {
-        self.update_global_counters();
-        self.write_batch()
-            .map_err(IntoProcessError::into_process_error)?;
-        Ok(())
-    }
-}
-
-pub struct VBinseqProcessor<W: Write + Send> {
-    /* Thread-local fields */
-    /// Encoder for the current thread
-    writer: VBinseqWriter<Vec<u8>>,
-    /// Number of records written by this thread
-    record_count: usize,
-    /// Number of records skipped by this thread
-    skipped_count: usize,
-    /* Global fields */
-    /// Global writer for the entire process
-    global_writer: Arc<Mutex<VBinseqWriter<W>>>,
-    /// Global counter for records written by all threads
-    global_record_count: Arc<Mutex<usize>>,
-    /// Global counter for records skipped by all threads
-    global_skipped_count: Arc<Mutex<usize>>,
-    /// Debug interval for logging progress
-    debug_interval: Arc<Mutex<usize>>,
-}
-
-impl<W: Write + Send> VBinseqProcessor<W> {
-    pub fn new(header: VBinseqHeader, policy: Policy, inner: W) -> binseq::Result<Self> {
-        let local_inner = Vec::with_capacity(DEFAULT_CAPACITY);
-        let writer = VBinseqWriterBuilder::default()
-            .header(header)
-            .policy(policy)
-            .headless(true)
-            .build(local_inner)?;
-        let global_writer = VBinseqWriterBuilder::default()
-            .header(header)
-            .policy(policy)
-            .build(inner)
-            .map(|w| Arc::new(Mutex::new(w)))?;
+impl<W: Write + Send> Encoder<W> {
+    pub fn new(writer: BinseqWriter<W>) -> binseq::Result<Self> {
+        let t_writer = writer.new_headless_buffer()?;
         Ok(Self {
-            writer,
-            global_writer,
-            record_count: 0,
-            skipped_count: 0,
-            global_record_count: Arc::new(Mutex::new(0)),
-            global_skipped_count: Arc::new(Mutex::new(0)),
-            debug_interval: Arc::new(Mutex::new(0)),
+            writer: Arc::new(Mutex::new(writer)),
+            t_writer,
+            t_count: 0,
+            t_skip: 0,
+            count: Arc::new(Mutex::new(0)),
+            skip: Arc::new(Mutex::new(0)),
+            debug_interval: Arc::new(Mutex::new(DEBUG_INTERVAL)),
         })
     }
 
-    /// Writes the current batch to the global writer.
-    ///
-    /// This function acquires a lock on the global writer and ingests the local buffer.
     fn write_batch(&mut self) -> binseq::Result<()> {
-        // Aquire lock on global writer
-        let mut global = self.global_writer.lock();
-
-        // Ingestion clears the local buffer
-        global.ingest(&mut self.writer)?;
-
-        Ok(())
+        self.writer.lock().ingest(&mut self.t_writer)
     }
 
-    /// Updates global counters
     fn update_global_counters(&mut self) {
-        *self.global_record_count.lock() += self.record_count;
-        *self.global_skipped_count.lock() += self.skipped_count;
-        *self.debug_interval.lock() += 1;
-        self.record_count = 0;
-        self.skipped_count = 0;
-        if (*self.debug_interval.lock()).is_multiple_of(DEBUG_INTERVAL) {
-            trace!("Processed {} records", self.global_record_count.lock());
+        // update counts
+        {
+            self.count.lock().add_assign(self.t_count);
+            self.skip.lock().add_assign(self.t_skip);
+            self.debug_interval.lock().add_assign(1);
+        }
+        // reset local
+        {
+            self.t_count = 0;
+            self.t_skip = 0;
+        }
+        // handle debug interval
+        {
+            if (*self.debug_interval.lock()).is_multiple_of(DEBUG_INTERVAL) {
+                trace!(
+                    "Processed {} records; skipped {}",
+                    self.count.lock(),
+                    self.skip.lock()
+                );
+            }
         }
     }
 
-    /// Get global number of records processed
+    pub fn finish(&mut self) -> binseq::Result<()> {
+        self.writer.lock().finish()
+    }
+
     pub fn get_global_record_count(&self) -> usize {
-        *self.global_record_count.lock()
+        *self.count.lock()
     }
 
-    /// Get global number of records skipped
-    pub fn get_global_skipped_count(&self) -> usize {
-        *self.global_skipped_count.lock()
-    }
-
-    /// Finish the global writer
-    pub fn finish(&self) -> binseq::Result<()> {
-        self.global_writer.lock().finish()
-    }
-}
-impl<W: Write + Send> Clone for VBinseqProcessor<W> {
-    fn clone(&self) -> Self {
-        Self {
-            writer: self.writer.clone(),
-            global_writer: self.global_writer.clone(),
-            record_count: self.record_count,
-            skipped_count: self.skipped_count,
-            global_record_count: self.global_record_count.clone(),
-            global_skipped_count: self.global_skipped_count.clone(),
-            debug_interval: self.debug_interval.clone(),
-        }
+    pub fn get_global_skip_count(&self) -> usize {
+        *self.skip.lock()
     }
 }
 
-impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for VBinseqProcessor<W> {
+impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for Encoder<W> {
     fn process_record(&mut self, record: Rf) -> paraseq::Result<()> {
-        if self.writer.is_paired() {
-            return Err(ProcessError::from(anyhow!(
-                "Provided VBinseq Configuration is expecting paired records."
-            )));
-        }
-
-        let write_status = self
-            .writer
-            .write_record(None, Some(record.id()), &record.seq(), record.qual())
+        let seq = record.seq();
+        let rec = SequencingRecordBuilder::default()
+            .s_seq(&seq)
+            .opt_s_qual(record.qual())
+            .s_header(record.id())
+            .build()
             .map_err(IntoProcessError::into_process_error)?;
-
-        if write_status {
-            self.record_count += 1;
+        if self
+            .t_writer
+            .push(rec)
+            .map_err(IntoProcessError::into_process_error)?
+        {
+            self.t_count += 1;
         } else {
-            self.skipped_count += 1;
+            self.t_skip += 1;
         }
-
-        // implicitly skip the record if encoding fails
         Ok(())
     }
-
     fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(IntoProcessError::into_process_error)?;
-        Ok(())
+            .map_err(IntoProcessError::into_process_error)
     }
 }
 
-impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for VBinseqProcessor<W> {
+impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Encoder<W> {
     fn process_record_pair(&mut self, record1: Rf, record2: Rf) -> paraseq::Result<()> {
-        if !self.writer.is_paired() {
-            return Err(ProcessError::from(anyhow!(
-                "Provided VBinseq Configuration does not expect paired records."
-            )));
-        }
-
-        let write_status = self
-            .writer
-            .write_paired_record(
-                None,
-                Some(record1.id()),
-                &record1.seq(),
-                record1.qual(),
-                Some(record2.id()),
-                &record2.seq(),
-                record2.qual(),
-            )
+        let s_seq = record1.seq();
+        let x_seq = record2.seq();
+        let rec = SequencingRecordBuilder::default()
+            .s_seq(&s_seq)
+            .opt_s_qual(record1.qual())
+            .s_header(record1.id())
+            .x_seq(&x_seq)
+            .opt_x_qual(record2.qual())
+            .x_header(record2.id())
+            .build()
             .map_err(IntoProcessError::into_process_error)?;
-
-        if write_status {
-            self.record_count += 1;
+        if self
+            .t_writer
+            .push(rec)
+            .map_err(IntoProcessError::into_process_error)?
+        {
+            self.t_count += 1;
         } else {
-            self.skipped_count += 1;
+            self.t_skip += 1;
         }
-
-        // implicitly skip the record if encoding fails
         Ok(())
     }
-
     fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(IntoProcessError::into_process_error)?;
-        Ok(())
+            .map_err(IntoProcessError::into_process_error)
     }
 }
-
-impl<W: Write + Send> binseq::ParallelProcessor for VBinseqProcessor<W> {
-    fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        let write_status = if record.is_paired() {
-            self.writer.write_paired_record(
-                record.flag(),
-                Some(record.sheader()),
-                record.sseq(),
-                Some(record.squal()),
-                Some(record.xheader()),
-                record.xseq(),
-                Some(record.xqual()),
-            )
+impl<W: Write + Send> binseq::ParallelProcessor for Encoder<W> {
+    fn process_record<R: binseq::BinseqRecord>(&mut self, record: R) -> binseq::Result<()> {
+        let rec = if self.t_writer.is_paired() {
+            SequencingRecordBuilder::default()
+                .s_seq(record.sseq())
+                .opt_s_qual(record.has_quality().then(|| record.squal()))
+                .s_header(record.sheader())
+                .x_seq(record.xseq())
+                .opt_x_qual(record.has_quality().then(|| record.xqual()))
+                .x_header(record.xheader())
+                .build()?
         } else {
-            self.writer.write_record(
-                record.flag(),
-                Some(record.sheader()),
-                record.sseq(),
-                Some(record.squal()),
-            )
-        }?;
-
-        if write_status {
-            self.record_count += 1;
+            SequencingRecordBuilder::default()
+                .s_seq(record.sseq())
+                .opt_s_qual(record.has_quality().then(|| record.squal()))
+                .s_header(record.sheader())
+                .build()?
+        };
+        if self.t_writer.push(rec)? {
+            self.t_count += 1;
         } else {
-            self.skipped_count += 1;
+            self.t_skip += 1;
         }
-
         Ok(())
     }
-
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
         self.update_global_counters();
-        self.write_batch()?;
-        Ok(())
+        self.write_batch()
     }
 }

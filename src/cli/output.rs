@@ -150,16 +150,22 @@ pub struct OutputBinseq {
     pub mode: Option<BinseqMode>,
 
     /// Policy for handling Ns in sequences
+    ///
+    /// Used by bq+vbq
     #[clap(short = 'p', long, default_value = "r")]
     pub policy: PolicyWrapper,
 
     /// Encoding bitsize (2 or 4 bits per nucleotide)
+    ///
+    /// Used by bq+vbq
     #[clap(short = 'S', long, default_value = "2")]
     bitsize: u8,
 
-    /// Include sequence names (headers) in the vbq file
+    /// Exclude sequence names (headers) in the binseq file
+    ///
+    /// Used by vbq+cbq
     #[clap(short = 'H', long)]
-    pub headers: bool,
+    skip_headers: bool,
 
     /// Skip ZSTD compression of VBQ blocks (default: compressed)
     ///
@@ -169,13 +175,13 @@ pub struct OutputBinseq {
 
     /// Skip inclusion of quality scores (default: included)
     ///
-    /// Only used by vbq.
+    /// Used by vbq+cbq
     #[clap(short = 'Q', long)]
     pub skip_quality: bool,
 
-    /// VBQ virtual block size (in bytes)
+    /// Virtual block size (in bytes)
     ///
-    /// Only used by vbq
+    /// Used by vbq+cbq
     #[clap(short = 'B', long, value_parser = parse_memory_size, default_value = "128K")]
     block_size: usize,
 
@@ -189,6 +195,8 @@ pub struct OutputBinseq {
     /// The compression level is between 1 and 22, with 3 being the default.
     /// Higher levels provide better compression at the cost of speed.
     /// Level 0 disables compression.
+    ///
+    /// Used by vbq+cbq
     #[clap(short, long, default_value = "3")]
     pub level: i32,
 
@@ -222,6 +230,14 @@ impl OutputBinseq {
         } else {
             // STDOUT
             Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn headers(&self) -> bool {
+        if self.archive {
+            true
+        } else {
+            !self.skip_headers
         }
     }
 
@@ -319,18 +335,21 @@ impl From<PolicyWrapper> for Policy {
 #[derive(Debug, Clone, Copy, ValueEnum, Default, PartialEq)]
 pub enum BinseqMode {
     #[clap(name = "bq")]
-    Binseq,
+    Bq,
     #[clap(name = "vbq")]
+    Vbq,
+    #[clap(name = "cbq")]
     #[default]
-    VBinseq,
+    Cbq,
 }
 impl BinseqMode {
     pub fn determine(path: &str) -> Result<Self> {
         let pathbuf = Path::new(path);
         if let Some(ext) = pathbuf.extension() {
             match ext.to_str() {
-                Some("bq") => Ok(Self::Binseq),
-                Some("vbq") => Ok(Self::VBinseq),
+                Some("bq") => Ok(Self::Bq),
+                Some("vbq") => Ok(Self::Vbq),
+                Some("cbq") => Ok(Self::Cbq),
                 _ => bail!("Could not determine BINSEQ output mode from path: {path}"),
             }
         } else {
@@ -339,8 +358,18 @@ impl BinseqMode {
     }
     pub fn extension(&self) -> &str {
         match self {
-            Self::Binseq => ".bq",
-            Self::VBinseq => ".vbq",
+            Self::Bq => ".bq",
+            Self::Vbq => ".vbq",
+            Self::Cbq => ".cbq",
+        }
+    }
+}
+impl Into<binseq::write::Format> for BinseqMode {
+    fn into(self) -> binseq::write::Format {
+        match self {
+            Self::Bq => binseq::write::Format::Bq,
+            Self::Vbq => binseq::write::Format::Vbq,
+            Self::Cbq => binseq::write::Format::Cbq,
         }
     }
 }
