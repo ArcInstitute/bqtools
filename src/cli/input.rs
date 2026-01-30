@@ -285,6 +285,7 @@ impl Span {
                     end, max_records
                 );
             }
+            self.end = Some(end.min(max_records));
         }
         Ok(())
     }
