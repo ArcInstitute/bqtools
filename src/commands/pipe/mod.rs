@@ -6,7 +6,7 @@ use std::thread;
 
 use anyhow::Result;
 use binseq::BinseqReader;
-use log::info;
+use log::{info, warn};
 
 use crate::cli::{FileFormat, PipeCommand};
 use processor::PipeProcessor;
@@ -23,6 +23,10 @@ pub enum RecordPair {
 }
 
 pub fn run(args: &PipeCommand) -> Result<()> {
+    if args.input.span.is_some() {
+        warn!("Span is ignored when using pipe subcommand");
+    }
+
     let format = args.format()?;
     let reader = BinseqReader::new(args.input.path())?;
     let num_records = reader.num_records()?;

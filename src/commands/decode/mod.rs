@@ -59,7 +59,16 @@ pub fn run(args: &DecodeCommand) -> Result<()> {
         None
     };
     let proc = Decoder::new(writer, format, mate);
-    reader.process_parallel(proc.clone(), args.output.threads())?;
+    if let Some(mut span) = args.input.span {
+        let num_records = reader.num_records()?;
+        reader.process_parallel_range(
+            proc.clone(),
+            args.output.threads(),
+            span.get_range(num_records)?,
+        )?
+    } else {
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+    }
     let num_records = proc.num_records();
     info!("Processed {num_records} records...");
     Ok(())
