@@ -34,7 +34,8 @@ pub struct InputFile {
     #[clap(short, long)]
     pub batch_size: Option<usize>,
 
-    #[clap(short = 'I', long, help = "Interleaved input file format")]
+    /// Input is paired-interleaved
+    #[clap(short = 'I', long, conflicts_with = "paired")]
     pub interleaved: bool,
 
     /// Apply encoding to all fasta/fastq files in the provided directory input.
