@@ -1,6 +1,6 @@
 use super::{MatchRanges, PatternMatch};
 
-use sassy::{profiles::Dna, Searcher};
+use sassy::{profiles::Iupac, Searcher};
 
 type Patterns = Vec<Vec<u8>>;
 
@@ -12,7 +12,7 @@ pub struct FuzzyMatcher {
     k: usize,      // maximum edit distance to accept
     inexact: bool, // whether to only report inexact matches
     offset: usize, // Left-offset relevant for range matching
-    searcher: Searcher<Dna>,
+    searcher: Searcher<Iupac>,
 }
 
 impl FuzzyMatcher {
@@ -40,7 +40,7 @@ fn find_and_insert_matches(
     pat: &[u8],
     sequence: &[u8],
     matches: &mut MatchRanges,
-    searcher: &mut Searcher<Dna>,
+    searcher: &mut Searcher<Iupac>,
     k: usize,
     inexact: bool,
     offset: usize,
