@@ -342,6 +342,18 @@ bqtools grep input.bq --xfile patterns.txt
 bqtools grep input.bq --file patterns.txt -x
 ```
 
+You can count the number of matching records with `-C` or get the fraction of matching records with `--frac`:
+
+```bash
+# Count the number of matching records
+bqtools grep input.bq "ACGTACGT" -C
+
+# Count matching records and show fraction of total
+bqtools grep input.bq "ACGTACGT" -F
+```
+
+The output of `--frac` is a TSV with three columns: [Count, Total, Fraction]
+
 `bqtools` also introduces a new feature for the counting the occurrences of individual patterns.
 This is useful for seeing how many times each pattern occurs across a sequencing dataset without having to iterate over the dataset multiple times using traditional methods.
 
