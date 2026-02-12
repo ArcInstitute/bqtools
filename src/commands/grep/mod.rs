@@ -61,7 +61,16 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
 fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
     let counter = build_counter(args)?;
     let proc = PatternCountProcessor::new(counter, args.grep.range);
-    reader.process_parallel(proc.clone(), args.output.threads())?;
+    if let Some(mut span) = args.input.span {
+        let num_records = reader.num_records()?;
+        reader.process_parallel_range(
+            proc.clone(),
+            args.output.threads(),
+            span.get_range(num_records)?,
+        )?
+    } else {
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+    }
     proc.pprint_pattern_counts()?;
     Ok(())
 }
@@ -110,20 +119,32 @@ fn run_grep(
     format: FileFormat,
     mate: Option<Mate>,
 ) -> Result<()> {
+    let count = args.grep.count || args.grep.frac;
     let matcher = build_matcher(args)?;
     let proc = FilterProcessor::new(
         matcher,
         args.grep.and_logic(),
         args.grep.invert,
-        args.grep.count,
+        count,
+        args.grep.frac,
         args.grep.range,
         writer,
         format,
         mate,
         args.should_color(),
     );
-    reader.process_parallel(proc.clone(), args.output.threads())?;
-    if args.grep.count {
+
+    if let Some(mut span) = args.input.span {
+        let num_records = reader.num_records()?;
+        reader.process_parallel_range(
+            proc.clone(),
+            args.output.threads(),
+            span.get_range(num_records)?,
+        )?;
+    } else {
+        reader.process_parallel(proc.clone(), args.output.threads())?;
+    }
+    if count {
         proc.pprint_counts();
     }
 

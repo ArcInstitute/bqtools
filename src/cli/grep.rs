@@ -52,6 +52,13 @@ pub struct GrepArgs {
     #[clap(short = 'C', long, conflicts_with = "pattern_count")]
     pub count: bool,
 
+    /// Show match count as a fraction of total records
+    ///
+    /// Implies --count (-C). Displays the number of matches,
+    /// total records, and the fraction of records matching.
+    #[clap(short = 'F', long, conflicts_with = "pattern_count")]
+    pub frac: bool,
+
     /// Only match patterns that are within this range.
     ///
     /// Will not match if the pattern is outside the range or if

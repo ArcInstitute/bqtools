@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use log::debug;
+use log::{debug, error, warn};
 use paraseq::fastx;
 
 #[cfg(not(feature = "gcs"))]
@@ -34,7 +34,8 @@ pub struct InputFile {
     #[clap(short, long)]
     pub batch_size: Option<usize>,
 
-    #[clap(short = 'I', long, help = "Interleaved input file format")]
+    /// Input is paired-interleaved
+    #[clap(short = 'I', long, conflicts_with = "paired")]
     pub interleaved: bool,
 
     /// Apply encoding to all fasta/fastq files in the provided directory input.
@@ -242,6 +243,10 @@ pub struct BatchEncodingOptions {
 pub struct InputBinseq {
     #[clap(help = "Input binseq file")]
     pub input: String,
+
+    /// Span of records to process. If not specified, all records will be processed.
+    #[clap(long)]
+    pub span: Option<Span>,
 }
 impl InputBinseq {
     pub fn path(&self) -> &str {
@@ -255,4 +260,68 @@ pub struct MultiInputBinseq {
     /// Input binseq files
     #[clap(num_args = 1..)]
     pub input: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Span {
+    start: Option<usize>,
+    end: Option<usize>,
+}
+impl Span {
+    fn validate(&mut self, max_records: usize) -> Result<()> {
+        if let Some(start) = self.start {
+            if start > max_records {
+                error!(
+                    "Provided start ({}) exceeds maximum number of records ({})",
+                    start, max_records
+                );
+                bail!("Maximum number of records exceeded")
+            }
+        }
+        if let Some(end) = self.end {
+            if end > max_records {
+                warn!(
+                    "Clipping provided endpoint ({}) to maximum number of records ({})",
+                    end, max_records
+                );
+            }
+            self.end = Some(end.min(max_records));
+        }
+        Ok(())
+    }
+    pub fn get_range(&mut self, max_records: usize) -> Result<std::ops::Range<usize>> {
+        self.validate(max_records)?;
+        match (self.start, self.end) {
+            (Some(start), Some(end)) => Ok(start..end),
+            (Some(start), None) => Ok(start..max_records),
+            (None, Some(end)) => Ok(0..end),
+            (None, None) => Ok(0..max_records),
+        }
+    }
+}
+
+impl FromStr for Span {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (start_str, end_str) = s
+            .split_once("..")
+            .ok_or_else(|| format!("expected range like '10..20', got '{s}'"))?;
+
+        let parse_bound = |bound_str: &str, name: &str| {
+            if bound_str.is_empty() {
+                Ok(None)
+            } else {
+                bound_str
+                    .parse()
+                    .map(Some)
+                    .map_err(|_| format!("invalid {name}: '{bound_str}'"))
+            }
+        };
+
+        let start = parse_bound(start_str, "start")?;
+        let end = parse_bound(end_str, "end")?;
+
+        Ok(Self { start, end })
+    }
 }
