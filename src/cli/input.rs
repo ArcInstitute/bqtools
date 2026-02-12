@@ -304,25 +304,23 @@ impl FromStr for Span {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (start, end) = s
+        let (start_str, end_str) = s
             .split_once("..")
             .ok_or_else(|| format!("expected range like '10..20', got '{s}'"))?;
 
-        let start = if start.is_empty() {
-            None
-        } else {
-            Some(
-                start
+        let parse_bound = |bound_str: &str, name: &str| {
+            if bound_str.is_empty() {
+                Ok(None)
+            } else {
+                bound_str
                     .parse()
-                    .map_err(|_| format!("invalid start: '{start}'"))?,
-            )
+                    .map(Some)
+                    .map_err(|_| format!("invalid {name}: '{bound_str}'"))
+            }
         };
 
-        let end = if end.is_empty() {
-            None
-        } else {
-            Some(end.parse().map_err(|_| format!("invalid end: '{end}'"))?)
-        };
+        let start = parse_bound(start_str, "start")?;
+        let end = parse_bound(end_str, "end")?;
 
         Ok(Self { start, end })
     }
