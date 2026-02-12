@@ -1,6 +1,6 @@
 use super::PatternCount;
 
-use sassy::{profiles::Dna, Searcher};
+use sassy::{profiles::Iupac, Searcher};
 
 type Patterns = Vec<Vec<u8>>;
 #[derive(Clone)]
@@ -13,7 +13,7 @@ pub struct FuzzyPatternCounter {
     inexact: bool,  // whether to only report inexact matches
     invert: bool,   // invert the match
 
-    searcher: Searcher<Dna>,
+    searcher: Searcher<Iupac>,
 }
 
 impl FuzzyPatternCounter {
