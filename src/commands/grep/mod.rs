@@ -119,12 +119,14 @@ fn run_grep(
     format: FileFormat,
     mate: Option<Mate>,
 ) -> Result<()> {
+    let count = args.grep.count || args.grep.frac;
     let matcher = build_matcher(args)?;
     let proc = FilterProcessor::new(
         matcher,
         args.grep.and_logic(),
         args.grep.invert,
-        args.grep.count,
+        count,
+        args.grep.frac,
         args.grep.range,
         writer,
         format,
@@ -142,7 +144,7 @@ fn run_grep(
     } else {
         reader.process_parallel(proc.clone(), args.output.threads())?;
     }
-    if args.grep.count {
+    if count {
         proc.pprint_counts();
     }
 

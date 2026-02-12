@@ -25,11 +25,17 @@ pub struct FilterProcessor<Pm: PatternMatch> {
     /// Only count the number of matches
     count: bool,
 
+    /// Show count as fraction of total records
+    frac: bool,
+
     /// Match within range
     range: Option<SimpleRange>,
 
     /// Local count
     local_count: usize,
+
+    /// Local total records processed
+    local_total: usize,
 
     /// Local primary/extended sequence match indices
     smatches: MatchRanges,
@@ -54,6 +60,7 @@ pub struct FilterProcessor<Pm: PatternMatch> {
     /// Global values
     global_writer: Arc<Mutex<SplitWriter>>,
     global_count: Arc<Mutex<usize>>,
+    global_total: Arc<Mutex<usize>>,
 }
 impl<Pm: PatternMatch> FilterProcessor<Pm> {
     #[allow(clippy::fn_params_excessive_bools)]
@@ -63,6 +70,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
         and_logic: bool,
         invert: bool,
         count: bool,
+        frac: bool,
         range: Option<SimpleRange>,
         writer: SplitWriter,
         format: FileFormat,
@@ -82,6 +90,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
             and_logic,
             invert,
             count,
+            frac,
             range,
             format,
             mate,
@@ -89,7 +98,9 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
             is_split: writer.is_split(),
             global_writer: Arc::new(Mutex::new(writer)),
             local_count: 0,
+            local_total: 0,
             global_count: Arc::new(Mutex::new(0)),
+            global_total: Arc::new(Mutex::new(0)),
         }
     }
     pub fn clear_matches(&mut self) {
@@ -132,13 +143,26 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
         }
     }
     pub fn pprint_counts(&self) {
-        println!("{}", self.global_count.lock());
+        let count = *self.global_count.lock();
+        if self.frac {
+            let total = *self.global_total.lock();
+            let frac = if total > 0 {
+                count as f64 / total as f64
+            } else {
+                0.0
+            };
+            println!("count\ttotal\tfrac");
+            println!("{count}\t{total}\t{frac:.4}");
+        } else {
+            println!("{count}");
+        }
     }
 }
 
 impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
         self.clear_matches();
+        self.local_total += 1;
 
         let sbuf = record.sseq();
         let xbuf = record.xseq();
@@ -231,6 +255,10 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
         // Increment the global count and reset local
         *self.global_count.lock() += self.local_count;
         self.local_count = 0;
+
+        // Increment the global total and reset local
+        *self.global_total.lock() += self.local_total;
+        self.local_total = 0;
 
         Ok(())
     }
