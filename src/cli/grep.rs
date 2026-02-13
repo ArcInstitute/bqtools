@@ -79,6 +79,7 @@ pub struct GrepArgs {
     /// Denotes patterns are fixed strings (non-regex)
     ///
     /// Allows usage of Aho-Corasick algorithm for efficient matching.
+    /// This is auto-detected when all patterns are literal strings.
     #[clap(short = 'x', long)]
     pub fixed: bool,
 
