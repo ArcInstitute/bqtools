@@ -79,6 +79,7 @@ pub struct GrepArgs {
     /// Denotes patterns are fixed strings (non-regex)
     ///
     /// Allows usage of Aho-Corasick algorithm for efficient matching.
+    /// This is auto-detected when all patterns are literal strings.
     #[clap(short = 'x', long)]
     pub fixed: bool,
 
@@ -109,7 +110,46 @@ pub struct GrepArgs {
     pub file_args: PatternFileArgs,
 }
 
+/// Returns true if the pattern is a fixed DNA string (only ACGT).
+fn is_fixed(pattern: &str) -> bool {
+    !pattern.is_empty()
+        && pattern
+            .bytes()
+            .all(|b| matches!(b, b'A' | b'C' | b'G' | b'T'))
+}
+
 impl GrepArgs {
+    /// Returns true if all patterns (CLI and file) are fixed DNA strings.
+    pub fn all_patterns_fixed(&self) -> Result<bool> {
+        let all_cli_fixed = self
+            .reg
+            .iter()
+            .chain(self.reg1.iter())
+            .chain(self.reg2.iter())
+            .all(|p| is_fixed(p));
+        if !all_cli_fixed {
+            return Ok(false);
+        }
+
+        for filetype in [
+            PatternFileType::File,
+            PatternFileType::SFile,
+            PatternFileType::XFile,
+        ] {
+            if !self.file_args.empty_file(filetype)
+                && !self
+                    .file_args
+                    .read_file_patterns(filetype)?
+                    .iter()
+                    .all(|p| is_fixed(p))
+            {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.reg1.is_empty()
             && self.reg2.is_empty()
@@ -319,5 +359,44 @@ impl ColorWhen {
                 std::io::stdout().is_terminal()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_fixed;
+
+    #[test]
+    fn test_fixed_dna_strings() {
+        assert!(is_fixed("ACGTACGT"));
+        assert!(is_fixed("AAAAAAAAAA"));
+        assert!(is_fixed("ACGT"));
+    }
+
+    #[test]
+    fn test_empty_string() {
+        assert!(!is_fixed(""));
+    }
+
+    #[test]
+    fn test_iupac_ambiguity_codes() {
+        assert!(!is_fixed("ACGTNRYW"));
+        assert!(!is_fixed("ACGN"));
+    }
+
+    #[test]
+    fn test_lowercase_not_fixed() {
+        assert!(!is_fixed("acgt"));
+    }
+
+    #[test]
+    fn test_regex_patterns_not_fixed() {
+        assert!(!is_fixed("AC.GT"));
+        assert!(!is_fixed("AC[GT]"));
+        assert!(!is_fixed("A{3}"));
+        assert!(!is_fixed("^ACGT"));
+        assert!(!is_fixed("ACG|TGA"));
+        assert!(!is_fixed("(ACG)"));
+        assert!(!is_fixed("AC\\dGT"));
     }
 }

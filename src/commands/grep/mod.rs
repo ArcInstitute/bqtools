@@ -38,7 +38,12 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
         return Ok(PatternCounter::Fuzzy(counter));
     }
 
-    if args.grep.fixed {
+    let use_fixed = args.grep.fixed || args.grep.all_patterns_fixed()?;
+    if !args.grep.fixed && use_fixed {
+        log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
+    }
+
+    if use_fixed {
         let counter = AhoCorasickPatternCounter::new(
             args.grep.bytes_pat1()?,
             args.grep.bytes_pat2()?,
@@ -89,7 +94,12 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         return Ok(PatternMatcher::Fuzzy(matcher));
     }
 
-    if args.grep.fixed && !args.grep.and_logic() {
+    let use_fixed = args.grep.fixed || args.grep.all_patterns_fixed()?;
+    if !args.grep.fixed && use_fixed {
+        log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
+    }
+
+    if use_fixed && !args.grep.and_logic() {
         let matcher = AhoCorasickMatcher::new(
             args.grep.bytes_pat1()?,
             args.grep.bytes_pat2()?,
@@ -99,7 +109,7 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         )?;
         Ok(PatternMatcher::AhoCorasick(matcher))
     } else {
-        if args.grep.fixed {
+        if use_fixed {
             warn!("`-x/--fixed provided but ignored when using AND logic");
         }
         let matcher = RegexMatcher::new(
