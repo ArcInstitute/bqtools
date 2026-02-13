@@ -82,6 +82,15 @@ bqtools encode some.fq -o some.cbq
 bqtools encode some_R1.fq some_R2.fq -o some.cbq
 ```
 
+### Benchmarking Changes
+
+Make use of `hyperfine` (`cargo install hyperfine` if not already installed) to measure performance of binaries after changes.
+
+```bash
+# Measures decoding performance
+hyperfine --warmup 3 --runs 10 "bqtools decode some.cbq > /dev/null"
+```
+
 ## Contribution Guide
 
 When making changes, keep the following documentation in sync:
