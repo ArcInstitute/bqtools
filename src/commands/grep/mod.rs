@@ -24,6 +24,22 @@ use crate::{
 use anyhow::Result;
 use binseq::prelude::*;
 
+/// Returns true if the pattern is a fixed DNA string (only ACGT).
+fn is_fixed(pattern: &[u8]) -> bool {
+    !pattern.is_empty()
+        && pattern
+            .iter()
+            .all(|b| matches!(b, b'A' | b'C' | b'G' | b'T'))
+}
+
+/// Returns true if all patterns across multiple sets are fixed DNA strings.
+fn all_patterns_fixed(pattern_sets: &[&[Vec<u8>]]) -> bool {
+    pattern_sets
+        .iter()
+        .flat_map(|s| s.iter())
+        .all(|p| is_fixed(p))
+}
+
 fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
@@ -38,19 +54,17 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
         return Ok(PatternCounter::Fuzzy(counter));
     }
 
-    let use_fixed = args.grep.fixed || args.grep.all_patterns_fixed()?;
+    let pat1 = args.grep.bytes_pat1()?;
+    let pat2 = args.grep.bytes_pat2()?;
+    let pat = args.grep.bytes_pat()?;
+    let use_fixed = args.grep.fixed || all_patterns_fixed(&[&pat1, &pat2, &pat]);
     if !args.grep.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
     }
 
     if use_fixed {
-        let counter = AhoCorasickPatternCounter::new(
-            args.grep.bytes_pat1()?,
-            args.grep.bytes_pat2()?,
-            args.grep.bytes_pat()?,
-            args.grep.no_dfa,
-            args.grep.invert,
-        )?;
+        let counter =
+            AhoCorasickPatternCounter::new(pat1, pat2, pat, args.grep.no_dfa, args.grep.invert)?;
         Ok(PatternCounter::AhoCorasick(counter))
     } else {
         let counter = RegexPatternCounter::new(
@@ -94,16 +108,19 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         return Ok(PatternMatcher::Fuzzy(matcher));
     }
 
-    let use_fixed = args.grep.fixed || args.grep.all_patterns_fixed()?;
+    let pat1 = args.grep.bytes_pat1()?;
+    let pat2 = args.grep.bytes_pat2()?;
+    let pat = args.grep.bytes_pat()?;
+    let use_fixed = args.grep.fixed || all_patterns_fixed(&[&pat1, &pat2, &pat]);
     if !args.grep.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
     }
 
     if use_fixed && !args.grep.and_logic() {
         let matcher = AhoCorasickMatcher::new(
-            args.grep.bytes_pat1()?,
-            args.grep.bytes_pat2()?,
-            args.grep.bytes_pat()?,
+            pat1,
+            pat2,
+            pat,
             args.grep.no_dfa,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
@@ -176,5 +193,65 @@ pub fn run(args: &GrepCommand) -> Result<()> {
         run_pattern_count(args, reader)
     } else {
         run_grep(args, reader, writer, format, mate)
+    }
+}
+
+#[cfg(test)]
+mod fixed_detection_tests {
+    use super::{all_patterns_fixed, is_fixed};
+
+    #[test]
+    fn test_fixed_dna_strings() {
+        assert!(is_fixed(b"ACGTACGT"));
+        assert!(is_fixed(b"AAAAAAAAAA"));
+        assert!(is_fixed(b"ACGT"));
+    }
+
+    #[test]
+    fn test_empty_string() {
+        assert!(!is_fixed(b""));
+    }
+
+    #[test]
+    fn test_iupac_ambiguity_codes() {
+        assert!(!is_fixed(b"ACGTNRYW"));
+        assert!(!is_fixed(b"ACGN"));
+    }
+
+    #[test]
+    fn test_lowercase_not_fixed() {
+        assert!(!is_fixed(b"acgt"));
+    }
+
+    #[test]
+    fn test_regex_patterns_not_fixed() {
+        assert!(!is_fixed(b"AC.GT"));
+        assert!(!is_fixed(b"AC[GT]"));
+        assert!(!is_fixed(b"A{3}"));
+        assert!(!is_fixed(b"^ACGT"));
+        assert!(!is_fixed(b"ACG|TGA"));
+        assert!(!is_fixed(b"(ACG)"));
+        assert!(!is_fixed(b"AC\\dGT"));
+    }
+
+    #[test]
+    fn test_all_patterns_fixed() {
+        let p1 = vec![b"ACGT".to_vec(), b"TTTT".to_vec()];
+        let p2 = vec![b"GGGG".to_vec()];
+        assert!(all_patterns_fixed(&[&p1, &p2]));
+    }
+
+    #[test]
+    fn test_all_patterns_fixed_with_regex() {
+        let p1 = vec![b"ACGT".to_vec(), b"AC.GT".to_vec()];
+        let p2 = vec![b"GGGG".to_vec()];
+        assert!(!all_patterns_fixed(&[&p1, &p2]));
+    }
+
+    #[test]
+    fn test_all_patterns_fixed_empty_sets() {
+        let p1: Vec<Vec<u8>> = vec![];
+        let p2: Vec<Vec<u8>> = vec![];
+        assert!(all_patterns_fixed(&[&p1, &p2]));
     }
 }
