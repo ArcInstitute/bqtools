@@ -52,17 +52,35 @@ Build without defaults: `cargo build --no-default-features -F fuzzy,gcs`
 
 ### Core Dependencies
 
-| Crate | Role |
-|-------|------|
-| `binseq` | BINSEQ format read/write |
-| `bitnuc` | 2-bit/4-bit nucleotide encoding |
+| Crate     | Role                             |
+| --------- | -------------------------------- |
+| `binseq`  | BINSEQ format read/write         |
+| `bitnuc`  | 2-bit/4-bit nucleotide encoding  |
 | `paraseq` | Parallel FASTX/BINSEQ processing |
-| `clap` | CLI argument parsing (derive) |
-| `anyhow` | Error handling throughout |
+| `clap`    | CLI argument parsing (derive)    |
+| `anyhow`  | Error handling throughout        |
 
 ### Testing
 
 Integration tests live in `tests/`. `tests/common.rs` provides a builder (`write_fastx()`) for generating random FASTQ/FASTA test data with configurable compression (none, gzip, zstd). Tests use cartesian products over format/compression/mode combinations. Dev dependencies: `bon` (builder macro), `nucgen` (random sequences), `tempfile`, `itertools`.
+
+### Generating Test Data
+
+Random FASTQ/FASTA test data can be created on the CLI with `nucgen` (`cargo install nucgen` if not already installed).
+
+```bash
+# generates 10,000 reads of length 150
+nucgen -n 10000 -l 150 some.fq
+# generates 30,000 paired-reads of length 50 and 200
+nucgen -n 30000 -l 50 -L 200 some_R1.fq some_R2.fq
+```
+
+These can then be ingested with `bqtools encode`:
+
+```bash
+bqtools encode some.fq -o some.cbq
+bqtools encode some_R1.fq some_R2.fq -o some.cbq
+```
 
 ## Contribution Guide
 
