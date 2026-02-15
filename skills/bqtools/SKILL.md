@@ -192,14 +192,27 @@ bqtools decode sample.cbq -o r2_only.fq -m 2
 Search for DNA patterns directly in BINSEQ files — no decoding needed.
 
 **R1/R2 terminology**: In paired BINSEQ files, R1 is called "primary" and R2 is
-called "extended". This matters for flags:
+called "extended". This matters for how you specify patterns:
 
-- CLI patterns: `-r` = R1 only, `-R` = R2 only, bare positional = either
-- Pattern files: `--sfile` = R1 only, `--xfile` = R2 only, `--file` = either
+**For single patterns on the command line:**
+
+- Positional (no flag): `bqtools grep reads.cbq "PATTERN"` — searches either R1 or R2
+- `-r "PATTERN"` — searches R1 only (primary)
+- `-R "PATTERN"` — searches R2 only (extended)
+
+**For pattern files:**
+
+- `--file` = searches either R1 or R2
+- `--sfile` = R1 only (primary)
+- `--xfile` = R2 only (extended)
 
 ```bash
-# Find reads containing a sequence
+# Find reads containing a sequence (searches both R1 and R2)
 bqtools grep reads.cbq "AGATCGGAAGAGC"
+
+# Search only in R1 or R2 of paired data
+bqtools grep reads.cbq -r "PATTERN_IN_R1"
+bqtools grep reads.cbq -R "PATTERN_IN_R2"
 
 # Just count how many reads match
 bqtools grep reads.cbq "AGATCGGAAGAGC" -C
@@ -213,12 +226,11 @@ bqtools grep reads.cbq "AGATCGGAAGAGC" -o matches.fq
 # Search with a regex
 bqtools grep reads.cbq "ACGT[AC]{3,5}TCCA"
 
-# Search only in R1 or R2 of paired data
-bqtools grep reads.cbq -r "PATTERN_IN_R1"
-bqtools grep reads.cbq -R "PATTERN_IN_R2"
-
 # Multiple patterns (all must match by default)
 bqtools grep reads.cbq "PATTERN1" "PATTERN2"
+
+# Multiple patterns (all must match) with specific read positioning
+bqtools grep reads.cbq -r "PATTERN1" -r "PATTERN2" -R "PATTERN3"
 
 # Multiple patterns, any can match
 bqtools grep reads.cbq "PATTERN1" "PATTERN2" --or-logic
