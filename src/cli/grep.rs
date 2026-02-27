@@ -1,8 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use paraseq::fasta;
+use paraseq::{fasta, Record};
 
-use crate::{cli::FileFormat, commands::grep::SimpleRange};
+use crate::{
+    cli::FileFormat,
+    commands::grep::{Pattern, PatternCollection, SimpleRange},
+};
 
 use super::{InputBinseq, OutputFile};
 
@@ -122,51 +125,6 @@ impl GrepArgs {
         }
         Ok(())
     }
-    fn chain_regex(
-        &self,
-        cli_patterns: &[String],
-        filetype: PatternFileType,
-    ) -> Result<Vec<regex::bytes::Regex>> {
-        let mut all_patterns = cli_patterns
-            .iter()
-            .map(std::borrow::ToOwned::to_owned)
-            .collect::<Vec<String>>();
-        if !self.file_args.empty_file(filetype) {
-            all_patterns.extend(self.file_args.read_file_patterns(filetype)?);
-        }
-
-        // all patterns are kept separate for:
-        // 1. AND logic
-        // 2. Individual pattern counting
-        if self.and_logic() || self.pattern_count {
-            Ok(all_patterns
-                .iter()
-                .map(|s| {
-                    regex::bytes::Regex::new(s).expect("Could not build regex from pattern: {s}")
-                })
-                .collect())
-
-        // for OR logic they can be compiled into a single regex for performance
-        } else {
-            let global_pattern = all_patterns.join("|");
-            if global_pattern.is_empty() {
-                Ok(vec![])
-            } else {
-                Ok(vec![regex::bytes::Regex::new(&global_pattern).expect(
-                    "Could not build regex from pattern: {global_pattern}",
-                )])
-            }
-        }
-    }
-    pub fn bytes_reg1(&self) -> Result<Vec<regex::bytes::Regex>> {
-        self.chain_regex(&self.reg1, PatternFileType::SFile)
-    }
-    pub fn bytes_reg2(&self) -> Result<Vec<regex::bytes::Regex>> {
-        self.chain_regex(&self.reg2, PatternFileType::XFile)
-    }
-    pub fn bytes_reg(&self) -> Result<Vec<regex::bytes::Regex>> {
-        self.chain_regex(&self.reg, PatternFileType::File)
-    }
     pub fn and_logic(&self) -> bool {
         if self.file_args.empty() {
             !self.or_logic
@@ -178,27 +136,30 @@ impl GrepArgs {
 }
 
 impl GrepArgs {
-    fn chain_bytes(
+    fn chain_patterns(
         &self,
         cli_patterns: &[String],
         filetype: PatternFileType,
-    ) -> Result<Vec<Vec<u8>>> {
-        let bytes_iter = cli_patterns.iter().map(|s| s.as_bytes().to_vec());
+    ) -> Result<PatternCollection> {
+        let cli_iter = cli_patterns.iter().map(|s| Pattern {
+            name: None,
+            sequence: s.as_bytes().to_vec(),
+        });
         if self.file_args.empty_file(filetype) {
-            Ok(bytes_iter.collect())
+            Ok(PatternCollection(cli_iter.collect()))
         } else {
-            let patterns = self.file_args.patterns(filetype)?;
-            Ok(bytes_iter.chain(patterns).collect())
+            let file_patterns = self.file_args.patterns(filetype)?;
+            Ok(PatternCollection(cli_iter.chain(file_patterns).collect()))
         }
     }
-    pub fn bytes_pat1(&self) -> Result<Vec<Vec<u8>>> {
-        self.chain_bytes(&self.reg1, PatternFileType::SFile)
+    pub fn patterns_m1(&self) -> Result<PatternCollection> {
+        self.chain_patterns(&self.reg1, PatternFileType::SFile)
     }
-    pub fn bytes_pat2(&self) -> Result<Vec<Vec<u8>>> {
-        self.chain_bytes(&self.reg2, PatternFileType::XFile)
+    pub fn patterns_m2(&self) -> Result<PatternCollection> {
+        self.chain_patterns(&self.reg2, PatternFileType::XFile)
     }
-    pub fn bytes_pat(&self) -> Result<Vec<Vec<u8>>> {
-        self.chain_bytes(&self.reg, PatternFileType::File)
+    pub fn patterns(&self) -> Result<PatternCollection> {
+        self.chain_patterns(&self.reg, PatternFileType::File)
     }
 }
 
@@ -253,6 +214,7 @@ pub struct PatternFileArgs {
     #[clap(long)]
     pub xfile: Option<String>,
 }
+
 impl PatternFileArgs {
     pub(crate) fn empty(&self) -> bool {
         self.file.is_none() && self.sfile.is_none() && self.xfile.is_none()
@@ -284,56 +246,39 @@ impl PatternFileArgs {
         Ok(first_byte == Some(b'>'))
     }
 
-    /// Read sequences from a FASTA file.
-    fn read_fasta_sequences(path: &str) -> Result<Vec<Vec<u8>>> {
-        let mut reader = fasta::Reader::from_path(path)?;
-        let mut rset = fasta::RecordSet::default();
-        let mut sequences = Vec::new();
-
-        while rset.fill(&mut reader)? {
-            for record in rset.iter() {
-                let record = record?;
-                sequences.push(record.seq().into_owned());
-            }
-        }
-
-        Ok(sequences)
-    }
-
-    fn read_file(&self, filetype: PatternFileType) -> Result<String> {
-        let path = self.file_path(filetype)?;
-        Ok(std::fs::read_to_string(path)?)
-    }
-
-    fn read_file_patterns(&self, filetype: PatternFileType) -> Result<Vec<String>> {
-        let path = self.file_path(filetype)?;
+    /// Load patterns from a file, auto-detecting FASTA vs plain text.
+    fn load_patterns(path: &str) -> Result<Vec<Pattern>> {
         if Self::is_fasta(path)? {
-            let sequences = Self::read_fasta_sequences(path)?;
-            Ok(sequences
-                .into_iter()
-                .map(|s| String::from_utf8(s).expect("Non-UTF8 sequence in FASTA"))
-                .collect())
+            let mut reader = fasta::Reader::from_path(path)?;
+            let mut rset = fasta::RecordSet::default();
+            let mut patterns = Vec::new();
+
+            while rset.fill(&mut reader)? {
+                for record in rset.iter() {
+                    let record = record?;
+                    patterns.push(Pattern {
+                        name: Some(record.id_str().to_string()),
+                        sequence: record.seq().into_owned(),
+                    });
+                }
+            }
+
+            Ok(patterns)
         } else {
-            let contents = self.read_file(filetype)?;
+            let contents = std::fs::read_to_string(path)?;
             Ok(contents
                 .lines()
-                .map(std::string::ToString::to_string)
+                .map(|line| Pattern {
+                    name: None,
+                    sequence: line.as_bytes().to_vec(),
+                })
                 .collect())
         }
     }
 
-    fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {
+    fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Pattern>> {
         let path = self.file_path(filetype)?;
-        if Self::is_fasta(path)? {
-            Self::read_fasta_sequences(path)
-        } else {
-            let contents = self.read_file(filetype)?;
-            let mut patterns = Vec::new();
-            for line in contents.lines() {
-                patterns.push(line.as_bytes().to_vec());
-            }
-            Ok(patterns)
-        }
+        Self::load_patterns(path)
     }
 }
 

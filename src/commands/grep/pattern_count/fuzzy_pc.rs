@@ -110,4 +110,8 @@ impl PatternCount for FuzzyPatternCounter {
             })
             .collect()
     }
+
+    fn pattern_names(&self) -> Option<Vec<String>> {
+        unimplemented!()
+    }
 }

@@ -12,6 +12,8 @@ pub use fuzzy_pc::FuzzyPatternCounter;
 mod processor;
 pub use processor::PatternCountProcessor;
 
+use super::PatternCollection;
+
 pub trait PatternCount: Clone + Send + Sync {
     /// Counts the number of patterns in the given primary and secondary strings.
     ///
@@ -24,6 +26,10 @@ pub trait PatternCount: Clone + Send + Sync {
     fn num_patterns(&self) -> usize;
 
     fn pattern_strings(&self) -> Vec<String>;
+
+    /// Returns pattern names if available (e.g. from FASTA headers).
+    /// Returns None if no patterns have names.
+    fn pattern_names(&self) -> Option<Vec<String>>;
 }
 
 #[derive(Clone)]
@@ -66,19 +72,41 @@ impl PatternCount for PatternCounter {
             PatternCounter::Fuzzy(counter) => counter.pattern_strings(),
         }
     }
+
+    fn pattern_names(&self) -> Option<Vec<String>> {
+        match self {
+            PatternCounter::Regex(counter) => counter.pattern_names(),
+            PatternCounter::AhoCorasick(counter) => counter.pattern_names(),
+            #[cfg(feature = "fuzzy")]
+            PatternCounter::Fuzzy(counter) => counter.pattern_names(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod pattern_count_tests {
     use super::{AhoCorasickPatternCounter, PatternCount, RegexPatternCounter};
+    use crate::commands::grep::{Pattern, PatternCollection};
 
     #[cfg(feature = "fuzzy")]
     use super::FuzzyPatternCounter;
 
+    fn pc(patterns: &[&[u8]]) -> PatternCollection {
+        PatternCollection(
+            patterns
+                .iter()
+                .map(|p| Pattern {
+                    name: None,
+                    sequence: p.to_vec(),
+                })
+                .collect(),
+        )
+    }
+
     #[test]
     fn test_regex_pattern_counter_single_pattern() {
-        let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut counter = RegexPatternCounter::new(re1, vec![], vec![], false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false).unwrap();
 
         assert_eq!(counter.num_patterns(), 1);
 
@@ -93,12 +121,9 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_multiple_patterns() {
-        let re1 = vec![
-            regex::bytes::Regex::new("AAAA").unwrap(),
-            regex::bytes::Regex::new("TTTT").unwrap(),
-            regex::bytes::Regex::new("CCCC").unwrap(),
-        ];
-        let mut counter = RegexPatternCounter::new(re1, vec![], vec![], false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[b"AAAA", b"TTTT", b"CCCC"]), pc(&[]), pc(&[]), false)
+                .unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -115,8 +140,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_secondary() {
-        let re2 = vec![regex::bytes::Regex::new("TTTT").unwrap()];
-        let mut counter = RegexPatternCounter::new(vec![], re2, vec![], false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[]), pc(&[b"TTTT"]), pc(&[]), false).unwrap();
 
         let primary = b"GGGGAAAACCCC";
         let secondary = b"GGGGTTTTCCCC";
@@ -129,8 +154,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_either() {
-        let re = vec![regex::bytes::Regex::new("CCCC").unwrap()];
-        let mut counter = RegexPatternCounter::new(vec![], vec![], re, false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCC"]), false).unwrap();
 
         // Test match in primary
         let primary1 = b"GGGGCCCCTTTT";
@@ -156,8 +181,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_no_match() {
-        let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut counter = RegexPatternCounter::new(re1, vec![], vec![], false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false).unwrap();
 
         let primary = b"GGGGCCCCTTTT";
         let secondary = b"GGGGCCCCTTTT";
@@ -170,8 +195,7 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_invert() {
-        let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut counter = RegexPatternCounter::new(re1, vec![], vec![], true);
+        let mut counter = RegexPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), true).unwrap();
 
         // Sequence without pattern (should count when inverted)
         let primary1 = b"GGGGCCCCTTTT";
@@ -190,11 +214,9 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_combined_patterns() {
-        let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let re2 = vec![regex::bytes::Regex::new("TTTT").unwrap()];
-        let re = vec![regex::bytes::Regex::new("CCCC").unwrap()];
-
-        let mut counter = RegexPatternCounter::new(re1, re2, re, false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[b"AAAA"]), pc(&[b"TTTT"]), pc(&[b"CCCC"]), false)
+                .unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -211,11 +233,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_pattern_strings() {
-        let re1 = vec![
-            regex::bytes::Regex::new("AAAA").unwrap(),
-            regex::bytes::Regex::new("TTTT").unwrap(),
-        ];
-        let counter = RegexPatternCounter::new(re1, vec![], vec![], false);
+        let counter =
+            RegexPatternCounter::new(pc(&[b"AAAA", b"TTTT"]), pc(&[]), pc(&[]), false).unwrap();
 
         let patterns = counter.pattern_strings();
         assert_eq!(patterns.len(), 2);
@@ -225,8 +244,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_multiple_records() {
-        let re1 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut counter = RegexPatternCounter::new(re1, vec![], vec![], false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false).unwrap();
 
         let mut counts = vec![0; counter.num_patterns()];
 
@@ -251,8 +270,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_regex_pattern_counter_empty_sequence() {
-        let re2 = vec![regex::bytes::Regex::new("AAAA").unwrap()];
-        let mut counter = RegexPatternCounter::new(vec![], re2, vec![], false);
+        let mut counter =
+            RegexPatternCounter::new(pc(&[]), pc(&[b"AAAA"]), pc(&[]), false).unwrap();
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"";
@@ -447,9 +466,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_single_pattern() {
-        let pat1 = vec![b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false, false).unwrap();
 
         assert_eq!(counter.num_patterns(), 1);
 
@@ -464,9 +482,14 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_multiple_patterns() {
-        let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec(), b"CCCC".to_vec()];
-        let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+        let mut counter = AhoCorasickPatternCounter::new(
+            pc(&[b"AAAA", b"TTTT", b"CCCC"]),
+            pc(&[]),
+            pc(&[]),
+            false,
+            false,
+        )
+        .unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -483,9 +506,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_secondary() {
-        let pat2 = vec![b"TTTT".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(vec![], pat2, vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[]), pc(&[b"TTTT"]), pc(&[]), false, false).unwrap();
 
         let primary = b"GGGGAAAACCCC";
         let secondary = b"GGGGTTTTCCCC";
@@ -498,9 +520,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_either() {
-        let pat = vec![b"CCCC".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(vec![], vec![], pat, false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCC"]), false, false).unwrap();
 
         // Test match in primary
         let primary1 = b"GGGGCCCCTTTT";
@@ -526,9 +547,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_no_match() {
-        let pat1 = vec![b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false, false).unwrap();
 
         let primary = b"GGGGCCCCTTTT";
         let secondary = b"GGGGCCCCTTTT";
@@ -541,9 +561,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_invert() {
-        let pat1 = vec![b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, true).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false, true).unwrap();
 
         // Sequence without pattern (should count when inverted)
         let primary1 = b"GGGGCCCCTTTT";
@@ -562,11 +581,14 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_combined_patterns() {
-        let pat1 = vec![b"AAAA".to_vec()];
-        let pat2 = vec![b"TTTT".to_vec()];
-        let pat = vec![b"CCCC".to_vec()];
-
-        let mut counter = AhoCorasickPatternCounter::new(pat1, pat2, pat, false, false).unwrap();
+        let mut counter = AhoCorasickPatternCounter::new(
+            pc(&[b"AAAA"]),
+            pc(&[b"TTTT"]),
+            pc(&[b"CCCC"]),
+            false,
+            false,
+        )
+        .unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -583,8 +605,9 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_pattern_strings() {
-        let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec()];
-        let counter = AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+        let counter =
+            AhoCorasickPatternCounter::new(pc(&[b"AAAA", b"TTTT"]), pc(&[]), pc(&[]), false, false)
+                .unwrap();
 
         let patterns = counter.pattern_strings();
         assert_eq!(patterns.len(), 2);
@@ -594,9 +617,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_multiple_records() {
-        let pat1 = vec![b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"AAAA"]), pc(&[]), pc(&[]), false, false).unwrap();
 
         let mut counts = vec![0; counter.num_patterns()];
 
@@ -621,9 +643,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_empty_sequence() {
-        let pat2 = vec![b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(vec![], pat2, vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[]), pc(&[b"AAAA"]), pc(&[]), false, false).unwrap();
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"";
@@ -636,9 +657,9 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_overlapping_patterns() {
-        let pat1 = vec![b"AAA".to_vec(), b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"AAA", b"AAAA"]), pc(&[]), pc(&[]), false, false)
+                .unwrap();
 
         let primary = b"GGGGAAAAATTTT";
         let secondary = b"";
@@ -652,9 +673,9 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_multiple_occurrences() {
-        let pat1 = vec![b"AAA".to_vec(), b"AAAA".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"AAA", b"AAAA"]), pc(&[]), pc(&[]), false, false)
+                .unwrap();
 
         let primary = b"GGGGAAAAATTTT";
         let secondary = b"";
@@ -669,9 +690,8 @@ mod pattern_count_tests {
 
     #[test]
     fn test_aho_corasick_pattern_counter_case_sensitive() {
-        let pat1 = vec![b"aaaa".to_vec()];
         let mut counter =
-            AhoCorasickPatternCounter::new(pat1, vec![], vec![], false, false).unwrap();
+            AhoCorasickPatternCounter::new(pc(&[b"aaaa"]), pc(&[]), pc(&[]), false, false).unwrap();
 
         // Different case should not match
         let primary = b"GGGGAAAATTTT";
