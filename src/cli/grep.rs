@@ -1,5 +1,6 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
+use paraseq::fasta;
 
 use crate::{cli::FileFormat, commands::grep::SimpleRange};
 
@@ -229,7 +230,8 @@ pub struct FuzzyArgs {
 pub struct PatternFileArgs {
     /// File of patterns to search for
     ///
-    /// This assumes one pattern per line.
+    /// Accepts a plain text file (one pattern per line) or a FASTA file
+    /// (sequences are used as patterns). FASTA files are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     /// These will match against either primary or extended sequence.
     #[clap(long)]
@@ -237,20 +239,22 @@ pub struct PatternFileArgs {
 
     /// File of patterns to search for in primary sequence
     ///
-    /// This assumes one pattern per line.
+    /// Accepts a plain text file (one pattern per line) or a FASTA file
+    /// (sequences are used as patterns). FASTA files are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     #[clap(long)]
     pub sfile: Option<String>,
 
     /// File of patterns to search for in extended sequence
     ///
-    /// This assumes one pattern per line.
+    /// Accepts a plain text file (one pattern per line) or a FASTA file
+    /// (sequences are used as patterns). FASTA files are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     #[clap(long)]
     pub xfile: Option<String>,
 }
 impl PatternFileArgs {
-    fn empty(&self) -> bool {
+    pub(crate) fn empty(&self) -> bool {
         self.file.is_none() && self.sfile.is_none() && self.xfile.is_none()
     }
 
@@ -262,34 +266,74 @@ impl PatternFileArgs {
         }
     }
 
-    fn read_file(&self, filetype: PatternFileType) -> Result<String> {
+    fn file_path(&self, filetype: PatternFileType) -> Result<&str> {
         let file = match filetype {
             PatternFileType::File => &self.file,
             PatternFileType::SFile => &self.sfile,
             PatternFileType::XFile => &self.xfile,
         };
-        if let Some(file) = file {
-            Ok(std::fs::read_to_string(file)?)
-        } else {
-            bail!("Specified file type {filetype:?} not provided at CLI")
+        file.as_deref()
+            .ok_or_else(|| anyhow::anyhow!("Specified file type {filetype:?} not provided at CLI"))
+    }
+
+    /// Returns true if the file starts with '>' (FASTA format).
+    fn is_fasta(path: &str) -> Result<bool> {
+        let first_byte = std::fs::read(path)?
+            .into_iter()
+            .find(|&b| b != b'\n' && b != b'\r');
+        Ok(first_byte == Some(b'>'))
+    }
+
+    /// Read sequences from a FASTA file.
+    fn read_fasta_sequences(path: &str) -> Result<Vec<Vec<u8>>> {
+        let mut reader = fasta::Reader::from_path(path)?;
+        let mut rset = fasta::RecordSet::default();
+        let mut sequences = Vec::new();
+
+        while rset.fill(&mut reader)? {
+            for record in rset.iter() {
+                let record = record?;
+                sequences.push(record.seq().into_owned());
+            }
         }
+
+        Ok(sequences)
+    }
+
+    fn read_file(&self, filetype: PatternFileType) -> Result<String> {
+        let path = self.file_path(filetype)?;
+        Ok(std::fs::read_to_string(path)?)
     }
 
     fn read_file_patterns(&self, filetype: PatternFileType) -> Result<Vec<String>> {
-        let contents = self.read_file(filetype)?;
-        Ok(contents
-            .lines()
-            .map(std::string::ToString::to_string)
-            .collect())
+        let path = self.file_path(filetype)?;
+        if Self::is_fasta(path)? {
+            let sequences = Self::read_fasta_sequences(path)?;
+            Ok(sequences
+                .into_iter()
+                .map(|s| String::from_utf8(s).expect("Non-UTF8 sequence in FASTA"))
+                .collect())
+        } else {
+            let contents = self.read_file(filetype)?;
+            Ok(contents
+                .lines()
+                .map(std::string::ToString::to_string)
+                .collect())
+        }
     }
 
     fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Vec<u8>>> {
-        let contents = self.read_file(filetype)?;
-        let mut patterns = Vec::new();
-        for line in contents.lines() {
-            patterns.push(line.as_bytes().to_vec());
+        let path = self.file_path(filetype)?;
+        if Self::is_fasta(path)? {
+            Self::read_fasta_sequences(path)
+        } else {
+            let contents = self.read_file(filetype)?;
+            let mut patterns = Vec::new();
+            for line in contents.lines() {
+                patterns.push(line.as_bytes().to_vec());
+            }
+            Ok(patterns)
         }
-        Ok(patterns)
     }
 }
 
