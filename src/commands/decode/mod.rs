@@ -65,7 +65,7 @@ pub fn run(args: &DecodeCommand) -> Result<()> {
             proc.clone(),
             args.output.threads(),
             span.get_range(num_records)?,
-        )?
+        )?;
     } else {
         reader.process_parallel(proc.clone(), args.output.threads())?;
     }

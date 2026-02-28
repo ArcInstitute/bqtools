@@ -364,12 +364,12 @@ impl BinseqMode {
         }
     }
 }
-impl Into<binseq::write::Format> for BinseqMode {
-    fn into(self) -> binseq::write::Format {
-        match self {
-            Self::Bq => binseq::write::Format::Bq,
-            Self::Vbq => binseq::write::Format::Vbq,
-            Self::Cbq => binseq::write::Format::Cbq,
+impl From<BinseqMode> for binseq::write::Format {
+    fn from(val: BinseqMode) -> Self {
+        match val {
+            BinseqMode::Bq => binseq::write::Format::Bq,
+            BinseqMode::Vbq => binseq::write::Format::Vbq,
+            BinseqMode::Cbq => binseq::write::Format::Cbq,
         }
     }
 }

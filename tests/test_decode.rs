@@ -30,12 +30,12 @@ fn run_encode_then_decode(
         out_path.to_str().unwrap(),
     ]
     .into_iter()
-    .map(|x| x.to_string())
+    .map(std::string::ToString::to_string)
     .collect();
 
     if let Some(t) = threads {
         encode_args.push("-T".to_string());
-        encode_args.push(format!("{}", t));
+        encode_args.push(format!("{t}"));
     }
     if vbq_index {
         encode_args.push("--index".to_string());
@@ -64,7 +64,7 @@ fn run_encode_then_decode(
         decode_out_path.to_str().unwrap(),
     ]
     .into_iter()
-    .map(|x| x.to_string())
+    .map(std::string::ToString::to_string)
     .collect();
 
     if let Some(format) = decode_format {
@@ -77,7 +77,7 @@ fn run_encode_then_decode(
     }
     if let Some(t) = threads {
         decode_args.push("-T".to_string());
-        decode_args.push(format!("{}", t));
+        decode_args.push(format!("{t}"));
     }
     println!("{decode_args:#?}");
 
@@ -98,7 +98,7 @@ fn run_decode_paired_prefix(
 ) -> Result<bool> {
     let mut decode_args: Vec<_> = vec!["decode", binseq_path.to_str().unwrap(), "--prefix", prefix]
         .into_iter()
-        .map(|x| x.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
 
     if let Some(format) = decode_format {
@@ -107,7 +107,7 @@ fn run_decode_paired_prefix(
     }
     if let Some(t) = threads {
         decode_args.push("-T".to_string());
-        decode_args.push(format!("{}", t));
+        decode_args.push(format!("{t}"));
     }
 
     let decode_status = Command::new(COMMAND_NAME)
@@ -130,10 +130,7 @@ fn test_round_trip_decode() -> Result<()> {
         let binseq_tmp = output_tempfile(mode)?;
         let decode_tmp = tempfile::NamedTempFile::with_suffix(format.suffix())?;
 
-        eprintln!(
-            "Testing round-trip: {:?} {:?} {:?} -T {:?}",
-            mode, comp, format, threads
-        );
+        eprintln!("Testing round-trip: {mode:?} {comp:?} {format:?} -T {threads:?}");
 
         let status = run_encode_then_decode()
             .in_path(in_tmp.path())
@@ -142,11 +139,7 @@ fn test_round_trip_decode() -> Result<()> {
             .maybe_threads(threads)
             .call()?;
 
-        assert!(
-            status,
-            "Round-trip failed for {:?} {:?} {:?}",
-            mode, comp, format
-        );
+        assert!(status, "Round-trip failed for {mode:?} {comp:?} {format:?}");
     }
     Ok(())
 }
@@ -162,7 +155,7 @@ fn test_decode_formats() -> Result<()> {
         let binseq_tmp = output_tempfile(mode)?;
         let decode_tmp = tempfile::NamedTempFile::new()?;
 
-        eprintln!("Testing decode format: {:?} -> {}", mode, output_format);
+        eprintln!("Testing decode format: {mode:?} -> {output_format}");
 
         let status = run_encode_then_decode()
             .in_path(in_tmp.path())
@@ -173,8 +166,7 @@ fn test_decode_formats() -> Result<()> {
 
         assert!(
             status,
-            "Decode format test failed for {:?} -> {}",
-            mode, output_format
+            "Decode format test failed for {mode:?} -> {output_format}"
         );
     }
     Ok(())
@@ -202,7 +194,7 @@ fn test_decode_mate_selection() -> Result<()> {
             .status
             .success();
 
-        assert!(encode_status, "Failed to encode paired data for {:?}", mode);
+        assert!(encode_status, "Failed to encode paired data for {mode:?}");
 
         // Test decoding specific mates
         for mate in ["1", "2", "both"] {
@@ -221,7 +213,7 @@ fn test_decode_mate_selection() -> Result<()> {
                 .status
                 .success();
 
-            assert!(decode_status, "Decode mate {} failed for {:?}", mate, mode);
+            assert!(decode_status, "Decode mate {mate} failed for {mode:?}");
         }
     }
     Ok(())
@@ -249,7 +241,7 @@ fn test_decode_paired_prefix() -> Result<()> {
             .status
             .success();
 
-        assert!(encode_status, "Failed to encode paired data for {:?}", mode);
+        assert!(encode_status, "Failed to encode paired data for {mode:?}");
 
         // Test decoding with prefix (creates separate R1/R2 files)
         let temp_dir = tempfile::tempdir()?;
@@ -261,7 +253,7 @@ fn test_decode_paired_prefix() -> Result<()> {
             .decode_format("q")
             .call()?;
 
-        assert!(status, "Decode with prefix failed for {:?}", mode);
+        assert!(status, "Decode with prefix failed for {mode:?}");
 
         // Check that both R1 and R2 files were created
         let r1_path = format!("{}_R1.fq", prefix.to_str().unwrap());
@@ -284,10 +276,7 @@ fn test_decode_threading() -> Result<()> {
         let binseq_tmp = output_tempfile(mode)?;
         let decode_tmp = tempfile::NamedTempFile::with_suffix(FastxFormat::default().suffix())?;
 
-        eprintln!(
-            "Testing decode threading: {:?} with {} threads",
-            mode, threads
-        );
+        eprintln!("Testing decode threading: {mode:?} with {threads} threads");
 
         let status = run_encode_then_decode()
             .in_path(in_tmp.path())
@@ -298,8 +287,7 @@ fn test_decode_threading() -> Result<()> {
 
         assert!(
             status,
-            "Decode threading test failed for {:?} with {} threads",
-            mode, threads
+            "Decode threading test failed for {mode:?} with {threads} threads"
         );
     }
     Ok(())
@@ -313,7 +301,7 @@ fn test_decode_compressed_output() -> Result<()> {
         let binseq_tmp = output_tempfile(mode)?;
         let decode_tmp = tempfile::NamedTempFile::with_suffix(".fastq.gz")?;
 
-        eprintln!("Testing decode with compressed output: {:?}", mode);
+        eprintln!("Testing decode with compressed output: {mode:?}");
 
         // Test with --compress flag
         let encode_status = Command::new(COMMAND_NAME)
@@ -343,8 +331,7 @@ fn test_decode_compressed_output() -> Result<()> {
 
         assert!(
             decode_status,
-            "Decode with compression failed for {:?} GZIP",
-            mode
+            "Decode with compression failed for {mode:?} GZIP"
         );
 
         let decode_status = Command::new(COMMAND_NAME)
@@ -361,8 +348,7 @@ fn test_decode_compressed_output() -> Result<()> {
 
         assert!(
             decode_status,
-            "Decode with compression failed for {:?} ZSTD",
-            mode
+            "Decode with compression failed for {mode:?} ZSTD"
         );
 
         let decode_status = Command::new(COMMAND_NAME)
@@ -379,8 +365,7 @@ fn test_decode_compressed_output() -> Result<()> {
 
         assert!(
             decode_status,
-            "Decode with compression failed for {:?} uncompressed",
-            mode
+            "Decode with compression failed for {mode:?} uncompressed"
         );
     }
     Ok(())

@@ -49,7 +49,7 @@ impl PatternCount for PatternCounter {
             }
             #[cfg(feature = "fuzzy")]
             PatternCounter::Fuzzy(counter) => {
-                counter.count_patterns(primary, secondary, pattern_count)
+                counter.count_patterns(primary, secondary, pattern_count);
             }
         }
     }

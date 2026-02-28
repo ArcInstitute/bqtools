@@ -88,7 +88,7 @@ fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
             proc.clone(),
             args.output.threads(),
             span.get_range(num_records)?,
-        )?
+        )?;
     } else {
         reader.process_parallel(proc.clone(), args.output.threads())?;
     }

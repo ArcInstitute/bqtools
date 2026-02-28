@@ -34,7 +34,7 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
         println!("-------------------------------");
         println!("           Metadata            ");
         println!("-------------------------------");
-        println!("Bits per Nucleotide : {}", bitsize);
+        println!("Bits per Nucleotide : {bitsize}");
         println!("Paired              : {}", header.is_paired());
         println!("Quality:            : {}", header.qual);
         println!("Headers:            : {}", header.headers);
@@ -42,7 +42,7 @@ fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: boo
         println!("-------------------------------");
         println!("          Compression          ");
         println!("-------------------------------");
-        println!("Virtual Block Size  : {}", block_size);
+        println!("Virtual Block Size  : {block_size}");
         println!("-------------------------------");
         println!("            Data               ");
         println!("-------------------------------");

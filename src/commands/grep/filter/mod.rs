@@ -546,8 +546,7 @@ mod matcher_unit_tests {
         for expected in expected_matches {
             assert!(
                 matches.contains(&expected),
-                "Should find match at offset position {:?}",
-                expected
+                "Should find match at offset position {expected:?}"
             );
         }
 
@@ -601,13 +600,11 @@ mod matcher_unit_tests {
         for (start, end) in &xmatches {
             assert!(
                 *start >= offset,
-                "Match start should include offset, found: {:?}",
-                xmatches
+                "Match start should include offset, found: {xmatches:?}"
             );
             assert!(
                 *end > offset,
-                "Match end should be greater than offset, found: {:?}",
-                xmatches
+                "Match end should be greater than offset, found: {xmatches:?}"
             );
             assert!(
                 *end - *start == 2,
@@ -674,8 +671,7 @@ mod matcher_unit_tests {
         for baseline_match in &baseline_matches {
             assert!(
                 !matches.contains(baseline_match),
-                "Should not find match at baseline position {:?}",
-                baseline_match
+                "Should not find match at baseline position {baseline_match:?}"
             );
         }
     }

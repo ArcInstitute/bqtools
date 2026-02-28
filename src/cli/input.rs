@@ -272,8 +272,7 @@ impl Span {
         if let Some(start) = self.start {
             if start > max_records {
                 error!(
-                    "Provided start ({}) exceeds maximum number of records ({})",
-                    start, max_records
+                    "Provided start ({start}) exceeds maximum number of records ({max_records})"
                 );
                 bail!("Maximum number of records exceeded")
             }
@@ -281,8 +280,7 @@ impl Span {
         if let Some(end) = self.end {
             if end > max_records {
                 warn!(
-                    "Clipping provided endpoint ({}) to maximum number of records ({})",
-                    end, max_records
+                    "Clipping provided endpoint ({end}) to maximum number of records ({max_records})"
                 );
             }
             self.end = Some(end.min(max_records));
