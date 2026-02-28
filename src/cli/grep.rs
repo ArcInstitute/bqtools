@@ -1,3 +1,8 @@
+use std::{
+    fs,
+    io::{self, Read},
+};
+
 use anyhow::Result;
 use clap::Parser;
 use paraseq::{fasta, Record};
@@ -240,10 +245,15 @@ impl PatternFileArgs {
 
     /// Returns true if the file starts with '>' (FASTA format).
     fn is_fasta(path: &str) -> Result<bool> {
-        let first_byte = std::fs::read(path)?
-            .into_iter()
-            .find(|&b| b != b'\n' && b != b'\r');
-        Ok(first_byte == Some(b'>'))
+        let file = fs::File::open(path)?;
+        // only take up to 10 bytes to determine fasta status
+        for byte in io::BufReader::new(file).bytes().take(10) {
+            let b = byte?;
+            if b != b'\n' && b != b'\r' {
+                return Ok(b == b'>');
+            }
+        }
+        Ok(false)
     }
 
     /// Load patterns from a file, auto-detecting FASTA vs plain text.
