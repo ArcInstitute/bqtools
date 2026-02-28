@@ -253,25 +253,25 @@ mod tests {
             start: None,
             end: None,
         };
-        assert_eq!(format!("{}", range), "..");
+        assert_eq!(format!("{range}"), "..");
 
         let range = SimpleRange {
             start: None,
             end: Some(10),
         };
-        assert_eq!(format!("{}", range), "..10");
+        assert_eq!(format!("{range}"), "..10");
 
         let range = SimpleRange {
             start: Some(5),
             end: None,
         };
-        assert_eq!(format!("{}", range), "5..");
+        assert_eq!(format!("{range}"), "5..");
 
         let range = SimpleRange {
             start: Some(3),
             end: Some(8),
         };
-        assert_eq!(format!("{}", range), "3..8");
+        assert_eq!(format!("{range}"), "3..8");
     }
 
     #[test]
@@ -345,7 +345,7 @@ mod tests {
         ];
 
         for original in ranges {
-            let string_repr = format!("{}", original);
+            let string_repr = format!("{original}");
             let parsed: SimpleRange = string_repr.parse().unwrap();
             assert_eq!(original.start, parsed.start);
             assert_eq!(original.end, parsed.end);

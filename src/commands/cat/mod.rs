@@ -80,9 +80,9 @@ fn record_vbq_header(paths: &[String]) -> Result<vbq::FileHeader> {
     for path in &paths[1..] {
         let reader = vbq::MmapReader::new(path)?;
         if reader.header() != header {
-            error!("Inconsistent header found for path: {}", path);
+            error!("Inconsistent header found for path: {path}");
             warn!("Note: The first VBQ used in `cat` will be considered as the reference header. All subsequent VBQs must have the same header.");
-            bail!("Inconsistent header found for path: {}", path);
+            bail!("Inconsistent header found for path: {path}");
         }
     }
     Ok(header)
@@ -97,9 +97,9 @@ fn record_cbq_header(paths: &[String]) -> Result<cbq::FileHeader> {
     for path in &paths[1..] {
         let reader = cbq::MmapReader::new(path)?;
         if reader.header() != header {
-            error!("Inconsistent header found for path: {}", path);
+            error!("Inconsistent header found for path: {path}");
             warn!("Note: The first CBQ used in `cat` will be considered as the reference header. All subsequent CBQs must have the same header.");
-            bail!("Inconsistent header found for path: {}", path);
+            bail!("Inconsistent header found for path: {path}");
         }
     }
     Ok(header)

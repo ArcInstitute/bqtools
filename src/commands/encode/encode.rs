@@ -55,7 +55,7 @@ pub fn encode_collection(
         }
     } else {
         bail!("All input files must have the same format.");
-    };
+    }
     let ohandle = match_output(opath)?;
     let mut builder = BinseqWriterBuilder::new(mode.into())
         .block_size(config.block_size)
@@ -82,12 +82,12 @@ pub fn encode_collection(
                 let inner = collection.inner_mut();
                 let slen = get_sequence_len(&mut inner[0])?;
                 let xlen = get_sequence_len(&mut inner[1])?;
-                builder = builder.slen(slen as u32).xlen(xlen as u32)
+                builder = builder.slen(slen as u32).xlen(xlen as u32);
             }
             fastx::CollectionType::Interleaved => {
                 let inner = collection.inner_mut();
                 let (slen, xlen) = get_interleaved_sequence_len(&mut inner[0])?;
-                builder = builder.slen(slen as u32).xlen(xlen as u32)
+                builder = builder.slen(slen).xlen(xlen);
             }
             _ => {
                 bail!("Unsupported collection type found in `encode_collection_bq`");

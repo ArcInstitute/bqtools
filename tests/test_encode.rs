@@ -26,11 +26,11 @@ fn run_encode(
         out_path.to_str().unwrap(),
     ]
     .into_iter()
-    .map(|x| x.to_string())
+    .map(std::string::ToString::to_string)
     .collect();
     if let Some(t) = threads {
         args.push("-T".to_string());
-        args.push(format!("{}", t));
+        args.push(format!("{t}"));
     }
     if vbq_vcomp {
         args.push("--uncompressed".to_string());
@@ -53,10 +53,7 @@ fn test_encoding() -> Result<()> {
     ) {
         let in_tmp = write_fastx().format(format).comp(comp).call()?;
         let out_tmp = output_tempfile(mode)?;
-        eprintln!(
-            "Testing: {:?} {:?} {:?} -T {:?}",
-            mode, comp, format, threads
-        );
+        eprintln!("Testing: {mode:?} {comp:?} {format:?} -T {threads:?}");
         let status = run_encode()
             .in_path(in_tmp.path())
             .out_path(out_tmp.path())

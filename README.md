@@ -320,6 +320,7 @@ bqtools grep input.bq "ACGTACGT" -zi
 ```
 
 `bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
+Pattern files can be either **plain text** (one pattern per line) or **FASTA** format (sequences are used as patterns, auto-detected).
 You can provide files for either primary/extended, just primary, or just extended patterns with the relevant flags.
 Notably this will match _solely_ with OR logic.
 This can be used also with fuzzy matching as well as with pattern counting described below.
@@ -329,8 +330,11 @@ If your patterns are all fixed strings (and not regex), you can improve performa
 This will use the more efficient [Aho-Corasick algorithm](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) to match patterns.
 
 ```bash
-# Run grep with patterns from a file
+# Run grep with patterns from a plain text file (one pattern per line)
 bqtools grep input.bq --file patterns.txt
+
+# Run grep with patterns from a FASTA file (sequences used as patterns)
+bqtools grep input.bq --file patterns.fa
 
 # Run grep with patterns from a file (primary)
 bqtools grep input.bq --sfile patterns.txt
@@ -387,7 +391,13 @@ bqtools grep input.bq --file patterns.txt -P
 bqtools grep input.bq --file patterns.txt -Px
 ```
 
-The output of pattern count is a TSV with three columns: [Pattern, Count, Fraction of Total]
+The output of pattern count is a TSV with three columns: [Name, Count, Fraction of Total].
+When patterns are loaded from a FASTA file, the FASTA sequence headers are used as names; otherwise, the pattern string itself is used.
+
+```bash
+# Count patterns from a FASTA file (names column shows FASTA headers)
+bqtools grep input.bq --file patterns.fa -P
+```
 
 ### Pipe
 

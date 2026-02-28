@@ -1,6 +1,7 @@
 mod color;
 mod filter;
 mod pattern_count;
+mod patterns;
 mod range;
 
 #[cfg(feature = "fuzzy")]
@@ -11,8 +12,10 @@ use pattern_count::FuzzyPatternCounter;
 
 use filter::{FilterProcessor, PatternMatcher, RegexMatcher};
 use pattern_count::{
-    AhoCorasickPatternCounter, PatternCountProcessor, PatternCounter, RegexPatternCounter,
+    AhoCorasickPatternCounter, PatternCount, PatternCountProcessor, PatternCounter,
+    RegexPatternCounter,
 };
+pub use patterns::{Pattern, PatternCollection};
 pub use range::SimpleRange;
 
 use super::decode::build_writer;
@@ -33,20 +36,23 @@ fn is_fixed(pattern: &[u8]) -> bool {
 }
 
 /// Returns true if all patterns across multiple sets are fixed DNA strings.
-fn all_patterns_fixed(pattern_sets: &[&[Vec<u8>]]) -> bool {
+fn all_patterns_fixed(pattern_sets: &[&PatternCollection]) -> bool {
     pattern_sets
         .iter()
         .flat_map(|s| s.iter())
-        .all(|p| is_fixed(p))
+        .all(|p| is_fixed(&p.sequence))
 }
 
 fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
+        let pat1 = args.grep.patterns_m1()?;
+        let pat2 = args.grep.patterns_m2()?;
+        let pat = args.grep.patterns()?;
         let counter = FuzzyPatternCounter::new(
-            args.grep.bytes_pat1()?,
-            args.grep.bytes_pat2()?,
-            args.grep.bytes_pat()?,
+            pat1,
+            pat2,
+            pat,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
@@ -54,9 +60,9 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
         return Ok(PatternCounter::Fuzzy(counter));
     }
 
-    let pat1 = args.grep.bytes_pat1()?;
-    let pat2 = args.grep.bytes_pat2()?;
-    let pat = args.grep.bytes_pat()?;
+    let pat1 = args.grep.patterns_m1()?;
+    let pat2 = args.grep.patterns_m2()?;
+    let pat = args.grep.patterns()?;
     let use_fixed = args.grep.fixed || all_patterns_fixed(&[&pat1, &pat2, &pat]);
     if !args.grep.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
@@ -67,26 +73,22 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
             AhoCorasickPatternCounter::new(pat1, pat2, pat, args.grep.no_dfa, args.grep.invert)?;
         Ok(PatternCounter::AhoCorasick(counter))
     } else {
-        let counter = RegexPatternCounter::new(
-            args.grep.bytes_reg1()?,
-            args.grep.bytes_reg2()?,
-            args.grep.bytes_reg()?,
-            args.grep.invert,
-        );
+        let counter = RegexPatternCounter::new(pat1, pat2, pat, args.grep.invert)?;
         Ok(PatternCounter::Regex(counter))
     }
 }
 
 fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
     let counter = build_counter(args)?;
-    let proc = PatternCountProcessor::new(counter, args.grep.range);
+    let pattern_names = counter.pattern_names();
+    let proc = PatternCountProcessor::new(counter, args.grep.range, pattern_names);
     if let Some(mut span) = args.input.span {
         let num_records = reader.num_records()?;
         reader.process_parallel_range(
             proc.clone(),
             args.output.threads(),
             span.get_range(num_records)?,
-        )?
+        )?;
     } else {
         reader.process_parallel(proc.clone(), args.output.threads())?;
     }
@@ -97,10 +99,13 @@ fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
 fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
+        let pat1 = args.grep.patterns_m1()?;
+        let pat2 = args.grep.patterns_m2()?;
+        let pat = args.grep.patterns()?;
         let matcher = FuzzyMatcher::new(
-            args.grep.bytes_pat1()?,
-            args.grep.bytes_pat2()?,
-            args.grep.bytes_pat()?,
+            pat1.bytes(),
+            pat2.bytes(),
+            pat.bytes(),
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
@@ -108,9 +113,9 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         return Ok(PatternMatcher::Fuzzy(matcher));
     }
 
-    let pat1 = args.grep.bytes_pat1()?;
-    let pat2 = args.grep.bytes_pat2()?;
-    let pat = args.grep.bytes_pat()?;
+    let pat1 = args.grep.patterns_m1()?;
+    let pat2 = args.grep.patterns_m2()?;
+    let pat = args.grep.patterns()?;
     let use_fixed = args.grep.fixed || all_patterns_fixed(&[&pat1, &pat2, &pat]);
     if !args.grep.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
@@ -118,9 +123,9 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
 
     if use_fixed && !args.grep.and_logic() {
         let matcher = AhoCorasickMatcher::new(
-            pat1,
-            pat2,
-            pat,
+            pat1.bytes(),
+            pat2.bytes(),
+            pat.bytes(),
             args.grep.no_dfa,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
@@ -130,9 +135,9 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
             warn!("`-x/--fixed provided but ignored when using AND logic");
         }
         let matcher = RegexMatcher::new(
-            args.grep.bytes_reg1()?,
-            args.grep.bytes_reg2()?,
-            args.grep.bytes_reg()?,
+            pat1.regexes()?,
+            pat2.regexes()?,
+            pat.regexes()?,
             args.grep.range.map_or(0, |r| r.offset()),
         );
         Ok(PatternMatcher::Regex(matcher))
@@ -198,7 +203,19 @@ pub fn run(args: &GrepCommand) -> Result<()> {
 
 #[cfg(test)]
 mod fixed_detection_tests {
-    use super::{all_patterns_fixed, is_fixed};
+    use super::{all_patterns_fixed, is_fixed, Pattern, PatternCollection};
+
+    fn pc(patterns: &[&[u8]]) -> PatternCollection {
+        PatternCollection(
+            patterns
+                .iter()
+                .map(|p| Pattern {
+                    name: None,
+                    sequence: p.to_vec(),
+                })
+                .collect(),
+        )
+    }
 
     #[test]
     fn test_fixed_dna_strings() {
@@ -236,22 +253,22 @@ mod fixed_detection_tests {
 
     #[test]
     fn test_all_patterns_fixed() {
-        let p1 = vec![b"ACGT".to_vec(), b"TTTT".to_vec()];
-        let p2 = vec![b"GGGG".to_vec()];
+        let p1 = pc(&[b"ACGT", b"TTTT"]);
+        let p2 = pc(&[b"GGGG"]);
         assert!(all_patterns_fixed(&[&p1, &p2]));
     }
 
     #[test]
     fn test_all_patterns_fixed_with_regex() {
-        let p1 = vec![b"ACGT".to_vec(), b"AC.GT".to_vec()];
-        let p2 = vec![b"GGGG".to_vec()];
+        let p1 = pc(&[b"ACGT", b"AC.GT"]);
+        let p2 = pc(&[b"GGGG"]);
         assert!(!all_patterns_fixed(&[&p1, &p2]));
     }
 
     #[test]
     fn test_all_patterns_fixed_empty_sets() {
-        let p1: Vec<Vec<u8>> = vec![];
-        let p2: Vec<Vec<u8>> = vec![];
+        let p1 = pc(&[]);
+        let p2 = pc(&[]);
         assert!(all_patterns_fixed(&[&p1, &p2]));
     }
 }
