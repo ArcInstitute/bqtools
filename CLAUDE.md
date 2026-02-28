@@ -44,7 +44,9 @@ Build without defaults: `cargo build --no-default-features -F fuzzy,gcs`
 
 **Parallel processing**: Commands use the `paraseq` crate's `ParallelProcessor` trait for embarrassingly parallel batch processing. Each command has a `processor.rs` implementing this trait with thread-local buffers and `Arc<Mutex<T>>` for shared global state.
 
-**Grep backends**: The grep command uses a `PatternMatcher` enum dispatching to three backends — `regex`, `aho-corasick` (fixed-string, multi-pattern), and `sassy` (fuzzy, feature-gated). The same pattern applies to `PatternCounter` for the `-P` pattern-count mode.
+**Grep backends**: The grep command uses a `PatternMatcher` enum dispatching to three backends — `regex`, `aho-corasick` (fixed-string, multi-pattern), and `sassy` (fuzzy, feature-gated). The same pattern applies to `PatternCounter` for the `-P` pattern-count mode. All backends accept `PatternCollection` which carries optional pattern names (from FASTA headers).
+
+**Pattern types**: `patterns.rs` defines `Pattern` (name + sequence) and `PatternCollection` (newtype over `Vec<Pattern>`) with methods `.bytes()`, `.regexes()`, `.names()`. Pattern files (`--file`, `--sfile`, `--xfile`) auto-detect FASTA vs plain text. FASTA headers become pattern names; plain text patterns have no name and fall back to the pattern string in output.
 
 **Encode modes**: Encoding dispatches across atomic (single/paired files), recursive (directory walk via `walkdir`), manifest (file list), and batch (multi-file thread distribution) modes.
 

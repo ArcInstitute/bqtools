@@ -262,8 +262,8 @@ mod tests {
         // Generate a large list to ensure O(n) performance
         let mut files = Vec::new();
         for i in 0..10000 {
-            files.push(PathBuf::from(format!("sample_{:04}_R1_lane1.fastq", i)));
-            files.push(PathBuf::from(format!("sample_{:04}_R2_lane1.fastq", i)));
+            files.push(PathBuf::from(format!("sample_{i:04}_R1_lane1.fastq")));
+            files.push(PathBuf::from(format!("sample_{i:04}_R2_lane1.fastq")));
         }
 
         let pairs = pair_r1_r2_files(&files).unwrap();

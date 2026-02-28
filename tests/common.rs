@@ -24,6 +24,7 @@ impl CompressionStatus {
         vals.into_iter()
     }
 
+    #[must_use]
     pub fn suffix(&self) -> &str {
         match self {
             Self::Uncompressed => "",
@@ -44,6 +45,7 @@ impl FastxFormat {
         let vals = [Self::Fasta, Self::Fastq];
         vals.into_iter()
     }
+    #[must_use]
     pub fn suffix(&self) -> &str {
         match self {
             Self::Fasta => ".fasta",
@@ -63,6 +65,7 @@ impl BinseqMode {
         let vals = [Self::Bq, Self::Vbq];
         vals.into_iter()
     }
+    #[must_use]
     pub fn suffix(&self) -> &str {
         match self {
             Self::Bq => ".bq",
@@ -72,18 +75,18 @@ impl BinseqMode {
 }
 
 fn write_fastq_to<W: Write>(wtr: &mut W, idx: usize, seq: &[u8], qual: &[u8]) -> Result<()> {
-    writeln!(wtr, "@seq.{}", idx)?;
+    writeln!(wtr, "@seq.{idx}")?;
     wtr.write_all(seq)?;
     writeln!(wtr, "\n+")?;
     wtr.write_all(qual)?;
-    write!(wtr, "\n")?;
+    writeln!(wtr)?;
     Ok(())
 }
 
 fn write_fasta_to<W: Write>(wtr: &mut W, idx: usize, seq: &[u8]) -> Result<()> {
-    writeln!(wtr, ">seq.{}", idx)?;
+    writeln!(wtr, ">seq.{idx}")?;
     wtr.write_all(seq)?;
-    write!(wtr, "\n")?;
+    writeln!(wtr)?;
     Ok(())
 }
 
@@ -118,8 +121,8 @@ pub fn write_fastx(
         seqgen.fill_buffer(&mut rng, slen);
         let seq = seqgen.bytes();
         match format {
-            FastxFormat::Fastq => write_fastq_to(&mut handle, idx, &seq, &qual)?,
-            FastxFormat::Fasta => write_fasta_to(&mut handle, idx, &seq)?,
+            FastxFormat::Fastq => write_fastq_to(&mut handle, idx, seq, &qual)?,
+            FastxFormat::Fasta => write_fasta_to(&mut handle, idx, seq)?,
         }
     }
     handle.flush()?;

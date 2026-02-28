@@ -2,9 +2,8 @@ use aho_corasick::{AhoCorasick, AhoCorasickBuilder, AhoCorasickKind};
 use anyhow::Result;
 use fixedbitset::FixedBitSet;
 
-use super::PatternCount;
+use super::{PatternCollection, PatternCount};
 
-type Patterns = Vec<Vec<u8>>;
 #[derive(Clone)]
 pub struct AhoCorasickPatternCounter {
     state1: AhoCorasick,
@@ -15,30 +14,31 @@ pub struct AhoCorasickPatternCounter {
     bits2: FixedBitSet,
     bits: FixedBitSet,
 
-    all_patterns: Patterns,
+    all_patterns: PatternCollection,
     invert: bool,
 }
 impl AhoCorasickPatternCounter {
     pub fn new(
-        pat1: Patterns,
-        pat2: Patterns,
-        pat: Patterns,
+        pat1: PatternCollection,
+        pat2: PatternCollection,
+        pat: PatternCollection,
         no_dfa: bool,
         invert: bool,
     ) -> Result<Self> {
-        let all_patterns = pat1
-            .iter()
-            .chain(pat2.iter())
-            .chain(pat.iter())
-            .cloned()
-            .collect();
+        let state1 = corasick_builder(&pat1.bytes(), no_dfa)?;
+        let state2 = corasick_builder(&pat2.bytes(), no_dfa)?;
+        let state = corasick_builder(&pat.bytes(), no_dfa)?;
+        let bits1 = FixedBitSet::with_capacity(pat1.len());
+        let bits2 = FixedBitSet::with_capacity(pat2.len());
+        let bits = FixedBitSet::with_capacity(pat.len());
+        let all_patterns = PatternCollection(pat1.into_iter().chain(pat2).chain(pat).collect());
         Ok(Self {
-            state1: corasick_builder(&pat1, no_dfa)?,
-            state2: corasick_builder(&pat2, no_dfa)?,
-            state: corasick_builder(&pat, no_dfa)?,
-            bits1: FixedBitSet::with_capacity(pat1.len()),
-            bits2: FixedBitSet::with_capacity(pat2.len()),
-            bits: FixedBitSet::with_capacity(pat.len()),
+            state1,
+            state2,
+            state,
+            bits1,
+            bits2,
+            bits,
             all_patterns,
             invert,
         })
@@ -101,7 +101,7 @@ impl AhoCorasickPatternCounter {
     }
 }
 
-fn corasick_builder(patterns: &Patterns, no_dfa: bool) -> Result<AhoCorasick> {
+fn corasick_builder(patterns: &[Vec<u8>], no_dfa: bool) -> Result<AhoCorasick> {
     Ok(AhoCorasickBuilder::new()
         .ascii_case_insensitive(false)
         .kind(if no_dfa {
@@ -144,10 +144,14 @@ impl PatternCount for AhoCorasickPatternCounter {
         self.all_patterns
             .iter()
             .map(|pat| {
-                std::str::from_utf8(pat)
+                std::str::from_utf8(&pat.sequence)
                     .expect("Error converting pattern to string")
                     .to_string()
             })
             .collect()
+    }
+
+    fn pattern_names(&self) -> Vec<String> {
+        self.all_patterns.names()
     }
 }

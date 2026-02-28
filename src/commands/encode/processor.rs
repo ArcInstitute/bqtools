@@ -29,8 +29,8 @@ impl<W: Write + Send> Clone for Encoder<W> {
     fn clone(&self) -> Self {
         Self {
             t_writer: self.t_writer.clone(),
-            t_count: self.t_count.clone(),
-            t_skip: self.t_skip.clone(),
+            t_count: self.t_count,
+            t_skip: self.t_skip,
             writer: self.writer.clone(),
             count: self.count.clone(),
             skip: self.skip.clone(),
