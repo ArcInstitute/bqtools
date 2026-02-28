@@ -27,9 +27,8 @@ pub trait PatternCount: Clone + Send + Sync {
 
     fn pattern_strings(&self) -> Vec<String>;
 
-    /// Returns pattern names if available (e.g. from FASTA headers).
-    /// Returns None if no patterns have names.
-    fn pattern_names(&self) -> Option<Vec<String>>;
+    /// Returns pattern names (FASTA headers if present, otherwise the pattern strings).
+    fn pattern_names(&self) -> Vec<String>;
 }
 
 #[derive(Clone)]
@@ -73,7 +72,7 @@ impl PatternCount for PatternCounter {
         }
     }
 
-    fn pattern_names(&self) -> Option<Vec<String>> {
+    fn pattern_names(&self) -> Vec<String> {
         match self {
             PatternCounter::Regex(counter) => counter.pattern_names(),
             PatternCounter::AhoCorasick(counter) => counter.pattern_names(),

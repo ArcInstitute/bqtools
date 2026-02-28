@@ -88,7 +88,7 @@ impl PatternCount for RegexPatternCounter {
             .collect()
     }
 
-    fn pattern_names(&self) -> Option<Vec<String>> {
-        Some(self.all_patterns.names())
+    fn pattern_names(&self) -> Vec<String> {
+        self.all_patterns.names()
     }
 }

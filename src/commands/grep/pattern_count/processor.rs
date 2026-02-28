@@ -11,22 +11,17 @@ use super::PatternCount;
 
 #[derive(Serialize)]
 pub struct PatternCountResult<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<&'a str>,
-    pattern: &'a str,
+    /// The name of the pattern OR the pattern if anonymous
+    name: &'a str,
+    /// Number of sequences containing the pattern
     count: usize,
+    /// Fraction of total sequences containing the pattern
     frac_total: f64,
 }
 impl<'a> PatternCountResult<'a> {
-    pub fn new(
-        name: Option<&'a str>,
-        pattern: &'a str,
-        count: usize,
-        total: usize,
-    ) -> Result<Self> {
+    pub fn new(name: &'a str, count: usize, total: usize) -> Result<Self> {
         Ok(Self {
             name,
-            pattern,
             count,
             frac_total: if total > 0 {
                 count as f64 / total as f64
@@ -41,7 +36,7 @@ impl<'a> PatternCountResult<'a> {
 pub struct PatternCountProcessor<Pc: PatternCount> {
     counter: Pc,
     range: Option<SimpleRange>,
-    pattern_names: Option<Vec<String>>,
+    pattern_names: Vec<String>,
 
     local_pattern_count: Vec<usize>,
     local_total: usize, // total number of reads processed (not just matches)
@@ -51,11 +46,7 @@ pub struct PatternCountProcessor<Pc: PatternCount> {
     global_total: Arc<Mutex<usize>>, // total number of reads processed
 }
 impl<Pc: PatternCount> PatternCountProcessor<Pc> {
-    pub fn new(
-        counter: Pc,
-        range: Option<SimpleRange>,
-        pattern_names: Option<Vec<String>>,
-    ) -> Self {
+    pub fn new(counter: Pc, range: Option<SimpleRange>, pattern_names: Vec<String>) -> Self {
         let num_patterns = counter.num_patterns();
         Self {
             counter,
@@ -80,13 +71,9 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
             .iter()
             .enumerate()
             .zip(self.global_pattern_count.iter())
-            .try_for_each(|((idx, pattern), count)| -> Result<()> {
-                let name = self
-                    .pattern_names
-                    .as_ref()
-                    .and_then(|names| names.get(idx))
-                    .map(String::as_str);
-                let record = PatternCountResult::new(name, pattern, *count.lock(), total_records)?;
+            .try_for_each(|((idx, _pattern), count)| -> Result<()> {
+                let name = &self.pattern_names[idx];
+                let record = PatternCountResult::new(name, *count.lock(), total_records)?;
                 writer.serialize(record)?;
                 Ok(())
             })?;
