@@ -50,9 +50,9 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
         let pat2 = args.grep.patterns_m2()?;
         let pat = args.grep.patterns()?;
         let counter = FuzzyPatternCounter::new(
-            pat1.bytes(),
-            pat2.bytes(),
-            pat.bytes(),
+            pat1,
+            pat2,
+            pat,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.invert,

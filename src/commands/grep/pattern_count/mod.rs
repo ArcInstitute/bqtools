@@ -284,8 +284,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_single_pattern() {
-        let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 1, false, false);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, false);
 
         assert_eq!(counter.num_patterns(), 1);
 
@@ -301,8 +301,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_with_mismatches() {
-        let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 2, false, false);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, false, false);
 
         // Exact match
         let primary1 = b"GGGGAAAAAAAATTTT";
@@ -329,8 +329,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_inexact_only() {
-        let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 2, true, false);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, true, false);
 
         // Exact match (should not count with inexact_only)
         let primary1 = b"GGGGAAAAAAAATTTT";
@@ -353,8 +353,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_invert() {
-        let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 1, false, true);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, true);
 
         // Sequence without pattern (should count when inverted)
         let primary1 = b"GGGGCCCCTTTT";
@@ -374,12 +374,14 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_multiple_patterns() {
-        let pat1 = vec![
-            b"AAAAAAAA".to_vec(),
-            b"TTTTTTTT".to_vec(),
-            b"CCCCCCCC".to_vec(),
-        ];
-        let mut counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 1, false, false);
+        let mut counter = FuzzyPatternCounter::new(
+            pc(&[b"AAAAAAAA", b"TTTTTTTT", b"CCCCCCCC"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+        );
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -397,8 +399,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_secondary() {
-        let pat2 = vec![b"TTTTTTTT".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(vec![], pat2, vec![], 1, false, false);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[]), pc(&[b"TTTTTTTT"]), pc(&[]), 1, false, false);
 
         let primary = b"GGGGAAAACCCC";
         let secondary = b"GGGGTTTTTTTTCCCC";
@@ -412,8 +414,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_either() {
-        let pat = vec![b"CCCCCCCC".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(vec![], vec![], pat, 1, false, false);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCCCCCC"]), 1, false, false);
 
         // Test match in primary
         let primary1 = b"GGGGCCCCCCCCTTTT";
@@ -433,8 +435,14 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_pattern_strings() {
-        let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 1, false, false);
+        let counter = FuzzyPatternCounter::new(
+            pc(&[b"AAAAAAAA", b"TTTTTTTT"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+        );
 
         let patterns = counter.pattern_strings();
         assert_eq!(patterns.len(), 2);
@@ -445,8 +453,8 @@ mod pattern_count_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_edit_distance_zero() {
-        let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut counter = FuzzyPatternCounter::new(pat1, vec![], vec![], 0, false, false);
+        let mut counter =
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 0, false, false);
 
         // Exact match (should count)
         let primary1 = b"GGGGAAAAAAAATTTT";

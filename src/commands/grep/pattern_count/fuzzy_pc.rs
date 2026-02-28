@@ -1,4 +1,4 @@
-use super::PatternCount;
+use super::{PatternCollection, PatternCount};
 
 use sassy::{profiles::Iupac, Searcher};
 
@@ -13,25 +13,31 @@ pub struct FuzzyPatternCounter {
     inexact: bool,  // whether to only report inexact matches
     invert: bool,   // invert the match
 
+    all_patterns: PatternCollection,
     searcher: Searcher<Iupac>,
 }
 
 impl FuzzyPatternCounter {
     pub fn new(
-        pat1: Patterns,
-        pat2: Patterns,
-        pat: Patterns,
+        pat1: PatternCollection,
+        pat2: PatternCollection,
+        pat: PatternCollection,
         k: usize,
         inexact: bool,
         invert: bool,
     ) -> Self {
+        let pat1_bytes = pat1.bytes();
+        let pat2_bytes = pat2.bytes();
+        let pat_bytes = pat.bytes();
+        let all_patterns = PatternCollection(pat1.into_iter().chain(pat2).chain(pat).collect());
         Self {
-            pat1,
-            pat2,
-            pat,
+            pat1: pat1_bytes,
+            pat2: pat2_bytes,
+            pat: pat_bytes,
             k,
             inexact,
             invert,
+            all_patterns,
             searcher: Searcher::new_fwd(),
         }
     }
@@ -99,12 +105,10 @@ impl PatternCount for FuzzyPatternCounter {
     }
 
     fn pattern_strings(&self) -> Vec<String> {
-        self.pat1
+        self.all_patterns
             .iter()
-            .chain(self.pat2.iter())
-            .chain(self.pat.iter())
             .map(|pat| {
-                std::str::from_utf8(pat)
+                std::str::from_utf8(&pat.sequence)
                     .expect("Invalid UTF-8 found in pattern")
                     .to_string()
             })
@@ -112,6 +116,6 @@ impl PatternCount for FuzzyPatternCounter {
     }
 
     fn pattern_names(&self) -> Vec<String> {
-        unimplemented!()
+        self.all_patterns.names()
     }
 }
