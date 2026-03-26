@@ -253,7 +253,9 @@ pub fn run(args: &GrepCommand) -> Result<()> {
 
 #[cfg(test)]
 mod fixed_detection_tests {
-    use super::{all_patterns_fixed, is_fixed, Pattern, PatternCollection};
+    use crate::commands::grep::redistribute_patterns;
+
+    use super::{all_patterns_fixed, is_fixed, Mate, Pattern, PatternCollection};
 
     fn pc(patterns: &[&[u8]]) -> PatternCollection {
         PatternCollection(
@@ -320,5 +322,48 @@ mod fixed_detection_tests {
         let p1 = pc(&[]);
         let p2 = pc(&[]);
         assert!(all_patterns_fixed(&[&p1, &p2]));
+    }
+
+    #[test]
+    fn test_redistribution_noop() {
+        let mut pat1 = pc(&[b"ACGT", b"TTTT"]);
+        let mut pat2 = pc(&[b"GGGG"]);
+        let mut pat = pc(&[b"AC.GT"]);
+
+        let pat1_clone = pat1.clone();
+        let pat2_clone = pat2.clone();
+        let pat_clone = pat.clone();
+
+        redistribute_patterns(&mut pat1, &mut pat2, &mut pat, Mate::Both).unwrap();
+
+        assert_eq!(pat1, pat1_clone);
+        assert_eq!(pat2, pat2_clone);
+        assert_eq!(pat, pat_clone);
+    }
+
+    #[test]
+    fn test_redistribution_m1() {
+        let mut pat1 = pc(&[b"ACGT", b"TTTT"]);
+        let mut pat2 = pc(&[b"GGGG"]);
+        let mut pat = pc(&[b"AC.GT"]);
+
+        redistribute_patterns(&mut pat1, &mut pat2, &mut pat, Mate::One).unwrap();
+
+        assert_eq!(pat1, pc(&[b"ACGT", b"TTTT", b"AC.GT"]));
+        assert!(pat2.is_empty());
+        assert!(pat.is_empty());
+    }
+
+    #[test]
+    fn test_redistribution_m2() {
+        let mut pat1 = pc(&[b"ACGT", b"TTTT"]);
+        let mut pat2 = pc(&[b"GGGG"]);
+        let mut pat = pc(&[b"AC.GT"]);
+
+        redistribute_patterns(&mut pat1, &mut pat2, &mut pat, Mate::Two).unwrap();
+
+        assert!(pat1.is_empty());
+        assert_eq!(pat2, pc(&[b"GGGG", b"AC.GT"]));
+        assert!(pat.is_empty());
     }
 }
