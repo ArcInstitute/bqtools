@@ -41,13 +41,13 @@ impl FuzzyPatternCounter {
         // encode the patterns for each collection/searcher combination
         let enc_pat1 = pat1
             .has_patterns()
-            .then_some(searcher_1.encode_patterns(&pat1.bytes()));
+            .then(|| searcher_1.encode_patterns(&pat1.bytes()));
         let enc_pat2 = pat2
             .has_patterns()
-            .then_some(searcher_2.encode_patterns(&pat2.bytes()));
+            .then(|| searcher_2.encode_patterns(&pat2.bytes()));
         let enc_pat = pat
             .has_patterns()
-            .then_some(searcher.encode_patterns(&pat.bytes()));
+            .then(|| searcher.encode_patterns(&pat.bytes()));
 
         // combine all patterns into a single collection for reporting
         let all_patterns = PatternCollection(pat1.into_iter().chain(pat2).chain(pat).collect());
