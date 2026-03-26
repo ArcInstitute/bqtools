@@ -5,6 +5,7 @@ use anyhow::Result;
 use binseq::BinseqReader;
 use bon::builder;
 use niffler::Level;
+use rand::{Rng, RngExt};
 use tempfile::NamedTempFile;
 
 pub const COMMAND_NAME: &str = "bqtools";
@@ -104,6 +105,21 @@ fn with_suffix(format: FastxFormat, comp: CompressionStatus) -> String {
     format!("{}{}", format.suffix(), comp.suffix())
 }
 
+fn fill_nucleotide_buffer<R: Rng>(buffer: &mut Vec<u8>, rng: &mut R, slen: usize) {
+    buffer.clear();
+    buffer.reserve(slen);
+    for _ in 0..slen {
+        buffer.push(match rng.random_range(0..=4) {
+            0 => b'A',
+            1 => b'C',
+            2 => b'G',
+            3 => b'T',
+            4 => b'N',
+            _ => unreachable!(),
+        });
+    }
+}
+
 #[builder]
 pub fn write_fastx(
     #[builder(default)] comp: CompressionStatus,
@@ -113,16 +129,14 @@ pub fn write_fastx(
 ) -> Result<NamedTempFile> {
     let tempfile = NamedTempFile::with_suffix(with_suffix(format, comp))?;
     let mut handle = compression_passthrough(tempfile.path(), comp)?;
-    let mut seqgen = nucgen::Sequence::with_capacity(slen);
+    let mut seq = Vec::with_capacity(slen);
     let mut rng = rand::rng();
     let qual = vec![b'?'; slen];
     for idx in 0..nrec {
-        seqgen.clear_buffer();
-        seqgen.fill_buffer(&mut rng, slen);
-        let seq = seqgen.bytes();
+        fill_nucleotide_buffer(&mut seq, &mut rng, slen);
         match format {
-            FastxFormat::Fastq => write_fastq_to(&mut handle, idx, seq, &qual)?,
-            FastxFormat::Fasta => write_fasta_to(&mut handle, idx, seq)?,
+            FastxFormat::Fastq => write_fastq_to(&mut handle, idx, &seq, &qual)?,
+            FastxFormat::Fasta => write_fasta_to(&mut handle, idx, &seq)?,
         }
     }
     handle.flush()?;
