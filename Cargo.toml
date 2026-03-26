@@ -37,7 +37,6 @@ zstd = { version = "0.13.3", features = ["zstdmt"] }
 [dev-dependencies]
 bon = "3.8.2"
 itertools = "0.14.0"
-nucgen = "0.2.0"
 tempfile = "3.24.0"
 
 [features]
