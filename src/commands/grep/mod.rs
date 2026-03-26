@@ -161,7 +161,7 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
-        );
+        )?;
         return Ok(PatternMatcher::Fuzzy(matcher));
     }
 
