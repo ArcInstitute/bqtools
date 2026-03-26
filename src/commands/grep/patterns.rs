@@ -47,6 +47,10 @@ impl PatternCollection {
         self.0.is_empty()
     }
 
+    pub fn has_patterns(&self) -> bool {
+        !self.is_empty()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Pattern> {
         self.0.iter()
     }
