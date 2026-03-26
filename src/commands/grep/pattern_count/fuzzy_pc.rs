@@ -16,11 +16,11 @@ pub struct FuzzyPatternCounter {
     invert: bool,                           // invert the match
 
     /// Fixed bitset for pat1
-    bs1: FixedBitSet,
+    bits1: FixedBitSet,
     /// Fixed bitset for pat2
-    bs2: FixedBitSet,
+    bits2: FixedBitSet,
     /// Fixed bitset for pat
-    bs: FixedBitSet,
+    bits: FixedBitSet,
 
     all_patterns: PatternCollection,
 
@@ -57,9 +57,9 @@ impl FuzzyPatternCounter {
             .has_patterns()
             .then(|| searcher.encode_patterns(&pat.bytes()));
 
-        let bs1 = FixedBitSet::with_capacity(pat1.len());
-        let bs2 = FixedBitSet::with_capacity(pat2.len());
-        let bs = FixedBitSet::with_capacity(pat.len());
+        let bits1 = FixedBitSet::with_capacity(pat1.len());
+        let bits2 = FixedBitSet::with_capacity(pat2.len());
+        let bits = FixedBitSet::with_capacity(pat.len());
 
         // combine all patterns into a single collection for reporting
         let all_patterns = PatternCollection(pat1.into_iter().chain(pat2).chain(pat).collect());
@@ -72,9 +72,9 @@ impl FuzzyPatternCounter {
             inexact,
             invert,
             all_patterns,
-            bs1,
-            bs2,
-            bs,
+            bits1,
+            bits2,
+            bits,
             searcher_1,
             searcher_2,
             searcher,
@@ -89,7 +89,7 @@ impl FuzzyPatternCounter {
                 .for_each(|m| {
                     let counted = !self.inexact || m.cost != 0;
                     if counted {
-                        self.bs1.set(m.pattern_idx, true);
+                        self.bits1.set(m.pattern_idx, true);
                     }
                 });
         }
@@ -103,7 +103,7 @@ impl FuzzyPatternCounter {
                 .for_each(|m| {
                     let counted = !self.inexact || m.cost != 0;
                     if counted {
-                        self.bs2.set(m.pattern_idx, true);
+                        self.bits2.set(m.pattern_idx, true);
                     }
                 });
         }
@@ -114,7 +114,7 @@ impl FuzzyPatternCounter {
             let mut eval = |m: &Match| {
                 let counted = !self.inexact || m.cost != 0;
                 if counted {
-                    self.bs.set(m.pattern_idx, true);
+                    self.bits.set(m.pattern_idx, true);
                 }
             };
 
@@ -133,9 +133,9 @@ impl FuzzyPatternCounter {
     }
 
     fn clear_bits(&mut self) {
-        self.bs1.clear();
-        self.bs2.clear();
-        self.bs.clear();
+        self.bits1.clear();
+        self.bits2.clear();
+        self.bits.clear();
     }
 
     fn update_pattern_count(&mut self, pattern_count: &mut [usize]) {
@@ -152,9 +152,9 @@ impl FuzzyPatternCounter {
             }
         };
 
-        eval(&self.bs1, self.invert, 0);
-        eval(&self.bs2, self.invert, self.bs1.len());
-        eval(&self.bs, self.invert, self.bs1.len() + self.bs2.len());
+        eval(&self.bits1, self.invert, 0);
+        eval(&self.bits2, self.invert, self.bits1.len());
+        eval(&self.bits, self.invert, self.bits1.len() + self.bits2.len());
     }
 }
 
