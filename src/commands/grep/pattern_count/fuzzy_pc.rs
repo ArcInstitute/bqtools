@@ -69,7 +69,7 @@ impl FuzzyPatternCounter {
     fn match_primary(&mut self, sequence: &[u8], pattern_counts: &mut [usize]) {
         if let Some(ref epat) = self.pat1 {
             self.searcher_1
-                .search_all_encoded_patterns(epat, sequence, self.k)
+                .search_encoded_patterns(epat, sequence, self.k)
                 .iter()
                 .for_each(|m| {
                     let counted = !self.inexact || m.cost != 0;
@@ -84,7 +84,7 @@ impl FuzzyPatternCounter {
         if let Some(ref epat) = self.pat2 {
             let offset = self.pat1.as_ref().map_or(0, |p| p.n_queries());
             self.searcher_2
-                .search_all_encoded_patterns(epat, sequence, self.k)
+                .search_encoded_patterns(epat, sequence, self.k)
                 .iter()
                 .for_each(|m| {
                     let counted = !self.inexact || m.cost != 0;
@@ -109,13 +109,13 @@ impl FuzzyPatternCounter {
 
             // match on primary
             self.searcher
-                .search_all_encoded_patterns(epat, primary, self.k)
+                .search_encoded_patterns(epat, primary, self.k)
                 .iter()
                 .for_each(|m| eval(m, pattern_counts));
 
             // match on secondary
             self.searcher
-                .search_all_encoded_patterns(epat, secondary, self.k)
+                .search_encoded_patterns(epat, secondary, self.k)
                 .iter()
                 .for_each(|m| eval(m, pattern_counts));
         }
