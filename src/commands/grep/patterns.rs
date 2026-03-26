@@ -51,6 +51,21 @@ impl PatternCollection {
     pub fn iter(&self) -> std::slice::Iter<'_, Pattern> {
         self.0.iter()
     }
+
+    /// Takes all patterns from `other` and moves them into this collection.
+    pub fn ingest(&mut self, other: &mut Self) {
+        self.0.extend(other.drain());
+    }
+
+    /// Drains all patterns from this collection, returning an iterator over them.
+    pub fn drain(&mut self) -> impl Iterator<Item = Pattern> + '_ {
+        self.0.drain(..)
+    }
+
+    /// Clears all patterns from this collection.
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
 }
 impl IntoIterator for PatternCollection {
     type Item = Pattern;

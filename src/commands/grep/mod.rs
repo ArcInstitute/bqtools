@@ -6,7 +6,7 @@ mod range;
 
 #[cfg(feature = "fuzzy")]
 use filter::FuzzyMatcher;
-use log::warn;
+use log::{error, warn};
 #[cfg(feature = "fuzzy")]
 use pattern_count::FuzzyPatternCounter;
 
@@ -24,7 +24,7 @@ use crate::{
     commands::{decode::SplitWriter, grep::filter::AhoCorasickMatcher},
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use binseq::prelude::*;
 
 /// Returns true if the pattern is a fixed DNA string (only ACGT).
@@ -43,16 +43,66 @@ fn all_patterns_fixed(pattern_sets: &[&PatternCollection]) -> bool {
         .all(|p| is_fixed(&p.sequence))
 }
 
+/// Handles pattern mates by clearing and ingesting patterns into the appropriate collections.
+///
+/// This is relevant when using the `--mate` option, and enforces that no matches can occur on an ignored mate.
+fn redistribute_patterns(
+    pat1: &mut PatternCollection,
+    pat2: &mut PatternCollection,
+    pat: &mut PatternCollection,
+    mate: Mate,
+) -> Result<()> {
+    match mate {
+        Mate::Both => {
+            // Do nothing - both mates are used
+        }
+        Mate::One => {
+            pat2.clear(); // remove existing patterns from mate 2
+            pat1.ingest(pat); // take patterns from both and apply only to mate 1
+            if pat1.is_empty() {
+                error!("No patterns provided for mate 1");
+                bail!("No patterns provided for mate 1");
+            }
+        }
+        Mate::Two => {
+            pat1.clear(); // remove existing patterns from mate 1
+            pat2.ingest(pat); // take patterns from both and apply only to mate 2
+            if pat2.is_empty() {
+                error!("No patterns provided for mate 2");
+                bail!("No patterns provided for mate 2");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn load_patterns(args: &GrepCommand) -> Result<AllPatterns> {
+    let mut pat1 = args.grep.patterns_m1()?;
+    let mut pat2 = args.grep.patterns_m2()?;
+    let mut pat = args.grep.patterns()?;
+    redistribute_patterns(&mut pat1, &mut pat2, &mut pat, args.output.mate)?;
+    Ok(AllPatterns { pat1, pat2, pat })
+}
+
+struct AllPatterns {
+    pat1: PatternCollection,
+    pat2: PatternCollection,
+    pat: PatternCollection,
+}
+impl AllPatterns {
+    pub fn are_fixed(&self) -> bool {
+        all_patterns_fixed(&[&self.pat1, &self.pat2, &self.pat])
+    }
+}
+
 fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
-        let pat1 = args.grep.patterns_m1()?;
-        let pat2 = args.grep.patterns_m2()?;
-        let pat = args.grep.patterns()?;
+        let patterns = load_patterns(args)?;
         let counter = FuzzyPatternCounter::new(
-            pat1,
-            pat2,
-            pat,
+            patterns.pat1,
+            patterns.pat2,
+            patterns.pat,
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
@@ -60,20 +110,24 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
         return Ok(PatternCounter::Fuzzy(counter));
     }
 
-    let pat1 = args.grep.patterns_m1()?;
-    let pat2 = args.grep.patterns_m2()?;
-    let pat = args.grep.patterns()?;
-    let use_fixed = args.grep.fixed || all_patterns_fixed(&[&pat1, &pat2, &pat]);
+    let patterns = load_patterns(args)?;
+    let use_fixed = args.grep.fixed || patterns.are_fixed();
     if !args.grep.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
     }
 
     if use_fixed {
-        let counter =
-            AhoCorasickPatternCounter::new(pat1, pat2, pat, args.grep.no_dfa, args.grep.invert)?;
+        let counter = AhoCorasickPatternCounter::new(
+            patterns.pat1,
+            patterns.pat2,
+            patterns.pat,
+            args.grep.no_dfa,
+            args.grep.invert,
+        )?;
         Ok(PatternCounter::AhoCorasick(counter))
     } else {
-        let counter = RegexPatternCounter::new(pat1, pat2, pat, args.grep.invert)?;
+        let counter =
+            RegexPatternCounter::new(patterns.pat1, patterns.pat2, patterns.pat, args.grep.invert)?;
         Ok(PatternCounter::Regex(counter))
     }
 }
@@ -99,13 +153,11 @@ fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
 fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
-        let pat1 = args.grep.patterns_m1()?;
-        let pat2 = args.grep.patterns_m2()?;
-        let pat = args.grep.patterns()?;
+        let patterns = load_patterns(args)?;
         let matcher = FuzzyMatcher::new(
-            pat1.bytes(),
-            pat2.bytes(),
-            pat.bytes(),
+            patterns.pat1.bytes(),
+            patterns.pat2.bytes(),
+            patterns.pat.bytes(),
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
@@ -113,19 +165,17 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         return Ok(PatternMatcher::Fuzzy(matcher));
     }
 
-    let pat1 = args.grep.patterns_m1()?;
-    let pat2 = args.grep.patterns_m2()?;
-    let pat = args.grep.patterns()?;
-    let use_fixed = args.grep.fixed || all_patterns_fixed(&[&pat1, &pat2, &pat]);
+    let patterns = load_patterns(args)?;
+    let use_fixed = args.grep.fixed || patterns.are_fixed();
     if !args.grep.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
     }
 
     if use_fixed && !args.grep.and_logic() {
         let matcher = AhoCorasickMatcher::new(
-            pat1.bytes(),
-            pat2.bytes(),
-            pat.bytes(),
+            patterns.pat1.bytes(),
+            patterns.pat2.bytes(),
+            patterns.pat.bytes(),
             args.grep.no_dfa,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
@@ -135,9 +185,9 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
             warn!("`-x/--fixed provided but ignored when using AND logic");
         }
         let matcher = RegexMatcher::new(
-            pat1.regexes()?,
-            pat2.regexes()?,
-            pat.regexes()?,
+            patterns.pat1.regexes()?,
+            patterns.pat2.regexes()?,
+            patterns.pat.regexes()?,
             args.grep.range.map_or(0, |r| r.offset()),
         );
         Ok(PatternMatcher::Regex(matcher))
