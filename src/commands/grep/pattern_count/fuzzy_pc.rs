@@ -47,15 +47,9 @@ impl FuzzyPatternCounter {
         let mut searcher = Searcher::new_fwd();
 
         // encode the patterns for each collection/searcher combination
-        let enc_pat1 = pat1
-            .has_patterns()
-            .then(|| searcher_1.encode_patterns(&pat1.bytes()));
-        let enc_pat2 = pat2
-            .has_patterns()
-            .then(|| searcher_2.encode_patterns(&pat2.bytes()));
-        let enc_pat = pat
-            .has_patterns()
-            .then(|| searcher.encode_patterns(&pat.bytes()));
+        let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(&pat1.bytes()));
+        let enc_pat2 = (!pat2.is_empty()).then(|| searcher_2.encode_patterns(&pat2.bytes()));
+        let enc_pat = (!pat.is_empty()).then(|| searcher.encode_patterns(&pat.bytes()));
 
         let bits1 = FixedBitSet::with_capacity(pat1.len());
         let bits2 = FixedBitSet::with_capacity(pat2.len());
