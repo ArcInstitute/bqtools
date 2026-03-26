@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 /// A pattern with an optional name (from FASTA headers).
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pattern {
     pub name: Option<String>,
     pub sequence: Vec<u8>,
@@ -15,7 +15,7 @@ impl Pattern {
 }
 
 /// A collection of patterns with convenience methods for type conversions.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternCollection(pub Vec<Pattern>);
 impl PatternCollection {
     pub fn bytes(&self) -> Vec<Vec<u8>> {
@@ -43,7 +43,6 @@ impl PatternCollection {
         self.0.len()
     }
 
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
