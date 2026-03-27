@@ -4,7 +4,7 @@ use crate::cli::{FileFormat, Mate, SampleCommand};
 use anyhow::Result;
 use binseq::prelude::*;
 use parking_lot::Mutex;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use super::decode::{build_writer, write_record_pair, SplitWriter};
 

@@ -209,13 +209,13 @@ It will then balance the provided file/file pairs among the thread pool to ensur
 All options provided by `bqtools encode` will be passed through to the sub-encoders.
 
 ```bash
-# Encode all FASTX files as BQ
-bqtools encode --recursive --mode bq ./
+# Encode all FASTX files as CBQ
+bqtools encode --recursive --mode cbq ./
 
-# Encode all paired FASTX files as VBQ and index their output
-bqtools encode --recursive --paired --mode vbq --index ./
+# Encode all paired FASTX files as VBQ
+bqtools encode --recursive --paired --mode vbq ./
 
-# Encode recursively with a max-subdirectory depth of 2
+# Encode as BQ recursively with a max-subdirectory depth of 2
 bqtools encode --recursive --mode bq --depth 2 ./
 ```
 

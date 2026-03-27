@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 /// A pattern with an optional name (from FASTA headers).
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pattern {
     pub name: Option<String>,
     pub sequence: Vec<u8>,
@@ -15,7 +15,7 @@ impl Pattern {
 }
 
 /// A collection of patterns with convenience methods for type conversions.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PatternCollection(pub Vec<Pattern>);
 impl PatternCollection {
     pub fn bytes(&self) -> Vec<Vec<u8>> {
@@ -43,13 +43,27 @@ impl PatternCollection {
         self.0.len()
     }
 
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Pattern> {
         self.0.iter()
+    }
+
+    /// Takes all patterns from `other` and moves them into this collection.
+    pub fn ingest(&mut self, other: &mut Self) {
+        self.0.extend(other.drain());
+    }
+
+    /// Drains all patterns from this collection, returning an iterator over them.
+    pub fn drain(&mut self) -> impl Iterator<Item = Pattern> + '_ {
+        self.0.drain(..)
+    }
+
+    /// Clears all patterns from this collection.
+    pub fn clear(&mut self) {
+        self.0.clear();
     }
 }
 impl IntoIterator for PatternCollection {
