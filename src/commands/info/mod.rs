@@ -5,6 +5,7 @@ use binseq::{
     BinseqReader,
 };
 use serde::Serialize;
+use thousands::Separable;
 
 use crate::cli::InfoCommand;
 
@@ -49,7 +50,10 @@ impl BqInfo {
         if let Some(extended_length) = self.extended_length {
             println!("Extended Length   : {}", extended_length);
         }
-        println!("Number of records : {}", self.num_records);
+        println!(
+            "Number of records : {}",
+            self.num_records.separate_with_underscores()
+        );
     }
 
     fn json(&self) {
@@ -117,7 +121,10 @@ impl VbqInfo {
         println!("            Data               ");
         println!("-------------------------------");
         println!("Number of blocks    : {}", self.n_blocks);
-        println!("Number of records   : {}", self.num_records);
+        println!(
+            "Number of records   : {}",
+            self.num_records.separate_with_underscores()
+        );
     }
 
     fn json(&self) {
@@ -194,7 +201,10 @@ impl CbqInfo {
         println!("            Data               ");
         println!("-------------------------------");
         println!("Number of blocks    : {}", self.num_blocks);
-        println!("Number of records   : {}", self.num_records);
+        println!(
+            "Number of records   : {}",
+            self.num_records.separate_with_underscores()
+        );
     }
 
     fn print_index(&self) {
