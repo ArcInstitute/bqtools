@@ -328,7 +328,7 @@ pub fn run(args: &InfoCommand) -> Result<()> {
             }
             let reader = cbq::MmapReader::new(path)?;
             for header in reader.iter_block_headers() {
-                println!("{:?}", header);
+                println!("{:?}", header?);
             }
         }
     } else {
