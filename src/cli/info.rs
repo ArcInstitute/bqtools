@@ -14,7 +14,7 @@ pub struct InfoCommand {
 #[clap(next_help_heading = "INFO OPTIONS")]
 pub struct InfoOpts {
     /// Only print the number of records in the file
-    #[clap(short, long)]
+    #[clap(short, long, conflicts_with_all=["json", "show_index", "show_headers"])]
     pub num: bool,
 
     /// Print the file in JSON format
@@ -22,10 +22,10 @@ pub struct InfoOpts {
     pub json: bool,
 
     /// Print the index of the file
-    #[clap(long)]
+    #[clap(long, conflicts_with_all=["json", "show_headers", "num"])]
     pub show_index: bool,
 
     /// Print the block headers of the file
-    #[clap(long, conflicts_with = "show_index")]
+    #[clap(long, conflicts_with_all=["json", "show_index", "num"])]
     pub show_headers: bool,
 }
