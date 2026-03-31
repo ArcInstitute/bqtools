@@ -1,99 +1,287 @@
 use anyhow::Result;
-use binseq::{bq, cbq, vbq, BinseqReader};
+use binseq::{
+    bq, cbq,
+    vbq::{self, BlockIndex},
+    BinseqReader,
+};
+use log::warn;
+use serde::Serialize;
+use thousands::Separable;
 
 use crate::cli::InfoCommand;
 
-fn log_reader_bq(reader: &bq::MmapReader, num_records: usize) {
-    let header = reader.header();
-    let bitsize: u8 = header.bits.into();
-    println!("Format Version    : {}", header.format);
-    println!("Bitsize           : {bitsize}");
-    println!("Paired            : {}", header.xlen > 0);
-    println!("Flags             : {}", header.flags);
-    println!("Sequence Length   : {}", header.slen);
-    if header.xlen > 0 {
-        println!("Extended Length   : {}", header.xlen);
-    }
-    println!("Number of records : {num_records}");
-}
-
-fn log_reader_vbq(reader: &vbq::MmapReader, num_records: usize, print_index: bool) -> Result<()> {
-    let header = reader.header();
-    let index = reader.load_index()?;
-
-    if print_index {
-        index.pprint();
-    } else {
-        let bitsize: u8 = header.bits.into();
-        let block_size = pprint_block_size(header.block as f64);
-        println!("-------------------------------");
-        println!("             File              ");
-        println!("-------------------------------");
-        println!("Format              : VBQ");
-        println!("Version             : {}", header.format);
-        println!("-------------------------------");
-        println!("           Metadata            ");
-        println!("-------------------------------");
-        println!("Bits per Nucleotide : {bitsize}");
-        println!("Paired              : {}", header.is_paired());
-        println!("Quality:            : {}", header.qual);
-        println!("Headers:            : {}", header.headers);
-        println!("Flags               : {}", header.flags);
-        println!("-------------------------------");
-        println!("          Compression          ");
-        println!("-------------------------------");
-        println!("Virtual Block Size  : {block_size}");
-        println!("-------------------------------");
-        println!("            Data               ");
-        println!("-------------------------------");
-        println!("Number of blocks    : {}", index.n_blocks());
-        println!("Number of records   : {num_records}");
-    }
-    Ok(())
-}
-
-fn log_reader_cbq(
-    reader: &cbq::MmapReader,
+#[derive(Serialize)]
+struct BqInfo {
+    path: String,
+    format: &'static str,
+    version: u8,
+    bitsize: u8,
+    paired: bool,
+    flags: bool,
+    sequence_length: u32,
+    extended_length: Option<u32>,
     num_records: usize,
-    print_index: bool,
-    print_block_headers: bool,
-) -> Result<()> {
-    let header = reader.header();
-    if print_index {
-        let index = reader.index();
-        index.pprint();
-    } else if print_block_headers {
-        for header in reader.iter_block_headers() {
-            println!("{:?}", header?);
+}
+impl BqInfo {
+    fn new(path: String, reader: &bq::MmapReader, num_records: usize) -> Self {
+        let header = reader.header();
+        let bitsize: u8 = header.bits.into();
+        Self {
+            path,
+            format: "BQ",
+            version: header.format,
+            bitsize,
+            paired: header.xlen > 0,
+            flags: header.flags,
+            sequence_length: header.slen,
+            extended_length: if header.xlen > 0 {
+                Some(header.xlen)
+            } else {
+                None
+            },
+            num_records,
         }
-    } else {
-        let block_size = pprint_block_size(header.block_size as f64);
-        let avg_block_size = pprint_block_size(reader.index().average_block_size());
+    }
+
+    fn tabular(&self) {
+        println!("Path                : {}", self.path);
+        println!("Format              : {}", self.format);
+        println!("Version             : {}", self.version);
+        println!("Bitsize             : {}", self.bitsize);
+        println!("Paired              : {}", self.paired);
+        println!("Flags               : {}", self.flags);
+        println!("Sequence Length     : {}", self.sequence_length);
+        if let Some(extended_length) = self.extended_length {
+            println!("Extended Length     : {}", extended_length);
+        }
+        println!(
+            "Number of records   : {}",
+            self.num_records.separate_with_underscores()
+        );
+    }
+
+    fn num_records(&self) {
+        println!("{}\t{}", self.num_records, self.path);
+    }
+}
+
+#[derive(Serialize)]
+struct VbqInfo {
+    path: String,
+    format: &'static str,
+    version: u8,
+    bitsize: u8,
+    paired: bool,
+    quality: bool,
+    headers: bool,
+    flags: bool,
+    block_size: u64,
+    n_blocks: usize,
+    num_records: usize,
+    #[serde(skip)]
+    block_index: BlockIndex,
+}
+
+impl VbqInfo {
+    fn new(path: String, reader: &vbq::MmapReader, num_records: usize) -> Result<Self> {
+        let header = reader.header();
+        let index = reader.load_index()?;
+        let bitsize: u8 = header.bits.into();
+        Ok(Self {
+            path,
+            format: "VBQ",
+            version: header.format,
+            bitsize,
+            paired: header.paired,
+            quality: header.qual,
+            headers: header.headers,
+            flags: header.flags,
+            block_size: header.block,
+            n_blocks: index.n_blocks(),
+            num_records,
+            block_index: index,
+        })
+    }
+
+    fn tabular(&self) {
         println!("-------------------------------");
         println!("             File              ");
         println!("-------------------------------");
-        println!("Format              : CBQ");
-        println!("Version             : {}", header.version);
+        println!("Path                : {}", self.path);
+        println!("Format              : {}", self.format);
+        println!("Version             : {}", self.version);
         println!("-------------------------------");
         println!("           Metadata            ");
         println!("-------------------------------");
-        println!("Paired              : {}", header.is_paired());
-        println!("Quality:            : {}", header.has_qualities());
-        println!("Headers:            : {}", header.has_headers());
-        println!("Flags               : {}", header.has_flags());
+        println!("Bits per Nucleotide : {}", self.bitsize);
+        println!("Paired              : {}", self.paired);
+        println!("Quality:            : {}", self.quality);
+        println!("Headers:            : {}", self.headers);
+        println!("Flags               : {}", self.flags);
         println!("-------------------------------");
         println!("          Compression          ");
         println!("-------------------------------");
-        println!("Compression Level   : {}", header.compression_level);
-        println!("Virtual Block Size  : {block_size}");
-        println!("Mean Block Size     : {avg_block_size}");
+        println!(
+            "Virtual Block Size  : {}",
+            pprint_block_size(self.block_size as f64)
+        );
         println!("-------------------------------");
         println!("            Data               ");
         println!("-------------------------------");
-        println!("Number of blocks    : {}", reader.num_blocks());
-        println!("Number of records   : {num_records}");
+        println!("Number of blocks    : {}", self.n_blocks);
+        println!(
+            "Number of records   : {}",
+            self.num_records.separate_with_underscores()
+        );
     }
-    Ok(())
+
+    fn print_index(&self) {
+        self.block_index.pprint();
+    }
+
+    fn num_records(&self) {
+        println!("{}\t{}", self.num_records, self.path);
+    }
+}
+
+#[derive(Serialize)]
+struct CbqInfo {
+    path: String,
+    format: &'static str,
+    version: u8,
+    paired: bool,
+    quality: bool,
+    headers: bool,
+    flags: bool,
+    compression_level: u64,
+    block_size: u64,
+    mean_block_size: f64,
+    num_blocks: usize,
+    num_records: usize,
+    #[serde(skip)]
+    index: cbq::Index,
+}
+impl CbqInfo {
+    fn new(path: String, reader: &cbq::MmapReader, num_records: usize) -> Self {
+        let header = reader.header();
+        let index = reader.index().to_owned();
+        let avg_block_size = reader.index().average_block_size();
+        Self {
+            path,
+            format: "CBQ",
+            version: header.version,
+            paired: header.is_paired(),
+            quality: header.has_qualities(),
+            headers: header.has_headers(),
+            flags: header.has_flags(),
+            compression_level: header.compression_level,
+            block_size: header.block_size,
+            mean_block_size: avg_block_size,
+            num_blocks: index.num_blocks(),
+            num_records,
+            index,
+        }
+    }
+
+    fn tabular(&self) {
+        println!("-------------------------------");
+        println!("             File              ");
+        println!("-------------------------------");
+        println!("Path                : {}", self.path);
+        println!("Format              : CBQ");
+        println!("Version             : {}", self.version);
+        println!("-------------------------------");
+        println!("           Metadata            ");
+        println!("-------------------------------");
+        println!("Paired              : {}", self.paired);
+        println!("Quality:            : {}", self.quality);
+        println!("Headers:            : {}", self.headers);
+        println!("Flags               : {}", self.flags);
+        println!("-------------------------------");
+        println!("          Compression          ");
+        println!("-------------------------------");
+        println!("Compression Level   : {}", self.compression_level);
+        println!(
+            "Virtual Block Size  : {}",
+            pprint_block_size(self.block_size as f64)
+        );
+        println!(
+            "Mean Block Size     : {}",
+            pprint_block_size(self.mean_block_size)
+        );
+        println!("-------------------------------");
+        println!("            Data               ");
+        println!("-------------------------------");
+        println!("Number of blocks    : {}", self.num_blocks);
+        println!(
+            "Number of records   : {}",
+            self.num_records.separate_with_underscores()
+        );
+    }
+
+    fn print_index(&self) {
+        self.index.pprint();
+    }
+
+    fn num_records(&self) {
+        println!("{}\t{}", self.num_records, self.path);
+    }
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum BinseqInfo {
+    Bq(BqInfo),
+    Vbq(VbqInfo),
+    Cbq(CbqInfo),
+}
+impl BinseqInfo {
+    pub fn from_path(path: &str) -> Result<Self> {
+        let reader = BinseqReader::new(path)?;
+        let num_records = reader.num_records()?;
+        match reader {
+            BinseqReader::Bq(bq_reader) => Ok(BinseqInfo::Bq(BqInfo::new(
+                path.to_string(),
+                &bq_reader,
+                num_records,
+            ))),
+            BinseqReader::Vbq(vbq_reader) => Ok(BinseqInfo::Vbq(VbqInfo::new(
+                path.to_string(),
+                &vbq_reader,
+                num_records,
+            )?)),
+            BinseqReader::Cbq(cbq_reader) => Ok(BinseqInfo::Cbq(CbqInfo::new(
+                path.to_string(),
+                &cbq_reader,
+                num_records,
+            ))),
+        }
+    }
+    pub fn tabular(&self) {
+        match self {
+            BinseqInfo::Bq(bq) => bq.tabular(),
+            BinseqInfo::Vbq(vbq) => vbq.tabular(),
+            BinseqInfo::Cbq(cbq) => cbq.tabular(),
+        }
+    }
+
+    pub fn num_records(&self) {
+        match self {
+            BinseqInfo::Bq(bq) => bq.num_records(),
+            BinseqInfo::Vbq(vbq) => vbq.num_records(),
+            BinseqInfo::Cbq(cbq) => cbq.num_records(),
+        }
+    }
+
+    pub fn print_index(&self) {
+        match self {
+            BinseqInfo::Bq(bq) => {
+                warn!("No index to print for BQ path: {}", bq.path)
+            }
+            BinseqInfo::Vbq(vbq) => vbq.print_index(),
+            BinseqInfo::Cbq(cbq) => cbq.print_index(),
+        }
+    }
 }
 
 fn pprint_block_size<T>(block_size: T) -> String
@@ -117,24 +305,48 @@ where
 }
 
 pub fn run(args: &InfoCommand) -> Result<()> {
-    let reader = BinseqReader::new(args.input.path())?;
-    let num_records = reader.num_records()?;
-    if args.opts.num {
-        println!("{num_records}");
+    // case for just CBQ with block headers
+    if args.opts.show_headers {
+        for path in args.input.iter() {
+            let reader = match cbq::MmapReader::new(path.as_str()) {
+                Ok(reader) => reader,
+                Err(e) => {
+                    warn!("Unable to read path: {} - {}", path, e);
+                    continue;
+                }
+            };
+            for header in reader.iter_block_headers() {
+                println!("{:?}", header?);
+            }
+        }
+        return Ok(());
+    }
+
+    // all other cases
+    let all_info: Vec<BinseqInfo> = args
+        .input
+        .iter()
+        .filter_map(|path| match BinseqInfo::from_path(path.as_str()) {
+            Ok(info) => Some(info),
+            Err(_) => {
+                warn!("Unable to read path: {}", path);
+                None
+            }
+        })
+        .collect();
+    if args.opts.json {
+        println!("{}", serde_json::to_string_pretty(&all_info)?);
+    } else if args.opts.num {
+        for info in all_info {
+            info.num_records();
+        }
+    } else if args.opts.show_index {
+        for info in all_info {
+            info.print_index();
+        }
     } else {
-        match reader {
-            BinseqReader::Bq(ref bq_reader) => log_reader_bq(bq_reader, num_records),
-            BinseqReader::Vbq(ref vbq_reader) => {
-                log_reader_vbq(vbq_reader, num_records, args.opts.show_index)?;
-            }
-            BinseqReader::Cbq(ref cbq_reader) => {
-                log_reader_cbq(
-                    cbq_reader,
-                    num_records,
-                    args.opts.show_index,
-                    args.opts.show_headers,
-                )?;
-            }
+        for info in all_info {
+            info.tabular();
         }
     }
     Ok(())

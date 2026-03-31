@@ -1,12 +1,10 @@
 use clap::Parser;
 
-use super::InputBinseq;
-
 #[derive(Parser, Debug)]
 /// Show information about a BINSEQ file.
 pub struct InfoCommand {
-    #[clap(flatten)]
-    pub input: InputBinseq,
+    #[clap(num_args=1.., required=true)]
+    pub input: Vec<String>,
 
     #[clap(flatten)]
     pub opts: InfoOpts,
@@ -16,14 +14,18 @@ pub struct InfoCommand {
 #[clap(next_help_heading = "INFO OPTIONS")]
 pub struct InfoOpts {
     /// Only print the number of records in the file
-    #[clap(short, long)]
+    #[clap(short, long, conflicts_with_all=["json", "show_index", "show_headers"])]
     pub num: bool,
 
+    /// Print the file in JSON format
+    #[clap(short, long, conflicts_with_all=["show_index", "show_headers", "num"])]
+    pub json: bool,
+
     /// Print the index of the file
-    #[clap(long)]
+    #[clap(long, conflicts_with_all=["json", "show_headers", "num"])]
     pub show_index: bool,
 
     /// Print the block headers of the file
-    #[clap(long, conflicts_with = "show_index")]
+    #[clap(long, conflicts_with_all=["json", "show_index", "num"])]
     pub show_headers: bool,
 }
