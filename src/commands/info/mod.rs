@@ -71,7 +71,7 @@ struct VbqInfo {
     quality: bool,
     headers: bool,
     flags: bool,
-    block_size: String,
+    block_size: u64,
     n_blocks: usize,
     num_records: usize,
     #[serde(skip)]
@@ -83,7 +83,6 @@ impl VbqInfo {
         let header = reader.header();
         let index = reader.load_index()?;
         let bitsize: u8 = header.bits.into();
-        let block_size = pprint_block_size(header.block as f64);
         Ok(Self {
             format: "VBQ",
             version: header.format,
@@ -92,7 +91,7 @@ impl VbqInfo {
             quality: header.qual,
             headers: header.headers,
             flags: header.flags,
-            block_size,
+            block_size: header.block,
             n_blocks: index.n_blocks(),
             num_records,
             block_index: index,
@@ -116,7 +115,10 @@ impl VbqInfo {
         println!("-------------------------------");
         println!("          Compression          ");
         println!("-------------------------------");
-        println!("Virtual Block Size  : {}", self.block_size);
+        println!(
+            "Virtual Block Size  : {}",
+            pprint_block_size(self.block_size as f64)
+        );
         println!("-------------------------------");
         println!("            Data               ");
         println!("-------------------------------");
@@ -145,8 +147,8 @@ struct CbqInfo {
     headers: bool,
     flags: bool,
     compression_level: u64,
-    block_size: String,
-    mean_block_size: String,
+    block_size: u64,
+    mean_block_size: f64,
     num_blocks: usize,
     num_records: usize,
     #[serde(skip)]
@@ -156,8 +158,7 @@ impl CbqInfo {
     fn new(reader: &cbq::MmapReader, num_records: usize) -> Self {
         let header = reader.header();
         let index = reader.index().to_owned();
-        let block_size = pprint_block_size(header.block_size as f64);
-        let avg_block_size = pprint_block_size(reader.index().average_block_size());
+        let avg_block_size = reader.index().average_block_size();
         Self {
             format: "CBQ",
             version: header.version,
@@ -166,7 +167,7 @@ impl CbqInfo {
             headers: header.has_headers(),
             flags: header.has_flags(),
             compression_level: header.compression_level,
-            block_size,
+            block_size: header.block_size,
             mean_block_size: avg_block_size,
             num_blocks: index.num_blocks(),
             num_records,
@@ -195,8 +196,14 @@ impl CbqInfo {
         println!("          Compression          ");
         println!("-------------------------------");
         println!("Compression Level   : {}", self.compression_level);
-        println!("Virtual Block Size  : {}", self.block_size);
-        println!("Mean Block Size     : {}", self.mean_block_size);
+        println!(
+            "Virtual Block Size  : {}",
+            pprint_block_size(self.block_size as f64)
+        );
+        println!(
+            "Mean Block Size     : {}",
+            pprint_block_size(self.mean_block_size)
+        );
         println!("-------------------------------");
         println!("            Data               ");
         println!("-------------------------------");
