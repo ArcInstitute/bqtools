@@ -19,6 +19,10 @@ pub struct InfoOpts {
     #[clap(short, long)]
     pub num: bool,
 
+    /// Print the file in JSON format
+    #[clap(short, long)]
+    pub json: bool,
+
     /// Print the index of the file
     #[clap(long)]
     pub show_index: bool,
