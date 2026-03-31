@@ -4,6 +4,7 @@ use binseq::{
     vbq::{self, BlockIndex},
     BinseqReader,
 };
+use log::warn;
 use serde::Serialize;
 use thousands::Separable;
 
@@ -11,6 +12,7 @@ use crate::cli::InfoCommand;
 
 #[derive(Serialize)]
 struct BqInfo {
+    path: String,
     format: &'static str,
     version: u8,
     bitsize: u8,
@@ -21,10 +23,11 @@ struct BqInfo {
     num_records: usize,
 }
 impl BqInfo {
-    fn new(reader: &bq::MmapReader, num_records: usize) -> Self {
+    fn new(path: String, reader: &bq::MmapReader, num_records: usize) -> Self {
         let header = reader.header();
         let bitsize: u8 = header.bits.into();
         Self {
+            path,
             format: "BQ",
             version: header.format,
             bitsize,
@@ -41,29 +44,30 @@ impl BqInfo {
     }
 
     fn tabular(&self) {
-        println!("Format            : {}", self.format);
-        println!("Version           : {}", self.version);
-        println!("Bitsize           : {}", self.bitsize);
-        println!("Paired            : {}", self.paired);
-        println!("Flags             : {}", self.flags);
-        println!("Sequence Length   : {}", self.sequence_length);
+        println!("Path                : {}", self.path);
+        println!("Format              : {}", self.format);
+        println!("Version             : {}", self.version);
+        println!("Bitsize             : {}", self.bitsize);
+        println!("Paired              : {}", self.paired);
+        println!("Flags               : {}", self.flags);
+        println!("Sequence Length     : {}", self.sequence_length);
         if let Some(extended_length) = self.extended_length {
-            println!("Extended Length   : {}", extended_length);
+            println!("Extended Length     : {}", extended_length);
         }
         println!(
-            "Number of records : {}",
+            "Number of records   : {}",
             self.num_records.separate_with_underscores()
         );
     }
 
-    fn json(&self) {
-        let json = serde_json::to_string_pretty(self).unwrap();
-        println!("{}", json);
+    fn num_records(&self) {
+        println!("{}\t{}", self.num_records, self.path);
     }
 }
 
 #[derive(Serialize)]
 struct VbqInfo {
+    path: String,
     format: &'static str,
     version: u8,
     bitsize: u8,
@@ -79,11 +83,12 @@ struct VbqInfo {
 }
 
 impl VbqInfo {
-    fn new(reader: &vbq::MmapReader, num_records: usize) -> Result<Self> {
+    fn new(path: String, reader: &vbq::MmapReader, num_records: usize) -> Result<Self> {
         let header = reader.header();
         let index = reader.load_index()?;
         let bitsize: u8 = header.bits.into();
         Ok(Self {
+            path,
             format: "VBQ",
             version: header.format,
             bitsize,
@@ -102,6 +107,7 @@ impl VbqInfo {
         println!("-------------------------------");
         println!("             File              ");
         println!("-------------------------------");
+        println!("Path                : {}", self.path);
         println!("Format              : {}", self.format);
         println!("Version             : {}", self.version);
         println!("-------------------------------");
@@ -129,17 +135,18 @@ impl VbqInfo {
         );
     }
 
-    fn json(&self) {
-        println!("{}", serde_json::to_string_pretty(self).unwrap());
-    }
-
     fn print_index(&self) {
         self.block_index.pprint();
+    }
+
+    fn num_records(&self) {
+        println!("{}\t{}", self.num_records, self.path);
     }
 }
 
 #[derive(Serialize)]
 struct CbqInfo {
+    path: String,
     format: &'static str,
     version: u8,
     paired: bool,
@@ -155,11 +162,12 @@ struct CbqInfo {
     index: cbq::Index,
 }
 impl CbqInfo {
-    fn new(reader: &cbq::MmapReader, num_records: usize) -> Self {
+    fn new(path: String, reader: &cbq::MmapReader, num_records: usize) -> Self {
         let header = reader.header();
         let index = reader.index().to_owned();
         let avg_block_size = reader.index().average_block_size();
         Self {
+            path,
             format: "CBQ",
             version: header.version,
             paired: header.is_paired(),
@@ -175,14 +183,11 @@ impl CbqInfo {
         }
     }
 
-    fn json(&self) {
-        println!("{}", serde_json::to_string_pretty(self).unwrap())
-    }
-
     fn tabular(&self) {
         println!("-------------------------------");
         println!("             File              ");
         println!("-------------------------------");
+        println!("Path                : {}", self.path);
         println!("Format              : CBQ");
         println!("Version             : {}", self.version);
         println!("-------------------------------");
@@ -217,57 +222,66 @@ impl CbqInfo {
     fn print_index(&self) {
         self.index.pprint();
     }
-}
 
-fn log_reader_bq(reader: &bq::MmapReader, num_records: usize, as_json: bool) {
-    let info = BqInfo::new(reader, num_records);
-    if as_json {
-        info.json();
-    } else {
-        info.tabular();
+    fn num_records(&self) {
+        println!("{}\t{}", self.num_records, self.path);
     }
 }
 
-fn log_reader_vbq(
-    reader: &vbq::MmapReader,
-    num_records: usize,
-    print_index: bool,
-    as_json: bool,
-) -> Result<()> {
-    let info = VbqInfo::new(reader, num_records)?;
-    if print_index {
-        info.print_index();
-    } else if as_json {
-        info.json();
-    } else {
-        info.tabular();
-    }
-    Ok(())
+#[derive(Serialize)]
+#[serde(untagged)]
+enum BinseqInfo {
+    Bq(BqInfo),
+    Vbq(VbqInfo),
+    Cbq(CbqInfo),
 }
-
-fn log_reader_cbq(
-    reader: &cbq::MmapReader,
-    num_records: usize,
-    print_index: bool,
-    print_block_headers: bool,
-    as_json: bool,
-) -> Result<()> {
-    if print_block_headers {
-        for header in reader.iter_block_headers() {
-            println!("{:?}", header?);
+impl BinseqInfo {
+    pub fn from_path(path: &str) -> Result<Self> {
+        let reader = BinseqReader::new(path)?;
+        let num_records = reader.num_records()?;
+        match reader {
+            BinseqReader::Bq(bq_reader) => Ok(BinseqInfo::Bq(BqInfo::new(
+                path.to_string(),
+                &bq_reader,
+                num_records,
+            ))),
+            BinseqReader::Vbq(vbq_reader) => Ok(BinseqInfo::Vbq(VbqInfo::new(
+                path.to_string(),
+                &vbq_reader,
+                num_records,
+            )?)),
+            BinseqReader::Cbq(cbq_reader) => Ok(BinseqInfo::Cbq(CbqInfo::new(
+                path.to_string(),
+                &cbq_reader,
+                num_records,
+            ))),
         }
-        return Ok(());
+    }
+    pub fn tabular(&self) {
+        match self {
+            BinseqInfo::Bq(bq) => bq.tabular(),
+            BinseqInfo::Vbq(vbq) => vbq.tabular(),
+            BinseqInfo::Cbq(cbq) => cbq.tabular(),
+        }
     }
 
-    let info = CbqInfo::new(reader, num_records);
-    if print_index {
-        info.print_index();
-    } else if as_json {
-        info.json();
-    } else {
-        info.tabular();
+    pub fn num_records(&self) {
+        match self {
+            BinseqInfo::Bq(bq) => bq.num_records(),
+            BinseqInfo::Vbq(vbq) => vbq.num_records(),
+            BinseqInfo::Cbq(cbq) => cbq.num_records(),
+        }
     }
-    Ok(())
+
+    pub fn print_index(&self) {
+        match self {
+            BinseqInfo::Bq(bq) => {
+                warn!("No index to print for BQ path: {}", bq.path)
+            }
+            BinseqInfo::Vbq(vbq) => vbq.print_index(),
+            BinseqInfo::Cbq(cbq) => cbq.print_index(),
+        }
+    }
 }
 
 fn pprint_block_size<T>(block_size: T) -> String
@@ -291,32 +305,35 @@ where
 }
 
 pub fn run(args: &InfoCommand) -> Result<()> {
-    let reader = BinseqReader::new(args.input.path())?;
-    let num_records = reader.num_records()?;
-    if args.opts.num {
-        println!("{num_records}");
+    let all_info: Vec<BinseqInfo> = args
+        .input
+        .iter()
+        .map(|path| BinseqInfo::from_path(path.as_str()))
+        .collect::<Result<_>>()?;
+    if args.opts.json {
+        println!("{}", serde_json::to_string_pretty(&all_info)?);
+    } else if args.opts.num {
+        for info in all_info {
+            info.num_records();
+        }
+    } else if args.opts.show_index {
+        for info in all_info {
+            info.print_index();
+        }
+    } else if args.opts.show_headers {
+        for path in args.input.iter() {
+            if !path.ends_with(".cbq") {
+                warn!("{} is not a .cbq file, skipping", path);
+                continue;
+            }
+            let reader = cbq::MmapReader::new(path)?;
+            for header in reader.iter_block_headers() {
+                println!("{:?}", header);
+            }
+        }
     } else {
-        match reader {
-            BinseqReader::Bq(ref bq_reader) => {
-                log_reader_bq(bq_reader, num_records, args.opts.json)
-            }
-            BinseqReader::Vbq(ref vbq_reader) => {
-                log_reader_vbq(
-                    vbq_reader,
-                    num_records,
-                    args.opts.show_index,
-                    args.opts.json,
-                )?;
-            }
-            BinseqReader::Cbq(ref cbq_reader) => {
-                log_reader_cbq(
-                    cbq_reader,
-                    num_records,
-                    args.opts.show_index,
-                    args.opts.show_headers,
-                    args.opts.json,
-                )?;
-            }
+        for info in all_info {
+            info.tabular();
         }
     }
     Ok(())
