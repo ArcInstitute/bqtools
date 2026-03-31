@@ -305,11 +305,29 @@ where
 }
 
 pub fn run(args: &InfoCommand) -> Result<()> {
+    // case for just CBQ with block headers
+    if args.opts.show_headers {
+        for path in args.input.iter() {
+            let reader = cbq::MmapReader::new(path.as_str())?;
+            for header in reader.iter_block_headers() {
+                println!("{:?}", header?);
+            }
+        }
+        return Ok(());
+    }
+
+    // all other cases
     let all_info: Vec<BinseqInfo> = args
         .input
         .iter()
-        .map(|path| BinseqInfo::from_path(path.as_str()))
-        .collect::<Result<_>>()?;
+        .filter_map(|path| match BinseqInfo::from_path(path.as_str()) {
+            Ok(info) => Some(info),
+            Err(_) => {
+                warn!("Unable to read path: {}", path);
+                None
+            }
+        })
+        .collect();
     if args.opts.json {
         println!("{}", serde_json::to_string_pretty(&all_info)?);
     } else if args.opts.num {
@@ -319,17 +337,6 @@ pub fn run(args: &InfoCommand) -> Result<()> {
     } else if args.opts.show_index {
         for info in all_info {
             info.print_index();
-        }
-    } else if args.opts.show_headers {
-        for path in args.input.iter() {
-            if !path.ends_with(".cbq") {
-                warn!("{} is not a .cbq file, skipping", path);
-                continue;
-            }
-            let reader = cbq::MmapReader::new(path)?;
-            for header in reader.iter_block_headers() {
-                println!("{:?}", header?);
-            }
         }
     } else {
         for info in all_info {
