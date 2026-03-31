@@ -308,7 +308,13 @@ pub fn run(args: &InfoCommand) -> Result<()> {
     // case for just CBQ with block headers
     if args.opts.show_headers {
         for path in args.input.iter() {
-            let reader = cbq::MmapReader::new(path.as_str())?;
+            let reader = match cbq::MmapReader::new(path.as_str()) {
+                Ok(reader) => reader,
+                Err(e) => {
+                    warn!("Unable to read path: {} - {}", path, e);
+                    continue;
+                }
+            };
             for header in reader.iter_block_headers() {
                 println!("{:?}", header?);
             }
