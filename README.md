@@ -266,7 +266,13 @@ bqtools info input.vbq --show-index
 
 # print out the CBQ block headers
 bqtools info input.cbq --show-headers
+
+# export as json
+bqtools info input.cbq --json
 ```
+
+> Note: using `info` without the `--json` flag will format the number of records to include underscores to delimit the thousands.
+> To avoid this behavior or to pass raw numerical values forward use the `--json` flag.
 
 ### Grep
 
