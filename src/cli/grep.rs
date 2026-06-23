@@ -201,7 +201,7 @@ pub struct PatternFileArgs {
     /// (sequences are used as patterns). FASTA files are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     /// These will match against either primary or extended sequence.
-    #[clap(long)]
+    #[clap(long, required_unless_present_any = ["sfile", "xfile"])]
     pub file: Option<String>,
 
     /// File of patterns to search for in primary sequence
@@ -209,7 +209,7 @@ pub struct PatternFileArgs {
     /// Accepts a plain text file (one pattern per line) or a FASTA file
     /// (sequences are used as patterns). FASTA files are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    #[clap(long)]
+    #[clap(long, required_unless_present_any = ["file", "xfile"])]
     pub sfile: Option<String>,
 
     /// File of patterns to search for in extended sequence
@@ -217,7 +217,7 @@ pub struct PatternFileArgs {
     /// Accepts a plain text file (one pattern per line) or a FASTA file
     /// (sequences are used as patterns). FASTA files are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    #[clap(long)]
+    #[clap(long, required_unless_present_any = ["file", "sfile"])]
     pub xfile: Option<String>,
 }
 
@@ -322,9 +322,34 @@ impl PatternFileArgs {
         }
     }
 
-    fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Pattern>> {
+    pub fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Pattern>> {
         let path = self.file_path(filetype)?;
         Self::load_patterns(path)
+    }
+
+    pub fn load_all_patterns(
+        &self,
+    ) -> Result<(PatternCollection, PatternCollection, PatternCollection)> {
+        let pat1 = if let Some(ref path) = self.sfile {
+            Self::load_patterns(path)?
+        } else {
+            Vec::default()
+        };
+        let pat2 = if let Some(ref path) = self.xfile {
+            Self::load_patterns(path)?
+        } else {
+            Vec::default()
+        };
+        let pat = if let Some(ref path) = self.file {
+            Self::load_patterns(path)?
+        } else {
+            Vec::default()
+        };
+        Ok((
+            PatternCollection(pat1),
+            PatternCollection(pat2),
+            PatternCollection(pat),
+        ))
     }
 }
 
