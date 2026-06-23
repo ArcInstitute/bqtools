@@ -19,7 +19,7 @@ pub use formats::FileFormat;
 pub use grep::{GrepCommand, PatternFileArgs};
 pub use info::InfoCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
-pub use output::{BinseqMode, Mate, OutputBinseq, OutputBinseqOptions, OutputFile};
+pub use output::{BinseqConfig, BinseqMode, Mate, OutputBinseq, OutputFile};
 pub use pipe::PipeCommand;
 pub use sample::SampleCommand;
 pub use split::SplitCommand;

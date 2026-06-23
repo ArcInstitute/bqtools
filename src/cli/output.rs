@@ -169,28 +169,8 @@ impl OutputBinseq {
         }
     }
 
-    pub fn headers(&self) -> bool {
-        self.options.headers()
-    }
-
-    pub fn block_size(&self) -> usize {
-        self.options.block_size()
-    }
-
-    pub fn compress(&self) -> bool {
-        self.options.compress()
-    }
-
-    pub fn quality(&self) -> bool {
-        self.options.quality()
-    }
-
     pub fn threads(&self) -> usize {
         self.options.threads()
-    }
-
-    pub fn bitsize(&self) -> BitSize {
-        self.options.bitsize()
     }
 }
 
@@ -420,5 +400,30 @@ fn parse_memory_size(input: &str) -> Result<usize, String> {
     match number_str.parse::<usize>() {
         Ok(number) => Ok(number * multiplier),
         Err(_) => Err(format!("Failed to parse number: {number_str}")),
+    }
+}
+
+pub struct BinseqConfig {
+    pub compress: bool,
+    pub quality: bool,
+    pub block_size: usize,
+    pub policy: Policy,
+    pub bitsize: BitSize,
+    pub headers: bool,
+    pub threads: usize,
+    pub compression_level: i32,
+}
+impl From<OutputBinseqOptions> for BinseqConfig {
+    fn from(options: OutputBinseqOptions) -> Self {
+        BinseqConfig {
+            compress: options.compress(),
+            quality: options.quality(),
+            block_size: options.block_size(),
+            policy: options.policy.into(),
+            bitsize: options.bitsize(),
+            headers: options.headers(),
+            threads: options.threads(),
+            compression_level: options.level,
+        }
     }
 }

@@ -38,7 +38,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.input.build_paired_collection()?,
             opath.as_deref(),
             args.mode()?,
-            args.output.clone().into(),
+            args.output.options.into(),
         )
     } else if args.input.interleaved {
         if let Some(FileFormat::Bam) = args.input.format() {
@@ -57,7 +57,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                         .context("Must provide an input path for HTSLib")?,
                     opath.as_deref(),
                     args.mode()?,
-                    args.output.clone().into(),
+                    args.output.options.into(),
                     true,
                 )
             }
@@ -67,7 +67,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                 args.input.build_interleaved_collection()?,
                 opath.as_deref(),
                 args.mode()?,
-                args.output.clone().into(),
+                args.output.options.into(),
             )
         }
     } else if let Some(FileFormat::Bam) = args.input.format() {
@@ -86,7 +86,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
                     .context("Must provide an input path for HTSlib")?,
                 opath.as_deref(),
                 args.mode()?,
-                args.output.clone().into(),
+                args.output.options.into(),
                 false,
             )
         }
@@ -96,7 +96,7 @@ fn run_atomic(args: &EncodeCommand) -> Result<()> {
             args.input.build_single_collection()?,
             opath.as_deref(),
             args.mode()?,
-            args.output.clone().into(),
+            args.output.options.into(),
         )
     }?;
 
