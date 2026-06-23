@@ -195,27 +195,29 @@ pub struct FuzzyArgs {
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "PATTERN FILE OPTIONS")]
 pub struct PatternFileArgs {
-    /// File of patterns to search for
+    /// File of patterns to search for in either primary or extended sequence
     ///
-    /// Accepts a plain text file (one pattern per line) or a FASTA file
-    /// (sequences are used as patterns). FASTA files are auto-detected.
+    /// Accepts a plain text file (one pattern per line), a FASTA file
+    /// (sequences are used as patterns), or TSV (alias / pattern).
+    /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    /// These will match against either primary or extended sequence.
     #[clap(long, required_unless_present_any = ["sfile", "xfile"])]
     pub file: Option<String>,
 
     /// File of patterns to search for in primary sequence
     ///
-    /// Accepts a plain text file (one pattern per line) or a FASTA file
-    /// (sequences are used as patterns). FASTA files are auto-detected.
+    /// Accepts a plain text file (one pattern per line), a FASTA file
+    /// (sequences are used as patterns), or TSV (alias / pattern).
+    /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     #[clap(long, required_unless_present_any = ["file", "xfile"])]
     pub sfile: Option<String>,
 
     /// File of patterns to search for in extended sequence
     ///
-    /// Accepts a plain text file (one pattern per line) or a FASTA file
-    /// (sequences are used as patterns). FASTA files are auto-detected.
+    /// Accepts a plain text file (one pattern per line), a FASTA file
+    /// (sequences are used as patterns), or TSV (alias / pattern).
+    /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     #[clap(long, required_unless_present_any = ["file", "sfile"])]
     pub xfile: Option<String>,
