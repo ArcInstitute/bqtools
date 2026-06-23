@@ -157,7 +157,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                             .to_string();
                         file_args.input.input = vec![inpath];
                         file_args.output.output = Some(outpath.clone());
-                        file_args.output.threads = threads_for_this_file;
+                        file_args.output.options.threads = threads_for_this_file;
                         outpath
                     }
                     2 => {
@@ -169,7 +169,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
 
                         file_args.input.input = inpaths;
                         file_args.output.output = Some(outpath.clone());
-                        file_args.output.threads = threads_for_this_file;
+                        file_args.output.options.threads = threads_for_this_file;
                         outpath
                     }
                     _ => {
@@ -183,7 +183,7 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
 
                         file_args.input.input = inpaths;
                         file_args.output.output = Some(outpath.clone());
-                        file_args.output.threads = threads_for_this_file;
+                        file_args.output.options.threads = threads_for_this_file;
                         outpath
                     }
                 };

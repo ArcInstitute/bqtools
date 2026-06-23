@@ -16,7 +16,7 @@ pub struct EncodeCommand {
 }
 impl EncodeCommand {
     pub fn mode(&self) -> Result<BinseqMode> {
-        if let Some(mode) = self.output.mode {
+        if let Some(mode) = self.output.options.mode {
             Ok(mode)
         } else if self.input.recursive {
             Ok(BinseqMode::default())

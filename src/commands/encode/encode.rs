@@ -34,11 +34,11 @@ impl From<OutputBinseq> for Config {
             compress: output.compress(),
             quality: output.quality(),
             block_size: output.block_size(),
-            policy: output.policy.into(),
+            policy: output.options.policy.into(),
             bitsize: output.bitsize(),
             headers: output.headers(),
             threads: output.threads(),
-            compression_level: output.level,
+            compression_level: output.options.level,
         }
     }
 }

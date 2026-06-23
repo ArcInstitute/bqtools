@@ -145,6 +145,57 @@ pub struct OutputBinseq {
     /// To output to stdout, use the `-P/--pipe` flag.
     pub output: Option<String>,
 
+    #[clap(flatten)]
+    pub options: OutputBinseqOptions,
+
+    /// Pipe the output to stdout
+    #[clap(short = 'P', long)]
+    pub pipe: bool,
+}
+impl OutputBinseq {
+    pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
+        let writer = match_output(self.output.as_deref())?;
+        Ok(writer)
+    }
+
+    pub fn mode(&self) -> Result<BinseqMode> {
+        if let Some(mode) = self.options.mode {
+            Ok(mode)
+        } else if let Some(ref path) = self.output {
+            BinseqMode::determine(path)
+        } else {
+            // STDOUT
+            Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn headers(&self) -> bool {
+        self.options.headers()
+    }
+
+    pub fn block_size(&self) -> usize {
+        self.options.block_size()
+    }
+
+    pub fn compress(&self) -> bool {
+        self.options.compress()
+    }
+
+    pub fn quality(&self) -> bool {
+        self.options.quality()
+    }
+
+    pub fn threads(&self) -> usize {
+        self.options.threads()
+    }
+
+    pub fn bitsize(&self) -> BitSize {
+        self.options.bitsize()
+    }
+}
+
+#[derive(Parser, Debug, Clone, Copy)]
+pub struct OutputBinseqOptions {
     /// Defines the BINSEQ mode to use.
     #[clap(short = 'm', long)]
     pub mode: Option<BinseqMode>,
@@ -200,10 +251,6 @@ pub struct OutputBinseq {
     #[clap(short, long, default_value = "3")]
     pub level: i32,
 
-    /// Pipe the output to stdout
-    #[clap(short = 'P', long)]
-    pub pipe: bool,
-
     /// Archive mode
     ///
     /// Automatically sets the relevant flags for VBQ archival mode.
@@ -216,23 +263,7 @@ pub struct OutputBinseq {
     #[clap(short = 'A', long, conflicts_with_all = ["uncompressed", "headers", "bitsize", "block_size", "skip_quality", "level"])]
     pub archive: bool,
 }
-impl OutputBinseq {
-    pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
-        let writer = match_output(self.output.as_deref())?;
-        Ok(writer)
-    }
-
-    pub fn mode(&self) -> Result<BinseqMode> {
-        if let Some(mode) = self.mode {
-            Ok(mode)
-        } else if let Some(ref path) = self.output {
-            BinseqMode::determine(path)
-        } else {
-            // STDOUT
-            Ok(BinseqMode::default())
-        }
-    }
-
+impl OutputBinseqOptions {
     pub fn headers(&self) -> bool {
         if self.archive {
             true
