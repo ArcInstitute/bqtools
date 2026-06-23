@@ -16,6 +16,7 @@ pub struct SplitCommand {
 }
 
 #[derive(Parser, Debug)]
+#[clap(next_help_heading = "SPLIT OPTIONS")]
 pub struct SplitOptions {
     /// Optional base path for output files. If not provided, the current working directory will be used.
     #[clap(long, default_value = "./split_outs")]
@@ -30,6 +31,7 @@ pub struct SplitOptions {
     pub unmatched_basename: String,
 
     /// Don't use Aho-Corasick DFA (slower, but lower memory)
+    #[clap(long)]
     pub no_dfa: bool,
 
     /// Number of processing threads to use, 0: auto
