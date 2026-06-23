@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
+use log::trace;
 use paraseq::{fasta, Record};
 
 use crate::{
@@ -256,9 +257,25 @@ impl PatternFileArgs {
         Ok(false)
     }
 
+    /// Returns true if the file is a two-column TSV (tab-separated values)
+    fn is_tsv(path: &str) -> Result<bool> {
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(false)
+            .from_path(path)?;
+        for res in reader.records().take(10) {
+            let record = res?;
+            if record.len() != 2 {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     /// Load patterns from a file, auto-detecting FASTA vs plain text.
     fn load_patterns(path: &str) -> Result<Vec<Pattern>> {
         if Self::is_fasta(path)? {
+            trace!("Loading patterns from fasta: {path}");
             let mut reader = fasta::Reader::from_path(path)?;
             let mut rset = fasta::RecordSet::default();
             let mut patterns = Vec::new();
@@ -274,7 +291,26 @@ impl PatternFileArgs {
             }
 
             Ok(patterns)
+        } else if Self::is_tsv(path)? {
+            trace!("Loading alias+patterns from tsv: {path}");
+            let mut reader = csv::ReaderBuilder::new()
+                .delimiter(b'\t')
+                .has_headers(false)
+                .from_path(path)?;
+            let mut patterns = Vec::new();
+            for result in reader.records() {
+                let record = result?;
+                if record.len() != 2 {
+                    anyhow::bail!("TSV file must have exactly two columns: name and pattern");
+                }
+                patterns.push(Pattern {
+                    name: Some(record[0].to_string()),
+                    sequence: record[1].as_bytes().to_vec(),
+                });
+            }
+            Ok(patterns)
         } else {
+            trace!("Loading patterns from txt: {path}");
             let contents = std::fs::read_to_string(path)?;
             Ok(contents
                 .lines()
