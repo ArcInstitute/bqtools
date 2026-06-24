@@ -201,7 +201,7 @@ pub struct PatternFileArgs {
     /// (sequences are used as patterns), or TSV (alias / pattern).
     /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    #[clap(long, required_unless_present_any = ["sfile", "xfile"])]
+    #[clap(long, required_unless_present_any = ["reg1", "reg2", "reg", "sfile", "xfile"])]
     pub file: Option<String>,
 
     /// File of patterns to search for in primary sequence
@@ -210,7 +210,7 @@ pub struct PatternFileArgs {
     /// (sequences are used as patterns), or TSV (alias / pattern).
     /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    #[clap(long, required_unless_present_any = ["file", "xfile"])]
+    #[clap(long, required_unless_present_any = ["reg1", "reg2", "reg", "file", "xfile"])]
     pub sfile: Option<String>,
 
     /// File of patterns to search for in extended sequence
@@ -219,7 +219,7 @@ pub struct PatternFileArgs {
     /// (sequences are used as patterns), or TSV (alias / pattern).
     /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    #[clap(long, required_unless_present_any = ["file", "sfile"])]
+    #[clap(long, required_unless_present_any = ["reg1", "reg2", "reg", "file", "sfile"])]
     pub xfile: Option<String>,
 }
 
