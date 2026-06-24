@@ -16,6 +16,8 @@ pub use cli::{Cli, Commands};
 pub use decode::DecodeCommand;
 pub use encode::EncodeCommand;
 pub use formats::FileFormat;
+#[cfg(feature = "fuzzy")]
+pub use grep::FuzzyArgs;
 pub use grep::{GrepCommand, PatternFileArgs};
 pub use info::InfoCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};

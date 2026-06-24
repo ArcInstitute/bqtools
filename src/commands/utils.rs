@@ -17,7 +17,7 @@ pub fn make_directory<P: AsRef<Path>>(path: P) -> Result<()> {
             trace!(
                 "Skipping directory creation for existing directory: {}",
                 path.as_ref().display()
-            )
+            );
         } else {
             bail!(
                 "Cannot create directory at existing file path: {}",

@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 
+#[cfg(feature = "fuzzy")]
+use super::FuzzyArgs;
 use super::{InputBinseq, PatternFileArgs};
 
 /// Split a BINSEQ file into multiple files based on patterns provided in a pattern file
@@ -14,6 +16,10 @@ pub struct SplitCommand {
 
     #[clap(flatten)]
     pub patterns: PatternFileArgs,
+
+    #[cfg(feature = "fuzzy")]
+    #[clap(flatten)]
+    pub fuzzy_args: FuzzyArgs,
 }
 
 impl SplitCommand {
