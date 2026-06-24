@@ -7,11 +7,14 @@ use binseq::{
     vbq, BinseqWriterBuilder, ParallelReader,
 };
 
-use splitter::{AhoCorasickSplitter, SplitProcessor, Splitter};
+use splitter::{AhoCorasickSplitter, RegexSplitter, SplitProcessor, Splitter};
 
 use crate::{
     cli::{BinseqMode, SplitCommand},
-    commands::{grep::PatternCollection, utils::make_directory},
+    commands::{
+        grep::{all_patterns_fixed, PatternCollection},
+        utils::make_directory,
+    },
 };
 
 /// The three pattern sets a split operates over: primary-only, secondary-only,
@@ -21,6 +24,11 @@ struct AllPatterns {
     pat2: PatternCollection,
     pat: PatternCollection,
 }
+impl AllPatterns {
+    pub fn are_fixed(&self) -> bool {
+        all_patterns_fixed(&[&self.pat1, &self.pat2, &self.pat])
+    }
+}
 
 fn load_patterns(args: &SplitCommand) -> Result<AllPatterns> {
     let (pat1, pat2, pat) = args.patterns.load_all_patterns()?;
@@ -29,17 +37,27 @@ fn load_patterns(args: &SplitCommand) -> Result<AllPatterns> {
 
 /// Selects and builds the splitter backend.
 ///
-/// Currently only the Aho-Corasick (fixed-string) backend is implemented;
-/// additional backends (regex, fuzzy, …) can be dispatched here as they land.
+/// Fixed-string pattern sets use the Aho-Corasick backend (auto-detected, or
+/// forced with `-x/--fixed`); anything else falls back to the regex backend.
 fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
     let patterns = load_patterns(args)?;
-    let splitter = AhoCorasickSplitter::new(
-        &patterns.pat1,
-        &patterns.pat2,
-        &patterns.pat,
-        args.split.no_dfa,
-    )?;
-    Ok(Splitter::AhoCorasick(splitter))
+    let use_fixed = args.split.fixed || patterns.are_fixed();
+    if !args.split.fixed && use_fixed {
+        log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
+    }
+
+    if use_fixed {
+        let splitter = AhoCorasickSplitter::new(
+            &patterns.pat1,
+            &patterns.pat2,
+            &patterns.pat,
+            args.split.no_dfa,
+        )?;
+        Ok(Splitter::AhoCorasick(splitter))
+    } else {
+        let splitter = RegexSplitter::new(&patterns.pat1, &patterns.pat2, &patterns.pat)?;
+        Ok(Splitter::Regex(splitter))
+    }
 }
 
 fn get_builder(args: &SplitCommand) -> Result<BinseqWriterBuilder> {

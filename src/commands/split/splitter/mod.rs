@@ -1,8 +1,10 @@
 mod ac_splitter;
 mod processor;
+mod regex_splitter;
 
 pub use ac_splitter::AhoCorasickSplitter;
 pub use processor::SplitProcessor;
+pub use regex_splitter::RegexSplitter;
 
 /// Resolves a record's (primary, secondary) sequences to a single output bin.
 ///
@@ -21,17 +23,20 @@ pub trait SequenceSplit: Clone + Send + Sync {
 #[derive(Clone)]
 pub enum Splitter {
     AhoCorasick(AhoCorasickSplitter),
+    Regex(RegexSplitter),
 }
 impl SequenceSplit for Splitter {
     fn split_idx(&mut self, primary: &[u8], secondary: &[u8]) -> Option<usize> {
         match self {
             Splitter::AhoCorasick(splitter) => splitter.split_idx(primary, secondary),
+            Splitter::Regex(splitter) => splitter.split_idx(primary, secondary),
         }
     }
 
     fn aliases(&self) -> &[String] {
         match self {
             Splitter::AhoCorasick(splitter) => splitter.aliases(),
+            Splitter::Regex(splitter) => splitter.aliases(),
         }
     }
 }
