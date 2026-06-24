@@ -19,7 +19,7 @@ It currently has two variants: BQ and VBQ.
 
 All support single and paired sequences and make use of two-bit or four-bit encoding for efficient nucleotide packing using [`bitnuc`](https://crates.io/crates/bitnuc) and efficient parallel FASTX processing using [`paraseq`](https://crates.io/crates/paraseq).
 
-For more information about BINSEQ, see our [preprint](https://www.biorxiv.org/content/10.1101/2025.04.08.647863v1) where we describe the format family and its applications.
+For more information about BINSEQ, see our [paper](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1014181) where we describe the format family, applications, and benchmark against other sequencing formats.
 
 ### Description of variants
 
@@ -483,3 +483,9 @@ ls fifo_*.fq | xargs -P 4 -I {} sh -c 'legacy-tool {} > {.}.out'
 - Pipes can be read sequentially _or_ in parallel without blocking.
 
 > Note: This feature is not available on Windows.
+
+# Citation
+
+```
+Teyssier N, Dobin A (2026) BINSEQ: A family of high-performance binary formats for nucleotide sequences. PLoS Comput Biol 22(5): e1014181. https://doi.org/10.1371/journal.pcbi.1014181
+```
