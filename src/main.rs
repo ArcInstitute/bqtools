@@ -29,6 +29,10 @@ fn main() -> Result<()> {
     env_logger::builder()
         .format_timestamp_millis()
         .filter_level(log::LevelFilter::Info)
+        .filter_module(
+            "sassy", // silence sassy's debug output
+            log::LevelFilter::Warn,
+        )
         .parse_env("BQTOOLS_LOG")
         .init();
 
