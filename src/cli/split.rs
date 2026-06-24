@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Parser;
 
 use super::{InputBinseq, PatternFileArgs};
@@ -13,6 +14,15 @@ pub struct SplitCommand {
 
     #[clap(flatten)]
     pub patterns: PatternFileArgs,
+}
+
+impl SplitCommand {
+    pub fn validate(&self) -> Result<()> {
+        if self.patterns.empty() {
+            anyhow::bail!("At least one pattern file must be specified");
+        }
+        Ok(())
+    }
 }
 
 #[derive(Parser, Debug)]

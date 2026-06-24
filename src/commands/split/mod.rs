@@ -47,6 +47,10 @@ fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
     }
 
     if use_fixed {
+        log::trace!(
+            "Using Aho-Corasick splitter backend (no_dfa={})",
+            args.split.no_dfa
+        );
         let splitter = AhoCorasickSplitter::new(
             &patterns.pat1,
             &patterns.pat2,
@@ -55,6 +59,7 @@ fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
         )?;
         Ok(Splitter::AhoCorasick(splitter))
     } else {
+        log::trace!("Using regex splitter backend");
         let splitter = RegexSplitter::new(&patterns.pat1, &patterns.pat2, &patterns.pat)?;
         Ok(Splitter::Regex(splitter))
     }
@@ -82,6 +87,7 @@ fn get_builder(args: &SplitCommand) -> Result<BinseqWriterBuilder> {
 }
 
 pub fn run(args: &SplitCommand) -> Result<()> {
+    args.validate()?;
     let splitter = build_splitter(args)?;
     let builder = get_builder(args)?;
     make_directory(&args.split.basepath)?;
