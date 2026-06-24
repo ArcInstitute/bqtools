@@ -133,9 +133,9 @@ impl ParallelProcessor for SplitProcessor {
                     Ok(())
                 });
 
-            self.t_counts.get_mut(pattern_idx).map(|c| {
+            if let Some(c) = self.t_counts.get_mut(pattern_idx) {
                 *c += 1;
-            });
+            }
         } else if self.write_undetermined {
             // always the last writer
             let undetermined_idx = self.t_writer.len() - 1;
@@ -146,9 +146,9 @@ impl ParallelProcessor for SplitProcessor {
                 .expect("number of writers misconfigured (undetermined)")
                 .push(rec)?;
 
-            self.t_counts.get_mut(undetermined_idx).map(|c| {
+            if let Some(c) = self.t_counts.get_mut(undetermined_idx) {
                 *c += 1;
-            });
+            }
         }
         Ok(())
     }

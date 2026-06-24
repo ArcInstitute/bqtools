@@ -7,6 +7,8 @@ use binseq::{
     vbq, BinseqWriterBuilder, ParallelReader,
 };
 
+#[cfg(feature = "fuzzy")]
+use splitter::FuzzySplitter;
 use splitter::{AhoCorasickSplitter, RegexSplitter, SplitProcessor, Splitter};
 
 use crate::{
@@ -37,10 +39,29 @@ fn load_patterns(args: &SplitCommand) -> Result<AllPatterns> {
 
 /// Selects and builds the splitter backend.
 ///
-/// Fixed-string pattern sets use the Aho-Corasick backend (auto-detected, or
+/// Fuzzy matching (`-z/--fuzzy`) takes priority when enabled. Otherwise,
+/// fixed-string pattern sets use the Aho-Corasick backend (auto-detected, or
 /// forced with `-x/--fixed`); anything else falls back to the regex backend.
 fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
     let patterns = load_patterns(args)?;
+
+    #[cfg(feature = "fuzzy")]
+    if args.fuzzy_args.fuzzy {
+        log::trace!(
+            "Using fuzzy splitter backend (k={}, inexact={}, backend=sassy)",
+            args.fuzzy_args.distance,
+            args.fuzzy_args.inexact,
+        );
+        let splitter = FuzzySplitter::new(
+            &patterns.pat1,
+            &patterns.pat2,
+            &patterns.pat,
+            args.fuzzy_args.distance,
+            args.fuzzy_args.inexact,
+        )?;
+        return Ok(Splitter::Fuzzy(splitter));
+    }
+
     let use_fixed = args.split.fixed || patterns.are_fixed();
     if !args.split.fixed && use_fixed {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");

@@ -1,8 +1,12 @@
 mod ac_splitter;
+#[cfg(feature = "fuzzy")]
+mod fuzzy_splitter;
 mod processor;
 mod regex_splitter;
 
 pub use ac_splitter::AhoCorasickSplitter;
+#[cfg(feature = "fuzzy")]
+pub use fuzzy_splitter::FuzzySplitter;
 pub use processor::SplitProcessor;
 pub use regex_splitter::RegexSplitter;
 
@@ -24,12 +28,16 @@ pub trait SequenceSplit: Clone + Send + Sync {
 pub enum Splitter {
     AhoCorasick(AhoCorasickSplitter),
     Regex(RegexSplitter),
+    #[cfg(feature = "fuzzy")]
+    Fuzzy(FuzzySplitter),
 }
 impl SequenceSplit for Splitter {
     fn split_idx(&mut self, primary: &[u8], secondary: &[u8]) -> Option<usize> {
         match self {
             Splitter::AhoCorasick(splitter) => splitter.split_idx(primary, secondary),
             Splitter::Regex(splitter) => splitter.split_idx(primary, secondary),
+            #[cfg(feature = "fuzzy")]
+            Splitter::Fuzzy(splitter) => splitter.split_idx(primary, secondary),
         }
     }
 
@@ -37,6 +45,8 @@ impl SequenceSplit for Splitter {
         match self {
             Splitter::AhoCorasick(splitter) => splitter.aliases(),
             Splitter::Regex(splitter) => splitter.aliases(),
+            #[cfg(feature = "fuzzy")]
+            Splitter::Fuzzy(splitter) => splitter.aliases(),
         }
     }
 }

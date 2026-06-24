@@ -55,7 +55,7 @@ impl AhoCorasickSplitter {
             let idx = if let Some(idx) = map.get(&name) {
                 *idx
             } else {
-                unique_aliases.push(name.to_string());
+                unique_aliases.push(name.clone());
                 let alias_index = map.len();
                 map.insert(name, alias_index);
                 alias_index
@@ -69,9 +69,9 @@ impl AhoCorasickSplitter {
             state2,
             state,
             all_bits,
-            alias_indices,
-            unique_aliases,
             unique_bits,
+            unique_aliases,
+            alias_indices,
         })
     }
 
@@ -113,9 +113,9 @@ impl SequenceSplit for AhoCorasickSplitter {
         self.match_either(primary, secondary);
 
         self.all_bits.ones().for_each(|idx| {
-            self.alias_indices
-                .get(idx)
-                .map(|u_idx| self.unique_bits.set(*u_idx, true));
+            if let Some(u_idx) = self.alias_indices.get(idx) {
+                self.unique_bits.set(*u_idx, true)
+            }
         });
 
         get_single_hit(&self.unique_bits)
@@ -153,9 +153,8 @@ fn get_single_hit(bitset: &FixedBitSet) -> Option<usize> {
     let mut num_hits = 0;
     let match_id = bitset
         .ones()
-        .map(|idx| {
+        .inspect(|_idx| {
             num_hits += 1;
-            idx
         })
         .last();
 
