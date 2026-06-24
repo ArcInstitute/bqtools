@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use binseq::{BinseqWriterBuilder, BitSize, Policy};
+use binseq::BinseqWriterBuilder;
 use log::trace;
 use paraseq::{
     fastx::{self},
@@ -7,7 +7,7 @@ use paraseq::{
 };
 
 use crate::{
-    cli::{BinseqMode, OutputBinseq},
+    cli::{BinseqConfig, BinseqMode},
     commands::{
         encode::{
             processor::Encoder,
@@ -18,36 +18,11 @@ use crate::{
     types::BoxedReader,
 };
 
-pub struct Config {
-    compress: bool,
-    quality: bool,
-    block_size: usize,
-    policy: Policy,
-    bitsize: BitSize,
-    headers: bool,
-    threads: usize,
-    compression_level: i32,
-}
-impl From<OutputBinseq> for Config {
-    fn from(output: OutputBinseq) -> Self {
-        Config {
-            compress: output.compress(),
-            quality: output.quality(),
-            block_size: output.block_size(),
-            policy: output.policy.into(),
-            bitsize: output.bitsize(),
-            headers: output.headers(),
-            threads: output.threads(),
-            compression_level: output.level,
-        }
-    }
-}
-
 pub fn encode_collection(
     mut collection: fastx::Collection<BoxedReader>,
     opath: Option<&str>,
     mode: BinseqMode,
-    mut config: Config,
+    mut config: BinseqConfig,
 ) -> Result<(usize, usize)> {
     if let Some(infmt) = collection.unique_format() {
         if infmt == fastx::Format::Fasta {
@@ -146,7 +121,7 @@ pub fn encode_htslib(
     inpath: &str,
     opath: Option<&str>,
     mode: BinseqMode,
-    config: Config,
+    config: BinseqConfig,
     paired: bool,
 ) -> Result<(usize, usize)> {
     use super::utils::get_sequence_len_htslib;

@@ -6,9 +6,10 @@ use clap::{
     Parser,
 };
 
-use crate::cli::PipeCommand;
-
-use super::{CatCommand, DecodeCommand, EncodeCommand, GrepCommand, InfoCommand, SampleCommand};
+use super::{
+    CatCommand, DecodeCommand, EncodeCommand, GrepCommand, InfoCommand, PipeCommand, SampleCommand,
+    SplitCommand,
+};
 
 // Configures Clap v3-style help menu colors
 const STYLES: Styles = Styles::styled()
@@ -38,6 +39,8 @@ pub enum Commands {
     Grep(GrepCommand),
 
     Sample(SampleCommand),
+
+    Split(SplitCommand),
 
     Pipe(PipeCommand),
 }

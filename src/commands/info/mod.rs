@@ -52,7 +52,7 @@ impl BqInfo {
         println!("Flags               : {}", self.flags);
         println!("Sequence Length     : {}", self.sequence_length);
         if let Some(extended_length) = self.extended_length {
-            println!("Extended Length     : {}", extended_length);
+            println!("Extended Length     : {extended_length}");
         }
         println!(
             "Number of records   : {}",
@@ -276,7 +276,7 @@ impl BinseqInfo {
     pub fn print_index(&self) {
         match self {
             BinseqInfo::Bq(bq) => {
-                warn!("No index to print for BQ path: {}", bq.path)
+                warn!("No index to print for BQ path: {}", bq.path);
             }
             BinseqInfo::Vbq(vbq) => vbq.print_index(),
             BinseqInfo::Cbq(cbq) => cbq.print_index(),
@@ -307,11 +307,11 @@ where
 pub fn run(args: &InfoCommand) -> Result<()> {
     // case for just CBQ with block headers
     if args.opts.show_headers {
-        for path in args.input.iter() {
+        for path in &args.input {
             let reader = match cbq::MmapReader::new(path.as_str()) {
                 Ok(reader) => reader,
                 Err(e) => {
-                    warn!("Unable to read path: {} - {}", path, e);
+                    warn!("Unable to read path: {path} - {e}");
                     continue;
                 }
             };
@@ -326,10 +326,11 @@ pub fn run(args: &InfoCommand) -> Result<()> {
     let all_info: Vec<BinseqInfo> = args
         .input
         .iter()
-        .filter_map(|path| match BinseqInfo::from_path(path.as_str()) {
-            Ok(info) => Some(info),
-            Err(_) => {
-                warn!("Unable to read path: {}", path);
+        .filter_map(|path| {
+            if let Ok(info) = BinseqInfo::from_path(path.as_str()) {
+                Some(info)
+            } else {
+                warn!("Unable to read path: {path}");
                 None
             }
         })

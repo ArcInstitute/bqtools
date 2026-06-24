@@ -1,6 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use anyhow::{bail, Result};
+use binseq::BinseqReader;
 use clap::Parser;
 use log::{debug, error, warn};
 use paraseq::fastx;
@@ -8,7 +9,7 @@ use paraseq::fastx;
 #[cfg(not(feature = "gcs"))]
 use log::error;
 
-use crate::types::BoxedReader;
+use crate::{cli::BinseqMode, types::BoxedReader};
 
 use super::FileFormat;
 
@@ -251,6 +252,15 @@ pub struct InputBinseq {
 impl InputBinseq {
     pub fn path(&self) -> &str {
         &self.input
+    }
+
+    pub fn mode(&self) -> Result<BinseqMode> {
+        let reader = BinseqReader::new(&self.input)?;
+        match reader {
+            BinseqReader::Bq(_) => Ok(BinseqMode::Bq),
+            BinseqReader::Vbq(_) => Ok(BinseqMode::Vbq),
+            BinseqReader::Cbq(_) => Ok(BinseqMode::Cbq),
+        }
     }
 }
 

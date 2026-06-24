@@ -145,6 +145,37 @@ pub struct OutputBinseq {
     /// To output to stdout, use the `-P/--pipe` flag.
     pub output: Option<String>,
 
+    #[clap(flatten)]
+    pub options: OutputBinseqOptions,
+
+    /// Pipe the output to stdout
+    #[clap(short = 'P', long)]
+    pub pipe: bool,
+}
+impl OutputBinseq {
+    pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
+        let writer = match_output(self.output.as_deref())?;
+        Ok(writer)
+    }
+
+    pub fn mode(&self) -> Result<BinseqMode> {
+        if let Some(mode) = self.options.mode {
+            Ok(mode)
+        } else if let Some(ref path) = self.output {
+            BinseqMode::determine(path)
+        } else {
+            // STDOUT
+            Ok(BinseqMode::default())
+        }
+    }
+
+    pub fn threads(&self) -> usize {
+        self.options.threads()
+    }
+}
+
+#[derive(Parser, Debug, Clone, Copy)]
+pub struct OutputBinseqOptions {
     /// Defines the BINSEQ mode to use.
     #[clap(short = 'm', long)]
     pub mode: Option<BinseqMode>,
@@ -200,10 +231,6 @@ pub struct OutputBinseq {
     #[clap(short, long, default_value = "3")]
     pub level: i32,
 
-    /// Pipe the output to stdout
-    #[clap(short = 'P', long)]
-    pub pipe: bool,
-
     /// Archive mode
     ///
     /// Automatically sets the relevant flags for VBQ archival mode.
@@ -216,23 +243,7 @@ pub struct OutputBinseq {
     #[clap(short = 'A', long, conflicts_with_all = ["uncompressed", "headers", "bitsize", "block_size", "skip_quality", "level"])]
     pub archive: bool,
 }
-impl OutputBinseq {
-    pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
-        let writer = match_output(self.output.as_deref())?;
-        Ok(writer)
-    }
-
-    pub fn mode(&self) -> Result<BinseqMode> {
-        if let Some(mode) = self.mode {
-            Ok(mode)
-        } else if let Some(ref path) = self.output {
-            BinseqMode::determine(path)
-        } else {
-            // STDOUT
-            Ok(BinseqMode::default())
-        }
-    }
-
+impl OutputBinseqOptions {
     pub fn headers(&self) -> bool {
         if self.archive {
             true
@@ -389,5 +400,30 @@ fn parse_memory_size(input: &str) -> Result<usize, String> {
     match number_str.parse::<usize>() {
         Ok(number) => Ok(number * multiplier),
         Err(_) => Err(format!("Failed to parse number: {number_str}")),
+    }
+}
+
+pub struct BinseqConfig {
+    pub compress: bool,
+    pub quality: bool,
+    pub block_size: usize,
+    pub policy: Policy,
+    pub bitsize: BitSize,
+    pub headers: bool,
+    pub threads: usize,
+    pub compression_level: i32,
+}
+impl From<OutputBinseqOptions> for BinseqConfig {
+    fn from(options: OutputBinseqOptions) -> Self {
+        BinseqConfig {
+            compress: options.compress(),
+            quality: options.quality(),
+            block_size: options.block_size(),
+            policy: options.policy.into(),
+            bitsize: options.bitsize(),
+            headers: options.headers(),
+            threads: options.threads(),
+            compression_level: options.level,
+        }
     }
 }

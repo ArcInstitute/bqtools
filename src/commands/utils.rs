@@ -1,21 +1,45 @@
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{self, BufWriter, Write},
+    path::Path,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use gzp::{
     deflate::Gzip,
     par::compress::{ParCompress, ParCompressBuilder},
 };
+use log::trace;
 
-pub fn match_output(path: Option<&str>) -> Result<Box<dyn Write + Send>> {
+pub fn make_directory<P: AsRef<Path>>(path: P) -> Result<()> {
+    if path.as_ref().exists() {
+        if path.as_ref().is_dir() {
+            trace!(
+                "Skipping directory creation for existing directory: {}",
+                path.as_ref().display()
+            );
+        } else {
+            bail!(
+                "Cannot create directory at existing file path: {}",
+                path.as_ref().display()
+            );
+        }
+    } else {
+        trace!("creating directory: {}", path.as_ref().display());
+        fs::create_dir_all(path)?;
+    }
+    Ok(())
+}
+
+pub fn match_output<P: AsRef<Path>>(path: Option<P>) -> Result<Box<dyn Write + Send>> {
     if let Some(path) = path {
+        trace!("Opening writer handle at: {}", path.as_ref().display());
         let handle = File::create(path)?;
         let buffer = BufWriter::new(handle);
         let boxed = Box::new(buffer);
         Ok(boxed)
     } else {
+        trace!("Opening writer handle to stdout");
         let handle = io::stdout();
         let buffer = BufWriter::new(handle);
         let boxed = Box::new(buffer);
