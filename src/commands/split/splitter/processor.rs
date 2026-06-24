@@ -123,6 +123,11 @@ impl SplitProcessor {
             .iter()
             .zip(self.counts.iter().map(|x| *x.lock()))
             .try_for_each(|(alias, count)| writeln!(&mut handle, "{alias}\t{count}"))?;
+        if self.write_undetermined {
+            if let Some(count) = self.counts.last() {
+                writeln!(&mut handle, "unmatched\t{}", *count.lock())?;
+            }
+        }
         handle.flush().map_err(Into::into)
     }
 }
