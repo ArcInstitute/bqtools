@@ -9,15 +9,19 @@ mod input;
 mod output;
 mod pipe;
 mod sample;
+mod split;
 
 pub use cat::CatCommand;
 pub use cli::{Cli, Commands};
 pub use decode::DecodeCommand;
 pub use encode::EncodeCommand;
 pub use formats::FileFormat;
-pub use grep::GrepCommand;
+#[cfg(feature = "fuzzy")]
+pub use grep::FuzzyArgs;
+pub use grep::{GrepCommand, PatternFileArgs};
 pub use info::InfoCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
-pub use output::{BinseqMode, Mate, OutputBinseq, OutputFile};
+pub use output::{BinseqConfig, BinseqMode, Mate, OutputBinseq, OutputFile};
 pub use pipe::PipeCommand;
 pub use sample::SampleCommand;
+pub use split::SplitCommand;

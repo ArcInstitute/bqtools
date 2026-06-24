@@ -29,6 +29,10 @@ fn main() -> Result<()> {
     env_logger::builder()
         .format_timestamp_millis()
         .filter_level(log::LevelFilter::Info)
+        .filter_module(
+            "sassy", // silence sassy's debug output
+            log::LevelFilter::Warn,
+        )
         .parse_env("BQTOOLS_LOG")
         .init();
 
@@ -42,6 +46,7 @@ fn main() -> Result<()> {
         Commands::Info(ref info) => commands::info::run(info),
         Commands::Grep(ref grep) => commands::grep::run(grep),
         Commands::Sample(ref sample) => commands::sample::run(sample),
+        Commands::Split(ref split) => commands::split::run(split),
         Commands::Pipe(ref pipe) => commands::pipe::run(pipe),
     }?;
     trace!("done");

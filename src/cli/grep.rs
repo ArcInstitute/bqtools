@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
+use log::trace;
 use paraseq::{fasta, Record};
 
 use crate::{
@@ -194,27 +195,29 @@ pub struct FuzzyArgs {
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "PATTERN FILE OPTIONS")]
 pub struct PatternFileArgs {
-    /// File of patterns to search for
+    /// File of patterns to search for in either primary or extended sequence
     ///
-    /// Accepts a plain text file (one pattern per line) or a FASTA file
-    /// (sequences are used as patterns). FASTA files are auto-detected.
+    /// Accepts a plain text file (one pattern per line), a FASTA file
+    /// (sequences are used as patterns), or TSV (alias / pattern).
+    /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
-    /// These will match against either primary or extended sequence.
     #[clap(long)]
     pub file: Option<String>,
 
     /// File of patterns to search for in primary sequence
     ///
-    /// Accepts a plain text file (one pattern per line) or a FASTA file
-    /// (sequences are used as patterns). FASTA files are auto-detected.
+    /// Accepts a plain text file (one pattern per line), a FASTA file
+    /// (sequences are used as patterns), or TSV (alias / pattern).
+    /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     #[clap(long)]
     pub sfile: Option<String>,
 
     /// File of patterns to search for in extended sequence
     ///
-    /// Accepts a plain text file (one pattern per line) or a FASTA file
-    /// (sequences are used as patterns). FASTA files are auto-detected.
+    /// Accepts a plain text file (one pattern per line), a FASTA file
+    /// (sequences are used as patterns), or TSV (alias / pattern).
+    /// FASTA files and TSVs are auto-detected.
     /// Patterns may be regex or literal (fuzzy doesn't support regex).
     #[clap(long)]
     pub xfile: Option<String>,
@@ -256,9 +259,25 @@ impl PatternFileArgs {
         Ok(false)
     }
 
+    /// Returns true if the file is a two-column TSV (tab-separated values)
+    fn is_tsv(path: &str) -> Result<bool> {
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(false)
+            .from_path(path)?;
+        for res in reader.records().take(10) {
+            let record = res?;
+            if record.len() != 2 {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     /// Load patterns from a file, auto-detecting FASTA vs plain text.
     fn load_patterns(path: &str) -> Result<Vec<Pattern>> {
         if Self::is_fasta(path)? {
+            trace!("Loading patterns from fasta: {path}");
             let mut reader = fasta::Reader::from_path(path)?;
             let mut rset = fasta::RecordSet::default();
             let mut patterns = Vec::new();
@@ -274,7 +293,26 @@ impl PatternFileArgs {
             }
 
             Ok(patterns)
+        } else if Self::is_tsv(path)? {
+            trace!("Loading alias+patterns from tsv: {path}");
+            let mut reader = csv::ReaderBuilder::new()
+                .delimiter(b'\t')
+                .has_headers(false)
+                .from_path(path)?;
+            let mut patterns = Vec::new();
+            for result in reader.records() {
+                let record = result?;
+                if record.len() != 2 {
+                    anyhow::bail!("TSV file must have exactly two columns: name and pattern");
+                }
+                patterns.push(Pattern {
+                    name: Some(record[0].to_string()),
+                    sequence: record[1].as_bytes().to_vec(),
+                });
+            }
+            Ok(patterns)
         } else {
+            trace!("Loading patterns from txt: {path}");
             let contents = std::fs::read_to_string(path)?;
             Ok(contents
                 .lines()
@@ -286,9 +324,34 @@ impl PatternFileArgs {
         }
     }
 
-    fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Pattern>> {
+    pub fn patterns(&self, filetype: PatternFileType) -> Result<Vec<Pattern>> {
         let path = self.file_path(filetype)?;
         Self::load_patterns(path)
+    }
+
+    pub fn load_all_patterns(
+        &self,
+    ) -> Result<(PatternCollection, PatternCollection, PatternCollection)> {
+        let pat1 = if let Some(ref path) = self.sfile {
+            Self::load_patterns(path)?
+        } else {
+            Vec::default()
+        };
+        let pat2 = if let Some(ref path) = self.xfile {
+            Self::load_patterns(path)?
+        } else {
+            Vec::default()
+        };
+        let pat = if let Some(ref path) = self.file {
+            Self::load_patterns(path)?
+        } else {
+            Vec::default()
+        };
+        Ok((
+            PatternCollection(pat1),
+            PatternCollection(pat2),
+            PatternCollection(pat),
+        ))
     }
 }
 

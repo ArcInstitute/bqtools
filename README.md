@@ -43,6 +43,7 @@ It is the _fastest_ variant but _is lossy_ by design.
 - **Cat**: Concatenate multiple BINSEQ files
 - **Info**: Show information and statistics about a BINSEQ file.
 - **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
+- **Split**: Split a BINSEQ file into multiple files based on matching patterns.
 - **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ.
 
 ## Installation
@@ -114,6 +115,7 @@ bqtools decode --help
 bqtools cat --help
 bqtools info --help
 bqtools grep --help
+bqtools split --help
 bqtools pipe --help
 ```
 
@@ -326,7 +328,8 @@ bqtools grep input.bq "ACGTACGT" -zi
 ```
 
 `bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
-Pattern files can be either **plain text** (one pattern per line) or **FASTA** format (sequences are used as patterns, auto-detected).
+Pattern files can be **plain text** (one pattern per line), **FASTA** (sequences are used as patterns), or **TSV** (two columns: alias and pattern). The format is auto-detected.
+For FASTA and TSV files the header/alias is used as the pattern name in output; plain text patterns use the pattern string itself.
 You can provide files for either primary/extended, just primary, or just extended patterns with the relevant flags.
 Notably this will match _solely_ with OR logic.
 This can be used also with fuzzy matching as well as with pattern counting described below.
@@ -398,11 +401,56 @@ bqtools grep input.bq --file patterns.txt -Px
 ```
 
 The output of pattern count is a TSV with three columns: [Name, Count, Fraction of Total].
-When patterns are loaded from a FASTA file, the FASTA sequence headers are used as names; otherwise, the pattern string itself is used.
+When patterns are loaded from a FASTA or TSV file, the header/alias is used as the name; otherwise, the pattern string itself is used.
 
 ```bash
 # Count patterns from a FASTA file (names column shows FASTA headers)
 bqtools grep input.bq --file patterns.fa -P
+```
+
+### Split
+
+Split a BINSEQ file into separate files based on which pattern each record matches.
+
+Patterns are provided through the same pattern files as `grep` (plain text, FASTA, or TSV with alias/sequence).
+Each output file is named after the pattern alias, and records matching no pattern are written to an `unmatched` file.
+A record is only written when it matches exactly one alias; ambiguous records (matching multiple aliases) are treated as unmatched.
+
+Like `grep`, the backend is auto-selected: fixed-string patterns use Aho-Corasick (or force with `-x/--fixed`), regex patterns use the regex backend, and `-z/--fuzzy` enables fuzzy matching.
+
+```bash
+# See full options list
+bqtools split --help
+
+# Split into per-pattern files (named by FASTA header / TSV alias)
+bqtools split input.cbq --file patterns.tsv
+
+# Write outputs to a specific directory
+bqtools split input.cbq --file patterns.tsv --basepath ./split_outs
+
+# Split on primary or extended sequence patterns
+bqtools split input.cbq --sfile primary.fa
+bqtools split input.cbq --xfile extended.fa
+
+# Force fixed-string (Aho-Corasick) matching
+bqtools split input.cbq --file patterns.tsv -x
+
+# Split with fuzzy matching (edit distance of 2)
+bqtools split input.cbq --file patterns.fa -z -k2
+
+# Skip writing the unmatched file
+bqtools split input.cbq --file patterns.tsv --skip-unmatched
+```
+
+Output files with fewer than a minimum number of records are removed (defaults to 1, dropping empty files).
+Use `--min-records N` to raise the threshold, or `--min-records 0` to keep all files.
+
+```bash
+# Only keep output files with at least 100 records
+bqtools split input.cbq --file patterns.tsv --min-records 100
+
+# Keep all output files, including empty ones
+bqtools split input.cbq --file patterns.tsv --min-records 0
 ```
 
 ### Pipe

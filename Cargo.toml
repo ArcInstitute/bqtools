@@ -1,6 +1,6 @@
 [package]
 name = "bqtools"
-version = "0.5.6"
+version = "0.5.7"
 edition = "2021"
 license = "MIT"
 authors = ["Noam Teyssier <noam.teyssier@arcinstitute.org>"]
@@ -49,8 +49,8 @@ gcs = ["paraseq/gcs"]
 
 [profile.release]
 # debug = true
-lto = true
-codegen-units = 1
+# lto = true
+# codegen-units = 1
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

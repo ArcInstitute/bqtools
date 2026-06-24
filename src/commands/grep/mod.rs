@@ -36,7 +36,7 @@ fn is_fixed(pattern: &[u8]) -> bool {
 }
 
 /// Returns true if all patterns across multiple sets are fixed DNA strings.
-fn all_patterns_fixed(pattern_sets: &[&PatternCollection]) -> bool {
+pub fn all_patterns_fixed(pattern_sets: &[&PatternCollection]) -> bool {
     pattern_sets
         .iter()
         .flat_map(|s| s.iter())
