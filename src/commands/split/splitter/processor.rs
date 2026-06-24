@@ -1,6 +1,6 @@
 use std::{
     io::{stderr, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -35,6 +35,9 @@ pub struct SplitProcessor {
 
     /// Aliases for each output bin (excludes the undetermined writer).
     aliases: Vec<String>,
+
+    /// Output file path for each writer (parallel to `writer`/`counts`).
+    paths: Vec<PathBuf>,
 }
 impl SplitProcessor {
     pub fn new<P: AsRef<Path>>(
@@ -47,19 +50,21 @@ impl SplitProcessor {
     ) -> Result<Self> {
         let mut t_writer = Vec::default();
         let mut writer = Vec::default();
+        let mut paths = Vec::default();
 
         let mut extend_writers = |basename| -> Result<()> {
             let output_path =
                 output_basepath
                     .as_ref()
                     .join(format!("{}{}", basename, output_mode.extension()));
-            let output_handle = match_output(Some(output_path))?;
+            let output_handle = match_output(Some(output_path.clone()))?;
 
             let gw = builder.clone().build(output_handle)?;
             let tw = gw.new_headless_buffer()?;
 
             t_writer.push(tw);
             writer.push(Mutex::new(gw));
+            paths.push(output_path);
 
             Ok(())
         };
@@ -85,11 +90,31 @@ impl SplitProcessor {
             writer: Arc::new(writer),
             counts,
             aliases,
+            paths,
         })
     }
 
     pub fn finish(&mut self) -> binseq::Result<()> {
         self.writer.iter().try_for_each(|w| w.lock().finish())
+    }
+
+    /// Removes any output files that received fewer than `min_records` records.
+    ///
+    /// Must be called after [`finish`](Self::finish) so all writers are flushed.
+    /// Returns the number of files removed.
+    pub fn prune_below(&self, min_records: usize) -> Result<usize> {
+        let mut removed = 0;
+        for (path, count) in self.paths.iter().zip(self.counts.iter().map(|c| *c.lock())) {
+            if count < min_records {
+                log::debug!(
+                    "Removing {} ({count} records, below threshold of {min_records})",
+                    path.display(),
+                );
+                std::fs::remove_file(path)?;
+                removed += 1;
+            }
+        }
+        Ok(removed)
     }
 
     pub fn pprint_counts(&self) -> Result<()> {

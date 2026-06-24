@@ -124,5 +124,11 @@ pub fn run(args: &SplitCommand) -> Result<()> {
     reader.process_parallel(proc.clone(), args.split.threads)?;
     proc.finish()?;
     proc.pprint_counts()?;
+    if args.split.min_records > 0 {
+        let removed = proc.prune_below(args.split.min_records)?;
+        if removed > 0 {
+            log::debug!("Removed {removed} output file(s) below the record threshold");
+        }
+    }
     Ok(())
 }

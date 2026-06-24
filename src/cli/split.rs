@@ -46,6 +46,12 @@ pub struct SplitOptions {
     #[clap(long, default_value = "unmatched")]
     pub unmatched_basename: String,
 
+    /// Remove output files with fewer than this many records.
+    ///
+    /// Defaults to 1, which removes empty output files. Set to 0 to keep all files.
+    #[clap(long, default_value_t = 1)]
+    pub min_records: usize,
+
     /// Denotes patterns are fixed strings (non-regex)
     ///
     /// Allows usage of Aho-Corasick algorithm for efficient matching.
