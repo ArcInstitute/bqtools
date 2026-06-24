@@ -48,8 +48,8 @@ fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
 
     if use_fixed {
         log::trace!(
-            "Using Aho-Corasick splitter backend (no_dfa={})",
-            args.split.no_dfa
+            "Using Aho-Corasick splitter backend (dfa={})",
+            !args.split.no_dfa,
         );
         let splitter = AhoCorasickSplitter::new(
             &patterns.pat1,
