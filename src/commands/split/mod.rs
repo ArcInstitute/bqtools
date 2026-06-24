@@ -1,11 +1,7 @@
 mod splitter;
 
 use anyhow::Result;
-use binseq::{
-    bq,
-    cbq::{self, MmapReader},
-    vbq, BinseqWriterBuilder, ParallelReader,
-};
+use binseq::{bq, cbq, vbq, BinseqReader, BinseqWriterBuilder, ParallelReader};
 
 #[cfg(feature = "fuzzy")]
 use splitter::FuzzySplitter;
@@ -120,7 +116,7 @@ pub fn run(args: &SplitCommand) -> Result<()> {
         !args.split.skip_unmatched,
         &args.split.unmatched_basename,
     )?;
-    let reader = MmapReader::new(args.input.path())?;
+    let reader = BinseqReader::new(args.input.path())?;
     reader.process_parallel(proc.clone(), args.split.threads)?;
     proc.finish()?;
     proc.pprint_counts()?;
