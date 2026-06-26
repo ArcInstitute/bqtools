@@ -12,7 +12,7 @@ use log::{info, warn};
 use crate::cli::{FileFormat, PipeCommand};
 use exec::ExecMode;
 use processor::PipeProcessor;
-use utils::{close_fifos, create_fifos};
+use utils::{create_fifos, FifoGuard};
 
 pub type BoxedWriter = Box<dyn Write + Send>;
 
@@ -70,10 +70,12 @@ pub fn run(args: &PipeCommand) -> Result<()> {
     };
 
     let basename = args.basepath();
-    let fifo_paths = create_fifos(basename, paired, num_pipes, format, channels)?;
+    // Wrap the FIFOs in a guard immediately so they are unlinked on any early
+    // return or panic below, not just on the happy path.
+    let fifo_guard = FifoGuard::new(create_fifos(basename, paired, num_pipes, format, channels)?);
     info!(
         "{} FIFOs created. Waiting for readers to connect...",
-        fifo_paths.len()
+        fifo_guard.paths().len()
     );
 
     let records_per_pipe = num_records / num_pipes;
@@ -145,8 +147,9 @@ pub fn run(args: &PipeCommand) -> Result<()> {
         }
     }
 
+    // `fifo_guard` unlinks the FIFOs as it drops here (and on any early return above).
     info!("Closing FIFOs");
-    close_fifos(&fifo_paths)?;
+    drop(fifo_guard);
 
     Ok(())
 }
@@ -509,6 +512,45 @@ mod tests {
             count_fastx_records(r2_out.path())?,
             DEFAULT_NUM_RECORDS,
             "R2-only paired -x record count mismatch"
+        );
+        Ok(())
+    }
+
+    /// When a consumer exits non-zero, `run` returns an error — but the FIFOs must
+    /// still be unlinked from disk by the `FifoGuard`, not leaked.
+    #[test]
+    fn test_pipe_fifos_cleaned_up_on_error() -> Result<()> {
+        let fastq = write_fastx().call()?;
+        let cbq = NamedTempFile::with_suffix(".cbq")?;
+        encode(fastq.path(), cbq.path())?;
+
+        let fifo_dir = tempfile::tempdir()?;
+        let basepath = fifo_dir.path().join("pipe").to_str().unwrap().to_string();
+
+        // Drain the FIFO (so writer threads complete), then exit non-zero so
+        // `run` bails after the FIFOs have been created.
+        let cmd = crate::cli::PipeCommand::try_parse_from([
+            "pipe",
+            cbq.path().to_str().unwrap(),
+            "-b",
+            &basepath,
+            "-p",
+            "2",
+            "-x",
+            "cat {} > /dev/null; exit 3",
+        ])?;
+        assert!(
+            super::run(&cmd).is_err(),
+            "run should propagate the non-zero consumer exit"
+        );
+
+        let leftover: Vec<_> = std::fs::read_dir(fifo_dir.path())?
+            .filter_map(std::result::Result::ok)
+            .map(|e| e.path())
+            .collect();
+        assert!(
+            leftover.is_empty(),
+            "FIFOs were leaked on error: {leftover:?}"
         );
         Ok(())
     }

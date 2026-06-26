@@ -4,7 +4,7 @@ use std::io::BufWriter;
 use std::path::Path;
 
 use anyhow::Result;
-use log::trace;
+use log::{trace, warn};
 use nix::sys::stat;
 use nix::unistd;
 
@@ -71,19 +71,44 @@ pub fn open_fifo(path: &str) -> Result<BoxedWriter> {
     Ok(Box::new(handle))
 }
 
-/// Close many FIFOs (unlink the path)
-pub fn close_fifos(paths: &[String]) -> Result<()> {
-    for path in paths {
-        close_fifo(path)?;
-    }
-    Ok(())
+/// RAII guard that unlinks a set of FIFOs when dropped.
+///
+/// Cleanup is tied to the guard's lifetime rather than the happy path, so the
+/// FIFOs are removed from disk on any early return, `?` propagation, or panic
+/// (via stack unwinding) — not just on successful completion.
+pub struct FifoGuard {
+    paths: Vec<String>,
 }
 
-/// Close a FIFO (unlink the path)
-pub fn close_fifo(path: &str) -> Result<()> {
+impl FifoGuard {
+    pub fn new(paths: Vec<String>) -> Self {
+        Self { paths }
+    }
+
+    /// The FIFO paths under guard.
+    pub fn paths(&self) -> &[String] {
+        &self.paths
+    }
+}
+
+impl Drop for FifoGuard {
+    fn drop(&mut self) {
+        for path in &self.paths {
+            close_fifo(path);
+        }
+    }
+}
+
+/// Close a FIFO (unlink the path).
+///
+/// A missing path (`ENOENT`) is treated as success so cleanup is idempotent;
+/// other errors are logged but not propagated, since this runs during teardown.
+fn close_fifo(path: &str) {
     trace!("Closing FIFO at path: {path}");
-    unistd::unlink(Path::new(path))?;
-    Ok(())
+    match unistd::unlink(Path::new(path)) {
+        Ok(()) | Err(Errno::ENOENT) => {}
+        Err(err) => warn!("Failed to unlink FIFO at {path}: {err}"),
+    }
 }
 
 pub fn name_fifo(basepath: &str, pid: usize, pair: RecordPair, format: FileFormat) -> String {
