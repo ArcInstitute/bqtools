@@ -77,7 +77,7 @@ pub fn spawn_consumers(
                 if template.contains("{n}") {
                     warn!(
                         "{{n}} was provided to batch exec but is not expanded to the thread pool index. did you mean to run batch?"
-                    )
+                    );
                 }
 
                 // When {R1} and {R2} are adjacent in the template, expand them as

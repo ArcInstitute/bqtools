@@ -64,8 +64,7 @@ pub fn run(args: &PipeCommand) -> Result<()> {
     let channels = if paired {
         args.exec()
             .or_else(|| args.exec_batch())
-            .map(exec::required_channels)
-            .unwrap_or(PairedChannels::Both)
+            .map_or(PairedChannels::Both, exec::required_channels)
     } else {
         PairedChannels::Both
     };
