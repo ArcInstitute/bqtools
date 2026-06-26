@@ -252,6 +252,110 @@ pub fn run(args: &GrepCommand) -> Result<()> {
 }
 
 #[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clap::Parser;
+    use itertools::iproduct;
+    use tempfile::NamedTempFile;
+
+    use crate::cli::{BinseqMode, FileFormat};
+    use crate::testutils::{count_fastx_records, write_fastx, DEFAULT_NUM_RECORDS};
+
+    fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    fn grep_count(bq_path: &std::path::Path, pattern: &str, invert: bool) -> Result<usize> {
+        // Build a grep command that writes to a temp file and count the result.
+        let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+        let mut args = vec![
+            "grep",
+            bq_path.to_str().unwrap(),
+            pattern,
+            "-o",
+            out_tmp.path().to_str().unwrap(),
+        ];
+        if invert {
+            args.push("-v");
+        }
+        let cmd = crate::cli::GrepCommand::try_parse_from(args)?;
+        super::run(&cmd)?;
+        count_fastx_records(out_tmp.path())
+    }
+
+    /// grep returns a count ≤ total records and > 0 for a short common pattern.
+    #[test]
+    fn test_grep_basic_count() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            let in_tmp = write_fastx().call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            let count = grep_count(bq_tmp.path(), "A", false)?;
+            assert!(count > 0, "grep count should be > 0 for {mode:?}");
+            assert!(
+                count <= DEFAULT_NUM_RECORDS,
+                "grep count {count} exceeds total for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// forward matches + inverted matches must equal the total record count exactly.
+    #[test]
+    fn test_grep_invert_complementary() -> Result<()> {
+        for (mode, fmt) in iproduct!(BinseqMode::enum_iter(), FileFormat::fastx_iter()) {
+            let in_tmp = write_fastx().format(fmt).call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            let fwd = grep_count(bq_tmp.path(), "AAAA", false)?;
+            let inv = grep_count(bq_tmp.path(), "AAAA", true)?;
+            assert_eq!(
+                fwd + inv,
+                DEFAULT_NUM_RECORDS,
+                "fwd({fwd}) + inv({inv}) != {DEFAULT_NUM_RECORDS} for {mode:?} {fmt:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// grep writes matching records to a file across all (mode, format) combinations.
+    #[test]
+    fn test_grep_all_modes_and_formats() -> Result<()> {
+        for (mode, fmt) in iproduct!(BinseqMode::enum_iter(), FileFormat::fastx_iter()) {
+            let in_tmp = write_fastx().format(fmt).call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            let out_tmp = NamedTempFile::with_suffix(fmt.fastx_suffix())?;
+            let cmd = crate::cli::GrepCommand::try_parse_from([
+                "grep",
+                bq_tmp.path().to_str().unwrap(),
+                "A",
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+            ])?;
+            super::run(&cmd)
+                .map_err(|e| anyhow::anyhow!("grep failed for {mode:?} {fmt:?}: {e}"))?;
+
+            let count = count_fastx_records(out_tmp.path())?;
+            assert!(
+                count <= DEFAULT_NUM_RECORDS,
+                "grep output count {count} > total for {mode:?} {fmt:?}"
+            );
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
 mod fixed_detection_tests {
     use crate::commands::grep::redistribute_patterns;
 
