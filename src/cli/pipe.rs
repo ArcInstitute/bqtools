@@ -33,14 +33,23 @@ pub struct PipeOptions {
     )]
     basepath: String,
 
-    /// Execute a shell command for each FIFO, replacing `{}` with the path.
-    /// For paired files use `{R1}` and `{R2}` for the respective FIFO paths.
-    /// Use `{n}` for the pipe index (useful for per-shard output paths).
+    /// Execute a shell command once per pipe, substituting FIFO paths.
+    ///
+    /// Use `{}` for the FIFO path (single-end), or `{R1}` / `{R2}` for the
+    /// respective paths (paired-end). Referencing only one of `{R1}` / `{R2}`
+    /// processes just that mate — the other channel's FIFOs are never created.
+    /// `{n}` expands to the pipe index, useful for per-shard output paths.
+    /// Mutually exclusive with `--exec-batch`.
     #[clap(short = 'x', long, conflicts_with = "exec_batch")]
     exec: Option<String>,
 
     /// Execute a single shell command with all FIFO paths substituted.
-    /// `{}` is replaced with a space-joined list; for paired use `{R1}` / `{R2}`.
+    ///
+    /// `{}` (single-end) or `{R1}` / `{R2}` (paired-end) each expand to a
+    /// space-joined list of every matching FIFO path. Writing `{R1} {R2}`
+    /// adjacently interleaves the paths as pairs (r1_0 r2_0 r1_1 r2_1 …) so
+    /// positional-argument tools receive each pair together.
+    /// Mutually exclusive with `--exec`.
     #[clap(short = 'X', long, conflicts_with = "exec")]
     exec_batch: Option<String>,
 }
