@@ -352,7 +352,7 @@ mod tests {
         Ok(())
     }
 
-    /// Missing `{R1}` or `{R2}` in a paired template must be caught before any FIFO is created.
+    /// A paired template with neither `{R1}` nor `{R2}` must be caught before any FIFO is created.
     #[test]
     fn test_pipe_exec_missing_token_paired() -> Result<()> {
         let r1 = write_fastx().call()?;
@@ -370,18 +370,18 @@ mod tests {
         let fifo_dir = tempfile::tempdir()?;
         let basepath = fifo_dir.path().join("pipe").to_str().unwrap().to_string();
 
-        // Template has {R1} but no {R2}.
+        // Template has neither {R1} nor {R2} — nothing to read from either FIFO.
         let cmd = crate::cli::PipeCommand::try_parse_from([
             "pipe",
             cbq.path().to_str().unwrap(),
             "-b",
             &basepath,
             "-x",
-            "cat {R1}",
+            "cat /dev/null",
         ])?;
         assert!(
             super::run(&cmd).is_err(),
-            "should error when {{R2}} is missing from paired template"
+            "should error when neither {{R1}} nor {{R2}} is present in paired template"
         );
         Ok(())
     }
@@ -416,6 +416,88 @@ mod tests {
         let shard1 = out_dir.path().join("shard_1.fastq");
         let total = count_fastx_records(&shard0)? + count_fastx_records(&shard1)?;
         assert_eq!(total, DEFAULT_NUM_RECORDS, "sharded record total mismatch");
+        Ok(())
+    }
+
+    /// Paired-end pipe with `-x` using only `{R1}`: only R1 FIFOs are created and
+    /// written; R2 is silently skipped. This is valid — one-mate-only processing.
+    #[test]
+    fn test_pipe_exec_paired_r1_only() -> Result<()> {
+        let r1 = write_fastx().call()?;
+        let r2 = write_fastx().call()?;
+        let cbq = NamedTempFile::with_suffix(".cbq")?;
+        let encode_cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            r1.path().to_str().unwrap(),
+            r2.path().to_str().unwrap(),
+            "-o",
+            cbq.path().to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&encode_cmd)?;
+
+        let fifo_dir = tempfile::tempdir()?;
+        let basepath = fifo_dir.path().join("pipe").to_str().unwrap().to_string();
+        let r1_out = NamedTempFile::with_suffix(".fastq")?;
+        let r1_path = r1_out.path().to_str().unwrap().to_string();
+
+        let cmd = crate::cli::PipeCommand::try_parse_from([
+            "pipe",
+            cbq.path().to_str().unwrap(),
+            "-b",
+            &basepath,
+            "-p",
+            "1",
+            "-x",
+            &format!("cat {{R1}} > {r1_path}"),
+        ])?;
+        super::run(&cmd)?;
+
+        assert_eq!(
+            count_fastx_records(r1_out.path())?,
+            DEFAULT_NUM_RECORDS,
+            "R1-only paired -x record count mismatch"
+        );
+        Ok(())
+    }
+
+    /// Paired-end pipe with `-x` using only `{R2}`: only R2 FIFOs are created and
+    /// written; R1 is silently skipped. This is valid — one-mate-only processing.
+    #[test]
+    fn test_pipe_exec_paired_r2_only() -> Result<()> {
+        let r1 = write_fastx().call()?;
+        let r2 = write_fastx().call()?;
+        let cbq = NamedTempFile::with_suffix(".cbq")?;
+        let encode_cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            r1.path().to_str().unwrap(),
+            r2.path().to_str().unwrap(),
+            "-o",
+            cbq.path().to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&encode_cmd)?;
+
+        let fifo_dir = tempfile::tempdir()?;
+        let basepath = fifo_dir.path().join("pipe").to_str().unwrap().to_string();
+        let r2_out = NamedTempFile::with_suffix(".fastq")?;
+        let r2_path = r2_out.path().to_str().unwrap().to_string();
+
+        let cmd = crate::cli::PipeCommand::try_parse_from([
+            "pipe",
+            cbq.path().to_str().unwrap(),
+            "-b",
+            &basepath,
+            "-p",
+            "1",
+            "-x",
+            &format!("cat {{R2}} > {r2_path}"),
+        ])?;
+        super::run(&cmd)?;
+
+        assert_eq!(
+            count_fastx_records(r2_out.path())?,
+            DEFAULT_NUM_RECORDS,
+            "R2-only paired -x record count mismatch"
+        );
         Ok(())
     }
 }
