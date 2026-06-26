@@ -4,6 +4,9 @@ mod cli;
 mod commands;
 mod types;
 
+#[cfg(test)]
+mod testutils;
+
 use cli::{Cli, Commands};
 
 use anyhow::Result;
