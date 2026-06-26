@@ -22,7 +22,7 @@ Cargo.lock
 
 split_outs/*
 *.cbq
-*.fa
-*.fq
-*.fasta
-*.fastq
+*.fa*
+*.fq*
+*.fasta*
+*.fastq*
