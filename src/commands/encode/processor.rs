@@ -53,6 +53,10 @@ impl<W: Write + Send> Encoder<W> {
     }
 
     fn write_batch(&mut self) -> binseq::Result<()> {
+        self.writer.lock().ingest_completed(&mut self.t_writer)
+    }
+
+    fn write_final(&mut self) -> binseq::Result<()> {
         self.writer.lock().ingest(&mut self.t_writer)
     }
 
@@ -118,6 +122,10 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for Encoder<W> 
         self.write_batch()
             .map_err(IntoProcessError::into_process_error)
     }
+    fn on_thread_complete(&mut self) -> paraseq::Result<()> {
+        self.write_final()
+            .map_err(IntoProcessError::into_process_error)
+    }
 }
 
 impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Encoder<W> {
@@ -149,6 +157,10 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Encod
         self.write_batch()
             .map_err(IntoProcessError::into_process_error)
     }
+    fn on_thread_complete(&mut self) -> paraseq::Result<()> {
+        self.write_final()
+            .map_err(IntoProcessError::into_process_error)
+    }
 }
 impl<W: Write + Send> binseq::ParallelProcessor for Encoder<W> {
     fn process_record<R: binseq::BinseqRecord>(&mut self, record: R) -> binseq::Result<()> {
@@ -178,5 +190,8 @@ impl<W: Write + Send> binseq::ParallelProcessor for Encoder<W> {
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
+    }
+    fn on_thread_complete(&mut self) -> binseq::Result<()> {
+        self.write_final()
     }
 }
