@@ -119,7 +119,9 @@ pub fn run(args: &SplitCommand) -> Result<()> {
     let reader = BinseqReader::new(args.input.path())?;
     reader.process_parallel(proc.clone(), args.split.threads)?;
     proc.finish()?;
-    proc.pprint_counts()?;
+    if !args.split.quiet {
+        proc.pprint_counts()?;
+    }
     if args.split.min_records > 0 {
         let removed = proc.prune_below(args.split.min_records)?;
         if removed > 0 {
