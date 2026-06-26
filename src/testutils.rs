@@ -80,8 +80,7 @@ pub fn write_fastx(
 ) -> Result<NamedTempFile> {
     let suffix = format!("{}{}", format.fastx_suffix(), comp.suffix());
     let tmp = NamedTempFile::with_suffix(&suffix)?;
-    let mut wtr =
-        niffler::to_path(tmp.path(), comp.niffler_format(), Level::Three)?;
+    let mut wtr = niffler::to_path(tmp.path(), comp.niffler_format(), Level::Three)?;
     let mut rng = rand::rng();
     for idx in 0..nrec {
         let seq = random_sequence(&mut rng, slen);

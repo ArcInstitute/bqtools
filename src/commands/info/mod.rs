@@ -327,8 +327,7 @@ mod tests {
             let reader_count = count_binseq(bq_tmp.path())?;
 
             assert_eq!(
-                info_count,
-                DEFAULT_NUM_RECORDS,
+                info_count, DEFAULT_NUM_RECORDS,
                 "info record count wrong for {mode:?} {fmt:?} {comp:?}"
             );
             assert_eq!(
@@ -352,8 +351,9 @@ mod tests {
                 args.extend_from_slice(flags);
                 args.push(bq_tmp.path().to_str().unwrap());
                 let cmd = crate::cli::InfoCommand::try_parse_from(args)?;
-                super::run(&cmd)
-                    .map_err(|e| anyhow::anyhow!("info failed for {mode:?} flags={flags:?}: {e}"))?;
+                super::run(&cmd).map_err(|e| {
+                    anyhow::anyhow!("info failed for {mode:?} flags={flags:?}: {e}")
+                })?;
             }
         }
         Ok(())
