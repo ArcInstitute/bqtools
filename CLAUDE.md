@@ -52,6 +52,8 @@ Build without defaults: `cargo build --no-default-features -F fuzzy,gcs`
 
 **Writer abstraction**: `SplitWriter` supports interleaved (single file) and split (separate R1/R2) output modes with polymorphic writers (file, stdout, compressed, chunked).
 
+**Pipe exec modes**: The pipe command (`src/commands/pipe/`) splits a BINSEQ file across named FIFOs (one writer thread per pipe). It can optionally spawn and supervise the consumer processes via `ExecMode` (`exec.rs`): `PerFifo` (`-x`/`--exec`) runs one shell command per pipe, while `Batch` (`-X`/`--exec-batch`) runs a single command with all FIFO paths space-joined. Templates use `{}` (single-end), `{R1}`/`{R2}` (paired-end), and `{n}` (pipe index, `-x` only). Templates are validated up front so a malformed template fails before any FIFO is opened (an unread FIFO would hang). `PairedChannels` (`mod.rs`) is derived from the template's tokens so referencing only `{R1}` or `{R2}` suppresses the unused channel's FIFOs and writer threads entirely. Consumers must be spawned before writer threads open the FIFOs, since opening a FIFO for writing blocks until a reader connects.
+
 ### Core Dependencies
 
 | Crate     | Role                             |
