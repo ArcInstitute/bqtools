@@ -44,7 +44,7 @@ It is the _fastest_ variant but _is lossy_ by design.
 - **Info**: Show information and statistics about a BINSEQ file.
 - **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
 - **Split**: Split a BINSEQ file into multiple files based on matching patterns.
-- **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ.
+- **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ, optionally spawning and supervising the consumer commands directly (`-x`/`-X`).
 
 ## Installation
 
@@ -473,11 +473,65 @@ bqtools pipe input.vbq -p 4 -b fifo &
 ls fifo_*.fq | xargs -P 4 -I {} sh -c 'legacy-tool {} > {.}.out'
 ```
 
+#### Executing commands automatically
+
+Managing FIFOs by hand (backgrounding the server, globbing paths, cleaning up)
+is error-prone. The `-x`/`--exec` and `-X`/`--exec-batch` flags let `bqtools pipe`
+spawn the consumer processes for you, wire them up to the FIFOs, and wait for
+them to finish before tearing everything down.
+
+**`-x` / `--exec`** runs one shell command **per pipe**, substituting these tokens:
+
+| Token  | Expands to                                        |
+| ------ | ------------------------------------------------- |
+| `{}`   | the FIFO path (single-end)                        |
+| `{R1}` | the R1 FIFO path (paired-end)                     |
+| `{R2}` | the R2 FIFO path (paired-end)                     |
+| `{n}`  | the pipe index (`0`, `1`, …) for per-shard output |
+
+```bash
+# Single-end: one `legacy-tool` invocation per pipe, in parallel
+bqtools pipe input.cbq -p 4 -x 'legacy-tool {} > shard_{n}.out'
+
+# Paired-end: each invocation receives its own R1/R2 pair
+bqtools pipe paired.cbq -p 4 -x 'legacy-tool --in1 {R1} --in2 {R2} -o out_{n}.bam'
+
+# Process only one mate by referencing just {R1} (R2 FIFOs are never created)
+bqtools pipe paired.cbq -p 4 -x 'legacy-tool {R1} > r1_{n}.out'
+```
+
+**`-X` / `--exec-batch`** runs a **single** command, substituting a space-joined
+list of all FIFO paths. This suits tools that accept many input files as
+positional arguments and parallelize internally.
+
+```bash
+# Single-end: all FIFO paths joined into one argument list
+bqtools pipe input.cbq -p 4 -X 'legacy-tool {} > merged.out'
+
+# Paired-end: {R1} and {R2} each expand to their full list
+bqtools pipe paired.cbq -p 4 -X 'legacy-tool --in1 {R1} --in2 {R2}'
+```
+
+In batch mode, writing `{R1} {R2}` **adjacent** in the template interleaves the
+paths as pairs (`r1_0 r2_0 r1_1 r2_1 …`) so positional-argument tools receive
+each pair together. When the tokens appear separately, each expands to its own
+contiguous list.
+
+Notes:
+
+- `-x` and `-X` are mutually exclusive.
+- The template is validated up front (`{}` for single-end, at least one of
+  `{R1}`/`{R2}` for paired-end) so a malformed template fails fast instead of
+  leaving an unread FIFO open.
+- `bqtools pipe` exits non-zero if any spawned command exits non-zero.
+- `{n}` only applies to `-x`; it has no meaning in `-X` (a single invocation).
+
 **Key features:**
 
 - Each pipe streams a portion of the BINSEQ file **sequentially**
 - No disk I/O for intermediate files - data flows through memory
 - Automatic paired-end handling (`_R1`/`_R2` pairs)
+- Optionally spawn and supervise consumer commands with `-x` / `-X`
 - Blocks until all pipes are fully read (prevents data loss)
 - Auto-scales to CPU count with `-p0` (default)
 - Pipes can be read sequentially _or_ in parallel without blocking.

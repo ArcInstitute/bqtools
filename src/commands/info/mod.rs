@@ -284,6 +284,82 @@ impl BinseqInfo {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clap::Parser;
+    use itertools::iproduct;
+    use tempfile::NamedTempFile;
+
+    use crate::cli::{BinseqMode, FileFormat};
+    use crate::testutils::{count_binseq, write_fastx, Compression, DEFAULT_NUM_RECORDS};
+
+    fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    /// `BinseqInfo::from_path` must parse the file without error and report the correct record count.
+    #[test]
+    fn test_info_record_count() -> Result<()> {
+        for (mode, fmt, comp) in iproduct!(
+            BinseqMode::enum_iter(),
+            FileFormat::fastx_iter(),
+            Compression::all(),
+        ) {
+            let in_tmp = write_fastx().format(fmt).comp(comp).call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            // BinseqInfo::from_path wraps BinseqReader::num_records — verify it agrees with
+            // a direct reader call so info and the reader are always in sync.
+            let info = super::BinseqInfo::from_path(bq_tmp.path().to_str().unwrap())?;
+            let info_count = match &info {
+                super::BinseqInfo::Bq(b) => b.num_records,
+                super::BinseqInfo::Vbq(v) => v.num_records,
+                super::BinseqInfo::Cbq(c) => c.num_records,
+            };
+            let reader_count = count_binseq(bq_tmp.path())?;
+
+            assert_eq!(
+                info_count, DEFAULT_NUM_RECORDS,
+                "info record count wrong for {mode:?} {fmt:?} {comp:?}"
+            );
+            assert_eq!(
+                info_count, reader_count,
+                "info and BinseqReader disagree on count for {mode:?} {fmt:?} {comp:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// `info::run` must not error for any mode or output option.
+    #[test]
+    fn test_info_run_all_modes() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            let in_tmp = write_fastx().call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            for flags in [&[][..], &["--num"], &["--json"]] {
+                let mut args = vec!["info"];
+                args.extend_from_slice(flags);
+                args.push(bq_tmp.path().to_str().unwrap());
+                let cmd = crate::cli::InfoCommand::try_parse_from(args)?;
+                super::run(&cmd).map_err(|e| {
+                    anyhow::anyhow!("info failed for {mode:?} flags={flags:?}: {e}")
+                })?;
+            }
+        }
+        Ok(())
+    }
+}
+
 fn pprint_block_size<T>(block_size: T) -> String
 where
     T: Into<f64> + Copy,

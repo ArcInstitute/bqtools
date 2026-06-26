@@ -66,4 +66,8 @@ pub struct SplitOptions {
     /// Number of processing threads to use, 0: auto
     #[clap(short = 'T', long, default_value_t = 0)]
     pub threads: usize,
+
+    /// Suppress the per-pattern record count summary written to stderr.
+    #[clap(long)]
+    pub quiet: bool,
 }

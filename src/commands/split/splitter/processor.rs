@@ -197,6 +197,16 @@ impl ParallelProcessor for SplitProcessor {
             .iter()
             .zip(self.t_writer.iter_mut())
             .try_for_each(|(global_writer, thread_writer)| {
+                global_writer.lock().ingest_completed(thread_writer)
+            })
+    }
+
+    fn on_thread_complete(&mut self) -> binseq::Result<()> {
+        // ingest reads
+        self.writer
+            .iter()
+            .zip(self.t_writer.iter_mut())
+            .try_for_each(|(global_writer, thread_writer)| {
                 global_writer.lock().ingest(thread_writer)
             })
     }

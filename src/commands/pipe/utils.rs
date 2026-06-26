@@ -4,31 +4,40 @@ use std::io::BufWriter;
 use std::path::Path;
 
 use anyhow::Result;
-use log::trace;
+use log::{trace, warn};
 use nix::sys::stat;
 use nix::unistd;
 
-use super::{BoxedWriter, RecordPair};
+use super::{BoxedWriter, PairedChannels, RecordPair};
 use crate::cli::FileFormat;
 
-/// Creates many FIFOs (named-pipes) at the given basepath
+/// Creates many FIFOs (named-pipes) at the given basepath.
 ///
-/// Note: this does not open the FIFOs for writing
+/// For paired files, `channels` controls which channels are created. For
+/// unpaired files, `channels` is ignored and a single unlabelled FIFO per
+/// thread is created.
+///
+/// Note: this does not open the FIFOs for writing.
 pub fn create_fifos(
     basepath: &str,
     paired: bool,
     num_threads: usize,
     format: FileFormat,
+    channels: PairedChannels,
 ) -> Result<Vec<String>> {
     let mut fifo_paths = Vec::new();
     if paired {
         for idx in 0..num_threads {
-            let path_r1 = name_fifo(basepath, idx, RecordPair::R1, format);
-            let path_r2 = name_fifo(basepath, idx, RecordPair::R2, format);
-            create_fifo(&path_r1)?;
-            create_fifo(&path_r2)?;
-            fifo_paths.push(path_r1);
-            fifo_paths.push(path_r2);
+            if matches!(channels, PairedChannels::Both | PairedChannels::R1Only) {
+                let path = name_fifo(basepath, idx, RecordPair::R1, format);
+                create_fifo(&path)?;
+                fifo_paths.push(path);
+            }
+            if matches!(channels, PairedChannels::Both | PairedChannels::R2Only) {
+                let path = name_fifo(basepath, idx, RecordPair::R2, format);
+                create_fifo(&path)?;
+                fifo_paths.push(path);
+            }
         }
     } else {
         for idx in 0..num_threads {
@@ -62,19 +71,44 @@ pub fn open_fifo(path: &str) -> Result<BoxedWriter> {
     Ok(Box::new(handle))
 }
 
-/// Close many FIFOs (unlink the path)
-pub fn close_fifos(paths: &[String]) -> Result<()> {
-    for path in paths {
-        close_fifo(path)?;
-    }
-    Ok(())
+/// RAII guard that unlinks a set of FIFOs when dropped.
+///
+/// Cleanup is tied to the guard's lifetime rather than the happy path, so the
+/// FIFOs are removed from disk on any early return, `?` propagation, or panic
+/// (via stack unwinding) — not just on successful completion.
+pub struct FifoGuard {
+    paths: Vec<String>,
 }
 
-/// Close a FIFO (unlink the path)
-pub fn close_fifo(path: &str) -> Result<()> {
+impl FifoGuard {
+    pub fn new(paths: Vec<String>) -> Self {
+        Self { paths }
+    }
+
+    /// The FIFO paths under guard.
+    pub fn paths(&self) -> &[String] {
+        &self.paths
+    }
+}
+
+impl Drop for FifoGuard {
+    fn drop(&mut self) {
+        for path in &self.paths {
+            close_fifo(path);
+        }
+    }
+}
+
+/// Close a FIFO (unlink the path).
+///
+/// A missing path (`ENOENT`) is treated as success so cleanup is idempotent;
+/// other errors are logged but not propagated, since this runs during teardown.
+fn close_fifo(path: &str) {
     trace!("Closing FIFO at path: {path}");
-    unistd::unlink(Path::new(path))?;
-    Ok(())
+    match unistd::unlink(Path::new(path)) {
+        Ok(()) | Err(Errno::ENOENT) => {}
+        Err(err) => warn!("Failed to unlink FIFO at {path}: {err}"),
+    }
 }
 
 pub fn name_fifo(basepath: &str, pid: usize, pair: RecordPair, format: FileFormat) -> String {

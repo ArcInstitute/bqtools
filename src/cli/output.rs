@@ -149,7 +149,7 @@ pub struct OutputBinseq {
     pub options: OutputBinseqOptions,
 
     /// Pipe the output to stdout
-    #[clap(short = 'P', long)]
+    #[clap(long)]
     pub pipe: bool,
 }
 impl OutputBinseq {
@@ -240,7 +240,7 @@ pub struct OutputBinseqOptions {
     /// - block size set to 200M
     /// - quality scores kept
     /// - zstd compression
-    #[clap(short = 'A', long, conflicts_with_all = ["uncompressed", "headers", "bitsize", "block_size", "skip_quality", "level"])]
+    #[clap(short = 'A', long, conflicts_with_all = ["uncompressed", "skip_headers", "bitsize", "block_size", "skip_quality", "level"])]
     pub archive: bool,
 }
 impl OutputBinseqOptions {
@@ -352,6 +352,12 @@ pub enum BinseqMode {
     #[clap(name = "cbq")]
     #[default]
     Cbq,
+}
+#[cfg(test)]
+impl BinseqMode {
+    pub fn enum_iter() -> impl Iterator<Item = Self> + Clone {
+        [Self::Bq, Self::Vbq, Self::Cbq].into_iter()
+    }
 }
 impl BinseqMode {
     pub fn determine(path: &str) -> Result<Self> {

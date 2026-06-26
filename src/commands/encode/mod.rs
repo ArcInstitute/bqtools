@@ -361,3 +361,151 @@ pub fn run(args: &EncodeCommand) -> Result<()> {
         run_atomic(args)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clap::Parser;
+    use itertools::iproduct;
+    use tempfile::NamedTempFile;
+
+    use crate::cli::{BinseqMode, FileFormat};
+    use crate::testutils::{count_binseq, write_fastx, Compression, DEFAULT_NUM_RECORDS};
+
+    fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        super::run(&cmd)
+    }
+
+    #[test]
+    fn test_encoding() -> Result<()> {
+        for (mode, fmt, comp) in iproduct!(
+            BinseqMode::enum_iter(),
+            FileFormat::fastx_iter(),
+            Compression::all(),
+        ) {
+            let in_tmp = write_fastx().format(fmt).comp(comp).call()?;
+            let out_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), out_tmp.path())?;
+            assert_eq!(
+                count_binseq(out_tmp.path())?,
+                DEFAULT_NUM_RECORDS,
+                "record count wrong for {mode:?} {fmt:?} {comp:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_encoding_thread_counts() -> Result<()> {
+        for threads in ["0", "1", "4"] {
+            let in_tmp = write_fastx().call()?;
+            let out_tmp = NamedTempFile::with_suffix(".cbq")?;
+            let cmd = crate::cli::EncodeCommand::try_parse_from([
+                "encode",
+                in_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+                "-T",
+                threads,
+            ])?;
+            super::run(&cmd)?;
+            assert_eq!(count_binseq(out_tmp.path())?, DEFAULT_NUM_RECORDS);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_vbq_specialization() -> Result<()> {
+        for (fmt, comp, uncompressed, skip_qual) in iproduct!(
+            FileFormat::fastx_iter(),
+            Compression::all(),
+            [false, true],
+            [false, true],
+        ) {
+            let in_tmp = write_fastx().format(fmt).comp(comp).call()?;
+            let out_tmp = NamedTempFile::with_suffix(".vbq")?;
+            let mut args = vec![
+                "encode",
+                in_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+            ];
+            if uncompressed {
+                args.push("--uncompressed");
+            }
+            if skip_qual {
+                args.push("--skip-quality");
+            }
+            let cmd = crate::cli::EncodeCommand::try_parse_from(args)?;
+            super::run(&cmd)?;
+            assert_eq!(
+                count_binseq(out_tmp.path())?,
+                DEFAULT_NUM_RECORDS,
+                "vbq count wrong: {fmt:?} {comp:?} uncompressed={uncompressed} skip_qual={skip_qual}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_cbq_specialization() -> Result<()> {
+        for (fmt, comp, skip_qual, skip_headers) in iproduct!(
+            FileFormat::fastx_iter(),
+            Compression::all(),
+            [false, true],
+            [false, true],
+        ) {
+            let in_tmp = write_fastx().format(fmt).comp(comp).call()?;
+            let out_tmp = NamedTempFile::with_suffix(".cbq")?;
+            let mut args = vec![
+                "encode",
+                in_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+            ];
+            if skip_qual {
+                args.push("--skip-quality");
+            }
+            if skip_headers {
+                args.push("--skip-headers");
+            }
+            let cmd = crate::cli::EncodeCommand::try_parse_from(args)?;
+            super::run(&cmd)?;
+            assert_eq!(
+                count_binseq(out_tmp.path())?,
+                DEFAULT_NUM_RECORDS,
+                "cbq count wrong: {fmt:?} {comp:?} skip_qual={skip_qual} skip_headers={skip_headers}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_paired_encoding() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            let r1 = write_fastx().call()?;
+            let r2 = write_fastx().call()?;
+            let out_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            let cmd = crate::cli::EncodeCommand::try_parse_from([
+                "encode",
+                r1.path().to_str().unwrap(),
+                r2.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+            ])?;
+            super::run(&cmd)?;
+            assert_eq!(
+                count_binseq(out_tmp.path())?,
+                DEFAULT_NUM_RECORDS,
+                "paired encode count wrong for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+}

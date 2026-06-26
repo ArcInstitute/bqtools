@@ -37,4 +37,18 @@ impl FileFormat {
             Self::Bam => "bam",
         }
     }
+
+    #[cfg(test)]
+    pub fn fastx_iter() -> impl Iterator<Item = Self> + Clone {
+        [Self::Fasta, Self::Fastq].into_iter()
+    }
+
+    #[cfg(test)]
+    pub fn fastx_suffix(self) -> &'static str {
+        match self {
+            Self::Fasta => ".fasta",
+            Self::Fastq => ".fastq",
+            _ => panic!("no test suffix for non-fastx format"),
+        }
+    }
 }
