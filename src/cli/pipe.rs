@@ -25,8 +25,24 @@ pub struct PipeOptions {
     #[clap(short, long, help = "Output file format")]
     format: Option<FileFormat>,
 
-    #[clap(short, long, help = "Base path for output files")]
+    #[clap(
+        short,
+        long,
+        help = "Base path for output files",
+        default_value = "bqtools_fifo"
+    )]
     basepath: String,
+
+    /// Execute a shell command for each FIFO, replacing `{}` with the path.
+    /// For paired files use `{R1}` and `{R2}` for the respective FIFO paths.
+    /// Use `{n}` for the pipe index (useful for per-shard output paths).
+    #[clap(short = 'x', long, conflicts_with = "exec_batch")]
+    exec: Option<String>,
+
+    /// Execute a single shell command with all FIFO paths substituted.
+    /// `{}` is replaced with a space-joined list; for paired use `{R1}` / `{R2}`.
+    #[clap(short = 'X', long, conflicts_with = "exec")]
+    exec_batch: Option<String>,
 }
 
 impl PipeCommand {
@@ -45,5 +61,11 @@ impl PipeCommand {
     }
     pub fn basepath(&self) -> &str {
         &self.pipe.basepath
+    }
+    pub fn exec(&self) -> Option<&str> {
+        self.pipe.exec.as_deref()
+    }
+    pub fn exec_batch(&self) -> Option<&str> {
+        self.pipe.exec_batch.as_deref()
     }
 }
