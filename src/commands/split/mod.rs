@@ -130,3 +130,161 @@ pub fn run(args: &SplitCommand) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write as _;
+
+    use anyhow::Result;
+    use clap::Parser;
+    use tempfile::NamedTempFile;
+
+    use crate::cli::BinseqMode;
+    use crate::testutils::{count_binseq, write_fastx, DEFAULT_NUM_RECORDS};
+
+    fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    /// Write a plain-text pattern file (one pattern per line).
+    fn write_patterns(patterns: &[&str]) -> Result<NamedTempFile> {
+        let tmp = NamedTempFile::with_suffix(".txt")?;
+        let mut f = std::fs::File::create(tmp.path())?;
+        for p in patterns {
+            writeln!(f, "{p}")?;
+        }
+        Ok(tmp)
+    }
+
+    /// Sum binseq record counts across every file in `dir` with `extension`.
+    fn count_all_in_dir(dir: &std::path::Path, extension: &str) -> Result<usize> {
+        let ext = extension.trim_start_matches('.');
+        std::fs::read_dir(dir)?
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .and_then(|x| x.to_str())
+                    .is_some_and(|x| x == ext)
+            })
+            .map(|e| count_binseq(&e.path()))
+            .try_fold(0usize, |acc, r| r.map(|n| acc + n))
+    }
+
+    /// The total records across all split output files must equal the input count,
+    /// regardless of how records distribute across patterns.
+    #[test]
+    fn test_split_record_conservation() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            let in_tmp = write_fastx().call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            // Two patterns: no matter how records split, the total must equal input.
+            let pat_file = write_patterns(&["AAAA", "CCCC"])?;
+            let out_dir = tempfile::tempdir()?;
+
+            let cmd = crate::cli::SplitCommand::try_parse_from([
+                "split",
+                bq_tmp.path().to_str().unwrap(),
+                "--file",
+                pat_file.path().to_str().unwrap(),
+                "--basepath",
+                out_dir.path().to_str().unwrap(),
+                "--min-records",
+                "0", // keep empty output files so we capture everything
+                "--quiet",
+            ])?;
+            super::run(&cmd)?;
+
+            let total = count_all_in_dir(out_dir.path(), mode.extension())?;
+            assert_eq!(
+                total, DEFAULT_NUM_RECORDS,
+                "split total count wrong for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// Using --skip-unmatched: no unmatched file should be created.
+    /// With a universal pattern ("A"), every record should match, so the
+    /// matched file contains all records.
+    #[test]
+    fn test_split_skip_unmatched() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        // "A" is a single-character pattern that matches any sequence containing
+        // an 'A'. After BQ encoding (Ns replaced), all 100-base sequences will
+        // contain at least one A with overwhelming probability.
+        let pat_file = write_patterns(&["A"])?;
+        let out_dir = tempfile::tempdir()?;
+
+        let cmd = crate::cli::SplitCommand::try_parse_from([
+            "split",
+            bq_tmp.path().to_str().unwrap(),
+            "--file",
+            pat_file.path().to_str().unwrap(),
+            "--basepath",
+            out_dir.path().to_str().unwrap(),
+            "--skip-unmatched",
+            "--quiet",
+        ])?;
+        super::run(&cmd)?;
+
+        // Only the "A.cbq" file should exist; verify its count.
+        let matched_path = out_dir.path().join("A.cbq");
+        assert!(matched_path.exists(), "expected A.cbq in output dir");
+        assert_eq!(count_binseq(&matched_path)?, DEFAULT_NUM_RECORDS);
+
+        // With --skip-unmatched and a universal pattern, nothing else should be there.
+        let file_count = std::fs::read_dir(out_dir.path())?.count();
+        assert_eq!(file_count, 1, "expected exactly one output file");
+
+        Ok(())
+    }
+
+    /// Named patterns (FASTA headers) become output file aliases.
+    #[test]
+    fn test_split_named_patterns() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        // FASTA pattern: header becomes the alias → output file name
+        let pat_file = {
+            let tmp = NamedTempFile::with_suffix(".fasta")?;
+            let mut f = std::fs::File::create(tmp.path())?;
+            writeln!(f, ">universal_pattern")?;
+            writeln!(f, "A")?;
+            tmp
+        };
+        let out_dir = tempfile::tempdir()?;
+
+        let cmd = crate::cli::SplitCommand::try_parse_from([
+            "split",
+            bq_tmp.path().to_str().unwrap(),
+            "--file",
+            pat_file.path().to_str().unwrap(),
+            "--basepath",
+            out_dir.path().to_str().unwrap(),
+            "--skip-unmatched",
+            "--quiet",
+        ])?;
+        super::run(&cmd)?;
+
+        // The alias "universal_pattern" → "universal_pattern.cbq"
+        let matched_path = out_dir.path().join("universal_pattern.cbq");
+        assert!(matched_path.exists(), "expected universal_pattern.cbq");
+        assert_eq!(count_binseq(&matched_path)?, DEFAULT_NUM_RECORDS);
+
+        Ok(())
+    }
+}
