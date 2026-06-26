@@ -24,6 +24,18 @@ pub enum RecordPair {
     Unpaired,
 }
 
+/// Which channels to create FIFOs and writer threads for in paired mode.
+///
+/// Derived from the exec template: a template with only `{R1}` suppresses R2
+/// entirely so no unread FIFO is left open. Only meaningful for paired files;
+/// unpaired files always write a single unlabelled FIFO.
+#[derive(Clone, Copy, Debug)]
+pub enum PairedChannels {
+    Both,
+    R1Only,
+    R2Only,
+}
+
 pub fn run(args: &PipeCommand) -> Result<()> {
     if args.input.span.is_some() {
         warn!("Span is ignored when using pipe subcommand");
@@ -45,20 +57,21 @@ pub fn run(args: &PipeCommand) -> Result<()> {
         exec::validate_template(t, paired)?;
     }
 
-    // Determine which paired channels are needed. In exec mode the template
-    // drives this — a template with only {R1} skips the R2 FIFO and writer
-    // entirely. Without exec, both channels are always created.
-    let (spawn_r1, spawn_r2) = if paired {
+    // Determine which channels to create FIFOs and writer threads for. In exec
+    // mode the template drives this — a template with only {R1} skips the R2
+    // FIFO and writer entirely. Without exec, both channels are always created.
+    // Only meaningful for paired files; unpaired always uses a single unlabelled FIFO.
+    let channels = if paired {
         args.exec()
             .or_else(|| args.exec_batch())
             .map(exec::required_channels)
-            .unwrap_or((true, true))
+            .unwrap_or(PairedChannels::Both)
     } else {
-        (false, false)
+        PairedChannels::Both
     };
 
     let basename = args.basepath();
-    let fifo_paths = create_fifos(basename, paired, num_pipes, format, spawn_r1, spawn_r2)?;
+    let fifo_paths = create_fifos(basename, paired, num_pipes, format, channels)?;
     info!(
         "{} FIFOs created. Waiting for readers to connect...",
         fifo_paths.len()
@@ -90,7 +103,7 @@ pub fn run(args: &PipeCommand) -> Result<()> {
         };
 
         if paired {
-            if spawn_r1 {
+            if matches!(channels, PairedChannels::Both | PairedChannels::R1Only) {
                 handles.push(spawn_pipe_thread(
                     basename.to_string(),
                     args.input.path().to_string(),
@@ -100,7 +113,7 @@ pub fn run(args: &PipeCommand) -> Result<()> {
                     rstart..rend,
                 ));
             }
-            if spawn_r2 {
+            if matches!(channels, PairedChannels::Both | PairedChannels::R2Only) {
                 handles.push(spawn_pipe_thread(
                     basename.to_string(),
                     args.input.path().to_string(),

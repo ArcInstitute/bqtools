@@ -5,7 +5,7 @@ use log::warn;
 
 use crate::cli::FileFormat;
 
-use super::{utils::name_fifo, RecordPair};
+use super::{utils::name_fifo, PairedChannels, RecordPair};
 
 pub enum ExecMode<'a> {
     /// `-x`: one shell invocation per FIFO (or per R1/R2 pair for paired files).
@@ -33,9 +33,16 @@ pub fn validate_template(template: &str, paired: bool) -> Result<()> {
     Ok(())
 }
 
-/// Returns which paired channels `(r1, r2)` the template requires.
-pub fn required_channels(template: &str) -> (bool, bool) {
-    (template.contains("{R1}"), template.contains("{R2}"))
+/// Returns which paired channels the template requires.
+pub fn required_channels(template: &str) -> PairedChannels {
+    match (template.contains("{R1}"), template.contains("{R2}")) {
+        (true, true) => PairedChannels::Both,
+        (true, false) => PairedChannels::R1Only,
+        (false, true) => PairedChannels::R2Only,
+        (false, false) => unreachable!(
+            "exec template for a single file must contain at least one of {{R1}} or {{R2}}"
+        ),
+    }
 }
 
 /// Spawn consumer subprocesses according to `mode`, returning their handles.
