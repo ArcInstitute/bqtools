@@ -135,3 +135,104 @@ pub fn run(args: CatCommand) -> Result<()> {
         BinseqMode::Cbq => run_cat(args, BinseqMode::Cbq),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clap::Parser;
+    use itertools::iproduct;
+    use tempfile::NamedTempFile;
+
+    use crate::cli::{BinseqMode, FileFormat};
+    use crate::testutils::{count_binseq, write_fastx, Compression, DEFAULT_NUM_RECORDS};
+
+    fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    fn cat(in_paths: &[&std::path::Path], out_path: &std::path::Path) -> Result<()> {
+        let mut args = vec!["cat".to_string()];
+        for p in in_paths {
+            args.push(p.to_str().unwrap().to_string());
+        }
+        args.extend(["-o".to_string(), out_path.to_str().unwrap().to_string()]);
+        let cmd = crate::cli::CatCommand::try_parse_from(args)?;
+        super::run(cmd)
+    }
+
+    /// Concatenating two N-record files must produce 2*N records.
+    #[test]
+    fn test_cat_two_files() -> Result<()> {
+        for (mode, fmt) in iproduct!(BinseqMode::enum_iter(), FileFormat::fastx_iter()) {
+            let in1 = write_fastx().format(fmt).call()?;
+            let in2 = write_fastx().format(fmt).call()?;
+            let bq1 = NamedTempFile::with_suffix(mode.extension())?;
+            let bq2 = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in1.path(), bq1.path())?;
+            encode(in2.path(), bq2.path())?;
+
+            let out = NamedTempFile::with_suffix(mode.extension())?;
+            cat(&[bq1.path(), bq2.path()], out.path())?;
+
+            assert_eq!(
+                count_binseq(out.path())?,
+                DEFAULT_NUM_RECORDS * 2,
+                "cat 2-file count wrong for {mode:?} {fmt:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_cat_three_files() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            let parts: Vec<_> = (0..3)
+                .map(|_| {
+                    let in_tmp = write_fastx().call()?;
+                    let bq = NamedTempFile::with_suffix(mode.extension())?;
+                    encode(in_tmp.path(), bq.path())?;
+                    Ok::<_, anyhow::Error>((in_tmp, bq))
+                })
+                .collect::<Result<_>>()?;
+
+            let bq_paths: Vec<_> = parts.iter().map(|(_, bq)| bq.path()).collect();
+            let out = NamedTempFile::with_suffix(mode.extension())?;
+            cat(&bq_paths, out.path())?;
+
+            assert_eq!(
+                count_binseq(out.path())?,
+                DEFAULT_NUM_RECORDS * 3,
+                "cat 3-file count wrong for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_cat_compressed_inputs() -> Result<()> {
+        for (mode, comp) in iproduct!(BinseqMode::enum_iter(), Compression::all()) {
+            let in1 = write_fastx().comp(comp).call()?;
+            let in2 = write_fastx().comp(comp).call()?;
+            let bq1 = NamedTempFile::with_suffix(mode.extension())?;
+            let bq2 = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in1.path(), bq1.path())?;
+            encode(in2.path(), bq2.path())?;
+
+            let out = NamedTempFile::with_suffix(mode.extension())?;
+            cat(&[bq1.path(), bq2.path()], out.path())?;
+
+            assert_eq!(
+                count_binseq(out.path())?,
+                DEFAULT_NUM_RECORDS * 2,
+                "cat compressed count wrong for {mode:?} {comp:?}"
+            );
+        }
+        Ok(())
+    }
+}
