@@ -11,24 +11,33 @@ use nix::unistd;
 use super::{BoxedWriter, RecordPair};
 use crate::cli::FileFormat;
 
-/// Creates many FIFOs (named-pipes) at the given basepath
+/// Creates many FIFOs (named-pipes) at the given basepath.
 ///
-/// Note: this does not open the FIFOs for writing
+/// For paired files, `r1` and `r2` control which channels are created — pass
+/// `(true, true)` for both, or either alone to create only that channel's FIFOs.
+///
+/// Note: this does not open the FIFOs for writing.
 pub fn create_fifos(
     basepath: &str,
     paired: bool,
     num_threads: usize,
     format: FileFormat,
+    r1: bool,
+    r2: bool,
 ) -> Result<Vec<String>> {
     let mut fifo_paths = Vec::new();
     if paired {
         for idx in 0..num_threads {
-            let path_r1 = name_fifo(basepath, idx, RecordPair::R1, format);
-            let path_r2 = name_fifo(basepath, idx, RecordPair::R2, format);
-            create_fifo(&path_r1)?;
-            create_fifo(&path_r2)?;
-            fifo_paths.push(path_r1);
-            fifo_paths.push(path_r2);
+            if r1 {
+                let path = name_fifo(basepath, idx, RecordPair::R1, format);
+                create_fifo(&path)?;
+                fifo_paths.push(path);
+            }
+            if r2 {
+                let path = name_fifo(basepath, idx, RecordPair::R2, format);
+                create_fifo(&path)?;
+                fifo_paths.push(path);
+            }
         }
     } else {
         for idx in 0..num_threads {
