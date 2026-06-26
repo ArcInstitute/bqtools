@@ -82,7 +82,9 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::cli::{BinseqMode, FileFormat};
-    use crate::testutils::{count_binseq, count_fastx_records, write_fastx, Compression, DEFAULT_NUM_RECORDS};
+    use crate::testutils::{
+        count_binseq, count_fastx_records, write_fastx, Compression, DEFAULT_NUM_RECORDS,
+    };
 
     fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
         let cmd = crate::cli::EncodeCommand::try_parse_from([
@@ -121,8 +123,7 @@ mod tests {
 
             let count = count_fastx_records(out_tmp.path())?;
             assert_eq!(
-                count,
-                DEFAULT_NUM_RECORDS,
+                count, DEFAULT_NUM_RECORDS,
                 "round-trip record count wrong for {mode:?} {fmt:?} {comp:?}"
             );
         }
@@ -173,6 +174,10 @@ mod tests {
         Ok(())
     }
 
+    /// Paired decode: mate selection produces the correct number of output records.
+    ///
+    /// The paired CBQ has N records, each holding (R1, R2). Selecting one mate
+    /// yields N output records; selecting both (interleaved) yields 2×N.
     #[test]
     fn test_decode_paired_mate_selection() -> Result<()> {
         let r1 = write_fastx().call()?;
@@ -189,7 +194,8 @@ mod tests {
 
         assert_eq!(count_binseq(bq_tmp.path())?, DEFAULT_NUM_RECORDS);
 
-        for mate in ["1", "2", "both"] {
+        // mate=1 or mate=2: one mate per pair → N records
+        for mate in ["1", "2"] {
             let out_tmp = NamedTempFile::with_suffix(".fastq")?;
             let cmd = crate::cli::DecodeCommand::try_parse_from([
                 "decode",
@@ -200,6 +206,82 @@ mod tests {
                 mate,
             ])?;
             super::run(&cmd)?;
+            assert_eq!(
+                count_fastx_records(out_tmp.path())?,
+                DEFAULT_NUM_RECORDS,
+                "mate={mate} should yield one record per pair"
+            );
+        }
+
+        // mate=both: R1 and R2 interleaved into a single file → 2×N records
+        {
+            let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+            let cmd = crate::cli::DecodeCommand::try_parse_from([
+                "decode",
+                bq_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+                "-m",
+                "both",
+            ])?;
+            super::run(&cmd)?;
+            assert_eq!(
+                count_fastx_records(out_tmp.path())?,
+                2 * DEFAULT_NUM_RECORDS,
+                "mate=both should yield two records per pair (interleaved)"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// --span slices a contiguous range of records from the binseq file.
+    ///
+    /// decode --span 0..50  on a 200-record file → exactly 50 records
+    /// decode --span 50..   on a 200-record file → exactly 150 records
+    #[test]
+    fn test_decode_span() -> Result<()> {
+        let nrec = 200usize;
+
+        for mode in BinseqMode::enum_iter() {
+            let in_tmp = write_fastx().nrec(nrec).call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            // First 50 records
+            let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+            let cmd = crate::cli::DecodeCommand::try_parse_from([
+                "decode",
+                bq_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+                "--span",
+                "0..50",
+            ])?;
+            super::run(&cmd)?;
+            assert_eq!(
+                count_fastx_records(out_tmp.path())?,
+                50,
+                "--span 0..50 should yield 50 records for {mode:?}"
+            );
+
+            // Records from 50 to end
+            let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+            let cmd = crate::cli::DecodeCommand::try_parse_from([
+                "decode",
+                bq_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+                "--span",
+                "50..",
+            ])?;
+            super::run(&cmd)?;
+            assert_eq!(
+                count_fastx_records(out_tmp.path())?,
+                nrec - 50,
+                "--span 50.. should yield {} records for {mode:?}",
+                nrec - 50
+            );
         }
         Ok(())
     }
