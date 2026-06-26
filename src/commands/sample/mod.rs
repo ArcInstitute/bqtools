@@ -151,3 +151,111 @@ pub fn run(args: &SampleCommand) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clap::Parser;
+    use itertools::iproduct;
+    use tempfile::NamedTempFile;
+
+    use crate::cli::{BinseqMode, FileFormat};
+    use crate::testutils::{count_fastx_records, write_fastx};
+
+    fn encode(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    fn sample(
+        bq_path: &std::path::Path,
+        out_path: &std::path::Path,
+        fraction: f64,
+        seed: u64,
+    ) -> Result<()> {
+        let cmd = crate::cli::SampleCommand::try_parse_from([
+            "sample",
+            bq_path.to_str().unwrap(),
+            "-F",
+            &fraction.to_string(),
+            "-S",
+            &seed.to_string(),
+            "-o",
+            out_path.to_str().unwrap(),
+        ])?;
+        super::run(&cmd)
+    }
+
+    /// Sampling at 0.5 should produce approximately half the records (±20%).
+    #[test]
+    fn test_sample_half() -> Result<()> {
+        let nrec = 1000;
+        let fraction = 0.5_f64;
+        let expected = (nrec as f64 * fraction) as usize;
+        let tolerance = nrec / 5;
+
+        for (mode, fmt) in iproduct!(BinseqMode::enum_iter(), FileFormat::fastx_iter()) {
+            let in_tmp = write_fastx().format(fmt).nrec(nrec).call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            let out_tmp = NamedTempFile::with_suffix(fmt.fastx_suffix())?;
+            sample(bq_tmp.path(), out_tmp.path(), fraction, 42)?;
+
+            let count = count_fastx_records(out_tmp.path())?;
+            assert!(
+                count.abs_diff(expected) <= tolerance,
+                "sample count {count} far from expected {expected} (±{tolerance}) for {mode:?} {fmt:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// Sampling at fraction=1.0 must return all records exactly.
+    #[test]
+    fn test_sample_fraction_one() -> Result<()> {
+        let nrec = 200;
+        for mode in BinseqMode::enum_iter() {
+            let in_tmp = write_fastx().nrec(nrec).call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+            sample(bq_tmp.path(), out_tmp.path(), 1.0, 42)?;
+
+            assert_eq!(
+                count_fastx_records(out_tmp.path())?,
+                nrec,
+                "sample fraction=1.0 should return all records for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// Different seeds should (very likely) produce different sample sizes.
+    #[test]
+    fn test_sample_different_seeds_vary() -> Result<()> {
+        let nrec = 1000;
+        let in_tmp = write_fastx().nrec(nrec).call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let counts: Vec<usize> = [42_u64, 123, 999]
+            .iter()
+            .map(|&seed| {
+                let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+                sample(bq_tmp.path(), out_tmp.path(), 0.5, seed)?;
+                count_fastx_records(out_tmp.path())
+            })
+            .collect::<Result<_>>()?;
+
+        let unique: std::collections::HashSet<_> = counts.iter().collect();
+        assert!(unique.len() > 1, "all seeds produced the same count — suspicious: {counts:?}");
+        Ok(())
+    }
+}
