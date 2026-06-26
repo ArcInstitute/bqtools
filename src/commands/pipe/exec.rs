@@ -7,6 +7,7 @@ use crate::cli::FileFormat;
 
 use super::{utils::name_fifo, PairedChannels, RecordPair};
 
+#[derive(Clone, Copy)]
 pub enum ExecMode<'a> {
     /// `-x`: one shell invocation per FIFO (or per R1/R2 pair for paired files).
     PerFifo(&'a str),
