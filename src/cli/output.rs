@@ -175,6 +175,7 @@ impl OutputBinseq {
 }
 
 #[derive(Parser, Debug, Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct OutputBinseqOptions {
     /// Defines the BINSEQ mode to use.
     #[clap(short = 'm', long)]
@@ -409,6 +410,7 @@ fn parse_memory_size(input: &str) -> Result<usize, String> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct BinseqConfig {
     pub compress: bool,
     pub quality: bool,

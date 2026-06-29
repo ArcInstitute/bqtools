@@ -116,13 +116,13 @@ impl FuzzyPatternCounter {
             self.searcher
                 .search_encoded_patterns(epat, primary, self.k)
                 .iter()
-                .for_each(|m| eval(m));
+                .for_each(&mut eval);
 
             // match on secondary
             self.searcher
                 .search_encoded_patterns(epat, secondary, self.k)
                 .iter()
-                .for_each(|m| eval(m));
+                .for_each(eval);
         }
     }
 
@@ -137,11 +137,11 @@ impl FuzzyPatternCounter {
         let mut eval = |bitset: &FixedBitSet, invert: bool, offset: usize| {
             if invert {
                 bitset.zeroes().for_each(|i| {
-                    pattern_count[i as usize + offset] += 1;
+                    pattern_count[i + offset] += 1;
                 });
             } else {
                 bitset.ones().for_each(|i| {
-                    pattern_count[i as usize + offset] += 1;
+                    pattern_count[i + offset] += 1;
                 });
             }
         };
@@ -167,9 +167,17 @@ impl PatternCount for FuzzyPatternCounter {
     }
 
     fn num_patterns(&self) -> usize {
-        self.pat1.as_ref().map_or(0, |p| p.n_queries())
-            + self.pat2.as_ref().map_or(0, |p| p.n_queries())
-            + self.pat.as_ref().map_or(0, |p| p.n_queries())
+        self.pat1
+            .as_ref()
+            .map_or(0, sassy::EncodedPatterns::n_queries)
+            + self
+                .pat2
+                .as_ref()
+                .map_or(0, sassy::EncodedPatterns::n_queries)
+            + self
+                .pat
+                .as_ref()
+                .map_or(0, sassy::EncodedPatterns::n_queries)
     }
 
     fn pattern_strings(&self) -> Vec<String> {

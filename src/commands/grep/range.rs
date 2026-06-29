@@ -47,14 +47,14 @@ impl FromStr for SimpleRange {
                 start: None,
                 end: None,
             }
-        } else if s.starts_with("..") {
-            let end = s[2..].parse().map_err(|_| "Invalid range")?;
+        } else if let Some(rest) = s.strip_prefix("..") {
+            let end = rest.parse().map_err(|_| "Invalid range")?;
             Self {
                 start: None,
                 end: Some(end),
             }
-        } else if s.ends_with("..") {
-            let start = s[..s.len() - 2].parse().map_err(|_| "Invalid range")?;
+        } else if let Some(rest) = s.strip_suffix("..") {
+            let start = rest.parse().map_err(|_| "Invalid range")?;
             Self {
                 start: Some(start),
                 end: None,

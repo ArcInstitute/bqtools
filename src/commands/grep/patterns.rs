@@ -8,7 +8,7 @@ pub struct Pattern {
 }
 impl Pattern {
     /// Compile the sequence into a regex.
-    pub fn into_regex(&self) -> Result<regex::bytes::Regex> {
+    pub fn to_regex(&self) -> Result<regex::bytes::Regex> {
         let seq_str = std::str::from_utf8(&self.sequence)?;
         Ok(regex::bytes::Regex::new(seq_str)?)
     }
@@ -23,7 +23,7 @@ impl PatternCollection {
     }
 
     pub fn regexes(&self) -> Result<Vec<regex::bytes::Regex>> {
-        self.0.iter().map(Pattern::into_regex).collect()
+        self.0.iter().map(Pattern::to_regex).collect()
     }
 
     pub fn names(&self) -> Vec<String> {

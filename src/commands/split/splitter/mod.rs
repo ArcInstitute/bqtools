@@ -29,7 +29,7 @@ pub enum Splitter {
     AhoCorasick(AhoCorasickSplitter),
     Regex(RegexSplitter),
     #[cfg(feature = "fuzzy")]
-    Fuzzy(FuzzySplitter),
+    Fuzzy(Box<FuzzySplitter>),
 }
 impl SequenceSplit for Splitter {
     fn split_idx(&mut self, primary: &[u8], secondary: &[u8]) -> Option<usize> {

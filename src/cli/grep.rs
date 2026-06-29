@@ -42,6 +42,7 @@ impl GrepCommand {
 
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "SEARCH OPTIONS")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct GrepArgs {
     /// Regex expression to search for in primary sequence
     #[clap(short = 'r', long)]

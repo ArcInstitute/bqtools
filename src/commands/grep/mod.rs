@@ -107,7 +107,7 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
         );
-        return Ok(PatternCounter::Fuzzy(counter));
+        return Ok(PatternCounter::Fuzzy(Box::new(counter)));
     }
 
     let patterns = load_patterns(args)?;
@@ -155,14 +155,14 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
     if args.grep.fuzzy_args.fuzzy {
         let patterns = load_patterns(args)?;
         let matcher = FuzzyMatcher::new(
-            patterns.pat1.bytes(),
-            patterns.pat2.bytes(),
-            patterns.pat.bytes(),
+            &patterns.pat1.bytes(),
+            &patterns.pat2.bytes(),
+            &patterns.pat.bytes(),
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
-        return Ok(PatternMatcher::Fuzzy(matcher));
+        return Ok(PatternMatcher::Fuzzy(Box::new(matcher)));
     }
 
     let patterns = load_patterns(args)?;
@@ -173,9 +173,9 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
 
     if use_fixed && !args.grep.and_logic() {
         let matcher = AhoCorasickMatcher::new(
-            patterns.pat1.bytes(),
-            patterns.pat2.bytes(),
-            patterns.pat.bytes(),
+            &patterns.pat1.bytes(),
+            &patterns.pat2.bytes(),
+            &patterns.pat.bytes(),
             args.grep.no_dfa,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
@@ -429,6 +429,7 @@ mod fixed_detection_tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_redistribution_noop() {
         let mut pat1 = pc(&[b"ACGT", b"TTTT"]);
         let mut pat2 = pc(&[b"GGGG"]);
@@ -436,13 +437,13 @@ mod fixed_detection_tests {
 
         let pat1_clone = pat1.clone();
         let pat2_clone = pat2.clone();
-        let pat_clone = pat.clone();
+        let either_clone = pat.clone();
 
         redistribute_patterns(&mut pat1, &mut pat2, &mut pat, Mate::Both).unwrap();
 
         assert_eq!(pat1, pat1_clone);
         assert_eq!(pat2, pat2_clone);
-        assert_eq!(pat, pat_clone);
+        assert_eq!(pat, either_clone);
     }
 
     #[test]
