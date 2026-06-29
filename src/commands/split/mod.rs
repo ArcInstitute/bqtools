@@ -55,7 +55,7 @@ fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
             args.fuzzy_args.distance,
             args.fuzzy_args.inexact,
         )?;
-        return Ok(Splitter::Fuzzy(splitter));
+        return Ok(Splitter::Fuzzy(Box::new(splitter)));
     }
 
     let use_fixed = args.split.fixed || patterns.are_fixed();
