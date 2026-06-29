@@ -88,7 +88,13 @@ impl InputFile {
             Some(format)
         } else if self.input.len() == 1 {
             let path = &self.input[0];
-            if path.ends_with(".bam") || path.ends_with(".sam") || path.ends_with(".cram") {
+            let p = std::path::Path::new(path);
+            if p.extension().is_some_and(|e| {
+                matches!(
+                    e.to_ascii_lowercase().to_string_lossy().as_ref(),
+                    "bam" | "sam" | "cram"
+                )
+            }) {
                 Some(FileFormat::Bam)
             } else {
                 None
