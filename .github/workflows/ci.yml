@@ -1,70 +1,43 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  build-and-test:
+  fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Build
-        run: cargo build --verbose
+      - uses: actions/checkout@v7
+      - run: cargo fmt --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo clippy --all-targets --all-features --verbose
 
   test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Test (default)
-        run: cargo test --verbose
-
-  test-conditional:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Test (no default)
-        run: cargo test --no-default-features --verbose
-      - name: Test (all features)
-        run: cargo test --all-features --verbose
-
-  test-conditional-features:
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        feature: ["gcs", "htslib", "fuzzy"]
+        features:
+          - "--all-features"
+          - "--no-default-features"
+          - "" # default
+          - "--no-default-features -F gcs"
+          - "--no-default-features -F htslib"
+          - "--no-default-features -F fuzzy"
     steps:
-      - uses: actions/checkout@v3
-      - name: Test (feature = ${{ matrix.feature }})
-        run: cargo test --no-default-features -F ${{ matrix.feature }} --verbose
-
-  check-conditional:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Check (default)
-        run: cargo check
-      - name: Check (all features)
-        run: cargo check --all-features
-      - name: Check (no features)
-        run: cargo check --no-default-features
-
-  check-conditional-features:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        feature: ["gcs", "htslib", "fuzzy"]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Check (each feature)
-        run: cargo check --no-default-features -F ${{ matrix.feature }}
-
-  fmt_lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Formatting
-        run: cargo fmt --check
-      - name: Linting
-        run: cargo clippy --verbose
+      - uses: actions/checkout@v7
+      - run: cargo test ${{ matrix.features }} --verbose
