@@ -10,6 +10,13 @@ const PHRED_OFFSET: u8 = 33;
 type QualAbundance = [usize; 94];
 const DEFAULT_QUAL_ABUNDANCE: QualAbundance = [0; 94];
 
+#[derive(Serialize)]
+pub struct BaseQualityRecord {
+    pos: usize,
+    qual: usize,
+    count: usize,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct BaseHistogram {
     /// Outer: position
@@ -67,13 +74,6 @@ impl BaseHistogram {
             .has_headers(true)
             .from_writer(wtr);
 
-        #[derive(Serialize)]
-        struct Record {
-            pos: usize,
-            qual: usize,
-            count: usize,
-        }
-
         self.inner
             .iter()
             .enumerate()
@@ -84,7 +84,7 @@ impl BaseHistogram {
                     .filter(|(_, count)| **count > 0)
                     .map(|(qual, count)| (qual, *count))
                     .try_for_each(|(qual, count)| -> Result<()> {
-                        ser.serialize(&Record { pos, qual, count })
+                        ser.serialize(&BaseQualityRecord { pos, qual, count })
                             .map_err(Into::into)
                     })
             })?;
