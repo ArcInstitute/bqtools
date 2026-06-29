@@ -109,7 +109,7 @@ pub fn count_fastx_records(path: &Path) -> Result<usize> {
         "fastq" | "fq" => reader.lines().count() / 4,
         "fasta" | "fa" => reader
             .lines()
-            .filter(|l| l.as_ref().map_or(false, |s| s.starts_with('>')))
+            .filter(|l| l.as_ref().is_ok_and(|s| s.starts_with('>')))
             .count(),
         other => anyhow::bail!("count_fastx_records: unknown extension '.{other}'"),
     };

@@ -166,7 +166,7 @@ mod tests {
     fn count_all_in_dir(dir: &std::path::Path, extension: &str) -> Result<usize> {
         let ext = extension.trim_start_matches('.');
         std::fs::read_dir(dir)?
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .filter(|e| {
                 e.path()
                     .extension()
