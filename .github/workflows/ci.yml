@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets --all-features --verbose
 
   test:
@@ -41,5 +40,4 @@ jobs:
           - "--no-default-features -F fuzzy"
     steps:
       - uses: actions/checkout@v7
-      - uses: Swatinem/rust-cache@v2
       - run: cargo test ${{ matrix.features }} --verbose
