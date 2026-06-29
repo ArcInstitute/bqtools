@@ -7,8 +7,8 @@ use clap::{
 };
 
 use super::{
-    CatCommand, DecodeCommand, EncodeCommand, GrepCommand, InfoCommand, PipeCommand, SampleCommand,
-    SplitCommand,
+    CatCommand, DecodeCommand, EncodeCommand, GrepCommand, InfoCommand, PipeCommand, QcCommand,
+    SampleCommand, SplitCommand,
 };
 
 // Configures Clap v3-style help menu colors
@@ -43,4 +43,6 @@ pub enum Commands {
     Split(SplitCommand),
 
     Pipe(PipeCommand),
+
+    Qc(QcCommand),
 }
