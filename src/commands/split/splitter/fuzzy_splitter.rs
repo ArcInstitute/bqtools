@@ -181,7 +181,7 @@ impl SequenceSplit for FuzzySplitter {
 
         self.all_bits.ones().for_each(|idx| {
             if let Some(u_idx) = self.alias_indices.get(idx) {
-                self.unique_bits.set(*u_idx, true)
+                self.unique_bits.set(*u_idx, true);
             }
         });
 
