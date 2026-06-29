@@ -154,15 +154,10 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
         let patterns = load_patterns(args)?;
-        let (bytes1, bytes2, bytes) = (
-            patterns.pat1.bytes(),
-            patterns.pat2.bytes(),
-            patterns.pat.bytes(),
-        );
         let matcher = FuzzyMatcher::new(
-            &bytes1,
-            &bytes2,
-            &bytes,
+            &patterns.pat1.bytes(),
+            &patterns.pat2.bytes(),
+            &patterns.pat.bytes(),
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
@@ -177,15 +172,10 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
     }
 
     if use_fixed && !args.grep.and_logic() {
-        let (bytes1, bytes2, bytes) = (
-            patterns.pat1.bytes(),
-            patterns.pat2.bytes(),
-            patterns.pat.bytes(),
-        );
         let matcher = AhoCorasickMatcher::new(
-            &bytes1,
-            &bytes2,
-            &bytes,
+            &patterns.pat1.bytes(),
+            &patterns.pat2.bytes(),
+            &patterns.pat.bytes(),
             args.grep.no_dfa,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
