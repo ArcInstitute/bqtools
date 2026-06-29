@@ -19,8 +19,8 @@ pub struct PatternCountResult<'a> {
     frac_total: f64,
 }
 impl<'a> PatternCountResult<'a> {
-    pub fn new(name: &'a str, count: usize, total: usize) -> Result<Self> {
-        Ok(Self {
+    pub fn new(name: &'a str, count: usize, total: usize) -> Self {
+        Self {
             name,
             count,
             frac_total: if total > 0 {
@@ -28,7 +28,7 @@ impl<'a> PatternCountResult<'a> {
             } else {
                 0.0
             },
-        })
+        }
     }
 }
 
@@ -73,7 +73,7 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
             .zip(self.global_pattern_count.iter())
             .try_for_each(|((idx, _pattern), count)| -> Result<()> {
                 let name = &self.pattern_names[idx];
-                let record = PatternCountResult::new(name, *count.lock(), total_records)?;
+                let record = PatternCountResult::new(name, *count.lock(), total_records);
                 writer.serialize(record)?;
                 Ok(())
             })?;
