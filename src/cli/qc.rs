@@ -18,6 +18,14 @@ pub struct QcOptions {
     #[clap(short = 'T', long, default_value_t = 0)]
     pub threads: usize,
 
+    /// Skip per-base-quality
+    #[clap(long)]
+    pub skip_base_qual: bool,
+
+    /// Skip per-seq-quality
+    #[clap(long)]
+    pub skip_seq_qual: bool,
+
     /// Path to output directory write to
     #[clap(short, long, default_value = "./bqtools-qc")]
     pub outdir: String,

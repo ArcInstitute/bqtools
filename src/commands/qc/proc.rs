@@ -1,4 +1,8 @@
-use super::PerBaseSequenceQuality;
+use std::path::{Path, PathBuf};
+
+use super::{base_quality::PerBaseSequenceQuality, seq_quality::PerSequenceQuality, QcConfig};
+
+use anyhow::Result;
 use binseq::ParallelProcessor;
 
 /// TODO: per base sequence quality
@@ -12,20 +16,50 @@ use binseq::ParallelProcessor;
 /// TODO: adapter content
 #[derive(Clone, Default)]
 pub struct QcProcessor {
-    pub bsq: PerBaseSequenceQuality,
+    outdir: PathBuf,
+    bsq: Option<PerBaseSequenceQuality>,
+    sq: Option<PerSequenceQuality>,
 }
-impl QcProcessor {}
+impl QcProcessor {
+    pub fn new<P: AsRef<Path>>(outdir: P, config: QcConfig) -> Self {
+        Self {
+            outdir: outdir.as_ref().to_path_buf(),
+            bsq: config.per_base_qual.then(|| Default::default()),
+            sq: config.per_seq_qual.then(|| Default::default()),
+        }
+    }
+
+    pub fn finish(&mut self) -> Result<()> {
+        if let Some(ref mut bsq) = self.bsq {
+            bsq.write_to_outdir(&self.outdir)?;
+        }
+        if let Some(ref mut sq) = self.sq {
+            sq.write_to_outdir(&self.outdir)?;
+        }
+        Ok(())
+    }
+}
 impl ParallelProcessor for QcProcessor {
     fn process_record<R: binseq::prelude::BinseqRecord>(
         &mut self,
         record: R,
     ) -> binseq::Result<()> {
-        self.bsq.push(&record);
+        if let Some(ref mut bsq) = self.bsq {
+            bsq.push(&record);
+        }
+        if let Some(ref mut sq) = self.sq {
+            sq.push(&record);
+        }
         Ok(())
     }
 
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
-        self.bsq.sync();
+        if let Some(ref mut bsq) = self.bsq {
+            bsq.sync()
+        }
+        if let Some(ref mut sq) = self.sq {
+            sq.sync()
+        }
         Ok(())
     }
 }

@@ -1,14 +1,15 @@
-use std::{io::Write, sync::Arc};
+use std::{io::Write, path::Path, sync::Arc};
 
 use anyhow::Result;
 use binseq::BinseqRecord;
 use parking_lot::Mutex;
 use serde::Serialize;
 
-const PHRED_OFFSET: u8 = 33;
+use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
+use crate::commands::{match_output, utils::make_directory};
 
-type QualAbundance = [usize; 94];
-const DEFAULT_QUAL_ABUNDANCE: QualAbundance = [0; 94];
+const BSQ_PRIMARY_PATH: &'static str = "bsq_R1.tsv";
+const BSQ_EXTENDED_PATH: &'static str = "bsq_R2.tsv";
 
 #[derive(Serialize)]
 pub struct BaseQualityRecord {
@@ -110,11 +111,26 @@ pub struct PerBaseSequenceQuality {
     n_records: Arc<Mutex<usize>>,
 }
 impl PerBaseSequenceQuality {
-    pub fn pprint<W: Write>(&self, s_wtr: &mut W, x_wtr: Option<&mut W>) -> Result<()> {
-        self.base_squal.lock().serialize_to(s_wtr)?;
-        if let Some(x_wtr) = x_wtr {
-            self.base_xqual.lock().serialize_to(x_wtr)?;
+    pub fn write_to_outdir<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
+        if !outdir.as_ref().exists() {
+            make_directory(outdir)?;
         }
+
+        let write_to = |base_qual: &BaseHistogram, primary: bool| -> Result<()> {
+            if base_qual.is_empty() {
+                return Ok(());
+            }
+            let mut handle = if primary {
+                match_output(Some(outdir.as_ref().join(BSQ_PRIMARY_PATH)))
+            } else {
+                match_output(Some(outdir.as_ref().join(BSQ_EXTENDED_PATH)))
+            }?;
+            base_qual.serialize_to(&mut handle)
+        };
+
+        write_to(&self.base_squal.lock(), true)?;
+        write_to(&self.base_xqual.lock(), false)?;
+
         Ok(())
     }
 
