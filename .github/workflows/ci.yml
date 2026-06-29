@@ -1,27 +1,43 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  build-and-test:
+  fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Build
-        run: cargo build --verbose
-      - name: Test
-        run: cargo test --verbose
-      - name: Test (fuzzy)
-        run: cargo test --verbose -F fuzzy
+      - uses: actions/checkout@v7
+      - run: cargo fmt --check
 
-  fmt_lint:
+  clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Formatting
-        run: cargo fmt --check
-      - name: Linting
-        run: cargo clippy --verbose
+      - uses: actions/checkout@v7
+      - run: cargo clippy --all-targets --all-features --verbose -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - "--all-features"
+          - "--no-default-features"
+          - "" # default
+          - "--no-default-features -F gcs"
+          - "--no-default-features -F htslib"
+          - "--no-default-features -F fuzzy"
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo test ${{ matrix.features }} --verbose

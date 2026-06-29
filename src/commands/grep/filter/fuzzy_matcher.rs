@@ -41,9 +41,9 @@ pub struct FuzzyMatcher {
 
 impl FuzzyMatcher {
     pub fn new(
-        pat1: Patterns,
-        pat2: Patterns,
-        pat: Patterns,
+        pat1: &Patterns,
+        pat2: &Patterns,
+        pat: &Patterns,
         k: usize,
         inexact: bool,
         offset: usize,
@@ -54,14 +54,14 @@ impl FuzzyMatcher {
         let mut searcher = Searcher::new_fwd();
 
         // validate pattern lengths
-        validate_single_pattern_length(&pat1)?;
-        validate_single_pattern_length(&pat2)?;
-        validate_single_pattern_length(&pat)?;
+        validate_single_pattern_length(pat1)?;
+        validate_single_pattern_length(pat2)?;
+        validate_single_pattern_length(pat)?;
 
         // encode the patterns for each collection/searcher combination
-        let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(&pat1));
-        let enc_pat2 = (!pat2.is_empty()).then(|| searcher_2.encode_patterns(&pat2));
-        let enc_pat = (!pat.is_empty()).then(|| searcher.encode_patterns(&pat));
+        let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(pat1));
+        let enc_pat2 = (!pat2.is_empty()).then(|| searcher_2.encode_patterns(pat2));
+        let enc_pat = (!pat.is_empty()).then(|| searcher.encode_patterns(pat));
 
         // initialize fixed-bitsets for each pattern collection
         let bs1 = FixedBitSet::with_capacity(pat1.len());
@@ -85,6 +85,7 @@ impl FuzzyMatcher {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn find_and_insert_matches(
     patterns: &EncodedPatterns<Profile>,
     sequence: &[u8],

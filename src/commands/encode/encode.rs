@@ -70,7 +70,7 @@ pub fn encode_collection(
         }
     }
     let writer = builder.build(ohandle)?;
-    let mut processor = super::processor::Encoder::new(writer)?;
+    let mut processor = Encoder::new(writer)?;
     process_collection(collection, &mut processor, config.threads)?;
     processor.finish()?;
 

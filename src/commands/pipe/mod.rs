@@ -300,7 +300,7 @@ mod tests {
     }
 
     /// Paired-end pipe with `-X` and adjacent `{R1} {R2}`: paths are interleaved
-    /// (r1_0 r2_0 r1_1 r2_1 …) so positional-argument tools receive pairs together.
+    /// (`r1_0` `r2_0` `r1_1` `r2_1` …) so positional-argument tools receive pairs together.
     #[test]
     fn test_pipe_exec_batch_paired_interleaved() -> Result<()> {
         let r1 = write_fastx().call()?;

@@ -6,9 +6,6 @@ use clap::Parser;
 use log::{debug, error, warn};
 use paraseq::fastx;
 
-#[cfg(not(feature = "gcs"))]
-use log::error;
-
 use crate::{cli::BinseqMode, types::BoxedReader};
 
 use super::FileFormat;
@@ -91,7 +88,12 @@ impl InputFile {
             Some(format)
         } else if self.input.len() == 1 {
             let path = &self.input[0];
-            if path.ends_with(".bam") || path.ends_with(".sam") || path.ends_with(".cram") {
+            let p = std::path::Path::new(path);
+            if p.extension().is_some_and(|ext| {
+                ext.eq_ignore_ascii_case("bam")
+                    || ext.eq_ignore_ascii_case("sam")
+                    || ext.eq_ignore_ascii_case("cram")
+            }) {
                 Some(FileFormat::Bam)
             } else {
                 None

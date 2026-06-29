@@ -14,16 +14,16 @@ pub struct AhoCorasickMatcher {
 
 impl AhoCorasickMatcher {
     pub fn new(
-        pat1: Patterns,
-        pat2: Patterns,
-        pat: Patterns,
+        pat1: &Patterns,
+        pat2: &Patterns,
+        pat: &Patterns,
         no_dfa: bool,
         offset: usize,
     ) -> Result<Self> {
         Ok(Self {
-            pat1: corasick_builder(&pat1, no_dfa)?,
-            pat2: corasick_builder(&pat2, no_dfa)?,
-            pat: corasick_builder(&pat, no_dfa)?,
+            pat1: corasick_builder(pat1, no_dfa)?,
+            pat2: corasick_builder(pat2, no_dfa)?,
+            pat: corasick_builder(pat, no_dfa)?,
             offset,
         })
     }

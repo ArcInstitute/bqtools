@@ -66,6 +66,7 @@ impl BqInfo {
 }
 
 #[derive(Serialize)]
+#[allow(clippy::struct_excessive_bools)]
 struct VbqInfo {
     path: String,
     format: &'static str,
@@ -145,6 +146,7 @@ impl VbqInfo {
 }
 
 #[derive(Serialize)]
+#[allow(clippy::struct_excessive_bools)]
 struct CbqInfo {
     path: String,
     format: &'static str,
@@ -284,6 +286,75 @@ impl BinseqInfo {
     }
 }
 
+fn pprint_block_size<T>(block_size: T) -> String
+where
+    T: Into<f64> + Copy,
+{
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * KB;
+    const GB: f64 = MB * KB;
+
+    let block_size = block_size.into();
+    if block_size < KB {
+        format!("{block_size} bytes")
+    } else if block_size < MB {
+        format!("{:.2} KB", block_size / KB)
+    } else if block_size < GB {
+        format!("{:.2} MB", block_size / MB)
+    } else {
+        format!("{:.2} GB", block_size / GB)
+    }
+}
+
+pub fn run(args: &InfoCommand) -> Result<()> {
+    // case for just CBQ with block headers
+    if args.opts.show_headers {
+        for path in &args.input {
+            let reader = match cbq::MmapReader::new(path.as_str()) {
+                Ok(reader) => reader,
+                Err(e) => {
+                    warn!("Unable to read path: {path} - {e}");
+                    continue;
+                }
+            };
+            for header in reader.iter_block_headers() {
+                println!("{:?}", header?);
+            }
+        }
+        return Ok(());
+    }
+
+    // all other cases
+    let all_info: Vec<BinseqInfo> = args
+        .input
+        .iter()
+        .filter_map(|path| {
+            if let Ok(info) = BinseqInfo::from_path(path.as_str()) {
+                Some(info)
+            } else {
+                warn!("Unable to read path: {path}");
+                None
+            }
+        })
+        .collect();
+    if args.opts.json {
+        println!("{}", serde_json::to_string_pretty(&all_info)?);
+    } else if args.opts.num {
+        for info in all_info {
+            info.num_records();
+        }
+    } else if args.opts.show_index {
+        for info in all_info {
+            info.print_index();
+        }
+    } else {
+        for info in all_info {
+            info.tabular();
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
@@ -358,73 +429,4 @@ mod tests {
         }
         Ok(())
     }
-}
-
-fn pprint_block_size<T>(block_size: T) -> String
-where
-    T: Into<f64> + Copy,
-{
-    const KB: f64 = 1024.0;
-    const MB: f64 = KB * KB;
-    const GB: f64 = MB * KB;
-
-    let block_size = block_size.into();
-    if block_size < KB {
-        format!("{block_size} bytes")
-    } else if block_size < MB {
-        format!("{:.2} KB", block_size / KB)
-    } else if block_size < GB {
-        format!("{:.2} MB", block_size / MB)
-    } else {
-        format!("{:.2} GB", block_size / GB)
-    }
-}
-
-pub fn run(args: &InfoCommand) -> Result<()> {
-    // case for just CBQ with block headers
-    if args.opts.show_headers {
-        for path in &args.input {
-            let reader = match cbq::MmapReader::new(path.as_str()) {
-                Ok(reader) => reader,
-                Err(e) => {
-                    warn!("Unable to read path: {path} - {e}");
-                    continue;
-                }
-            };
-            for header in reader.iter_block_headers() {
-                println!("{:?}", header?);
-            }
-        }
-        return Ok(());
-    }
-
-    // all other cases
-    let all_info: Vec<BinseqInfo> = args
-        .input
-        .iter()
-        .filter_map(|path| {
-            if let Ok(info) = BinseqInfo::from_path(path.as_str()) {
-                Some(info)
-            } else {
-                warn!("Unable to read path: {path}");
-                None
-            }
-        })
-        .collect();
-    if args.opts.json {
-        println!("{}", serde_json::to_string_pretty(&all_info)?);
-    } else if args.opts.num {
-        for info in all_info {
-            info.num_records();
-        }
-    } else if args.opts.show_index {
-        for info in all_info {
-            info.print_index();
-        }
-    } else {
-        for info in all_info {
-            info.tabular();
-        }
-    }
-    Ok(())
 }

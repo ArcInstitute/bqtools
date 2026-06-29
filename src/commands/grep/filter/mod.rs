@@ -44,7 +44,7 @@ pub enum PatternMatcher {
     Regex(RegexMatcher),
     AhoCorasick(AhoCorasickMatcher),
     #[cfg(feature = "fuzzy")]
-    Fuzzy(FuzzyMatcher),
+    Fuzzy(Box<FuzzyMatcher>),
 }
 impl PatternMatch for PatternMatcher {
     fn match_primary(
@@ -54,16 +54,10 @@ impl PatternMatch for PatternMatcher {
         and_logic: bool,
     ) -> bool {
         match self {
-            PatternMatcher::Regex(ref mut matcher) => {
-                matcher.match_primary(sequence, matches, and_logic)
-            }
-            PatternMatcher::AhoCorasick(ref mut matcher) => {
-                matcher.match_primary(sequence, matches, and_logic)
-            }
+            PatternMatcher::Regex(ref mut m) => m.match_primary(sequence, matches, and_logic),
+            PatternMatcher::AhoCorasick(ref mut m) => m.match_primary(sequence, matches, and_logic),
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref mut matcher) => {
-                matcher.match_primary(sequence, matches, and_logic)
-            }
+            PatternMatcher::Fuzzy(ref mut m) => m.match_primary(sequence, matches, and_logic),
         }
     }
 
@@ -74,16 +68,12 @@ impl PatternMatch for PatternMatcher {
         and_logic: bool,
     ) -> bool {
         match self {
-            PatternMatcher::Regex(ref mut matcher) => {
-                matcher.match_secondary(sequence, matches, and_logic)
-            }
-            PatternMatcher::AhoCorasick(ref mut matcher) => {
-                matcher.match_secondary(sequence, matches, and_logic)
+            PatternMatcher::Regex(ref mut m) => m.match_secondary(sequence, matches, and_logic),
+            PatternMatcher::AhoCorasick(ref mut m) => {
+                m.match_secondary(sequence, matches, and_logic)
             }
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref mut matcher) => {
-                matcher.match_secondary(sequence, matches, and_logic)
-            }
+            PatternMatcher::Fuzzy(ref mut m) => m.match_secondary(sequence, matches, and_logic),
         }
     }
 
@@ -96,30 +86,31 @@ impl PatternMatch for PatternMatcher {
         and_logic: bool,
     ) -> bool {
         match self {
-            PatternMatcher::Regex(ref mut matcher) => {
-                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            PatternMatcher::Regex(ref mut m) => {
+                m.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
-            PatternMatcher::AhoCorasick(ref mut matcher) => {
-                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            PatternMatcher::AhoCorasick(ref mut m) => {
+                m.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref mut matcher) => {
-                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            PatternMatcher::Fuzzy(ref mut m) => {
+                m.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
         }
     }
 
     fn offset(&self) -> usize {
         match self {
-            PatternMatcher::Regex(ref matcher) => matcher.offset(),
-            PatternMatcher::AhoCorasick(ref matcher) => matcher.offset(),
+            PatternMatcher::Regex(ref m) => m.offset(),
+            PatternMatcher::AhoCorasick(ref m) => m.offset(),
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref matcher) => matcher.offset(),
+            PatternMatcher::Fuzzy(ref m) => m.offset(),
         }
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::similar_names)]
 mod matcher_unit_tests {
     use std::collections::HashSet;
 
@@ -332,7 +323,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_basic() {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0).unwrap();
 
         // Exact match
         let seq_exact = b"GGGGAAAAAAAATTTT";
@@ -357,7 +348,8 @@ mod matcher_unit_tests {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
 
         // Test with k=0 (exact match only)
-        let mut matcher_k0 = FuzzyMatcher::new(pat1.clone(), vec![], vec![], 0, false, 0).unwrap();
+        let mut matcher_k0 =
+            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 0, false, 0).unwrap();
         let seq_exact = b"GGGGAAAAAAAATTTT";
         let seq_mismatch = b"GGGGAAAAACAATTTT";
         let mut matches1 = HashSet::new();
@@ -367,7 +359,7 @@ mod matcher_unit_tests {
         assert!(!matcher_k0.match_primary(seq_mismatch, &mut matches2, true));
 
         // Test with k=2 (up to 2 edits)
-        let mut matcher_k2 = FuzzyMatcher::new(pat1, vec![], vec![], 2, false, 0).unwrap();
+        let mut matcher_k2 = FuzzyMatcher::new(&pat1, &vec![], &vec![], 2, false, 0).unwrap();
         let mut matches3 = HashSet::new();
 
         assert!(matcher_k2.match_primary(seq_mismatch, &mut matches3, true));
@@ -377,7 +369,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_inexact_only() {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 2, true, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 2, true, 0).unwrap();
 
         // Exact match should not be reported with inexact_only
         let seq_exact = b"GGGGAAAAAAAATTTT";
@@ -394,7 +386,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_secondary() {
         let pat2 = vec![b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(vec![], pat2, vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, 0).unwrap();
 
         let sequence = b"GGGGTTTTTTTTCCCC";
         let mut matches = HashSet::new();
@@ -406,7 +398,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_either() {
         let pat = vec![b"CCCCCCCC".to_vec()];
-        let mut matcher = FuzzyMatcher::new(vec![], vec![], pat, 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &vec![], &pat, 1, false, 0).unwrap();
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"GGGGCCCCCCCCTTTT";
@@ -424,7 +416,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_and_logic() {
         let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0).unwrap();
 
         // Sequence with both patterns
         let seq_both = b"AAAAAAAATTTTTTTT";
@@ -441,7 +433,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_or_logic() {
         let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0).unwrap();
 
         // Sequence with only one pattern
         let seq = b"AAAAAAAACCCCCCCC";
@@ -452,7 +444,7 @@ mod matcher_unit_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_matcher_empty_patterns() {
-        let mut matcher = FuzzyMatcher::new(vec![], vec![], vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &vec![], &vec![], 1, false, 0).unwrap();
 
         let sequence = b"GGGGAAAATTTT";
         let mut matches = HashSet::new();
@@ -617,7 +609,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_offset_zero() {
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 0, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 0, false, 0).unwrap();
 
         let sequence = b"GGGGAAAAATTTT";
         let mut matches = HashSet::new();
@@ -637,7 +629,7 @@ mod matcher_unit_tests {
         let offset = 15;
         let pat1 = vec![b"AAAA".to_vec()];
         let mut matcher =
-            FuzzyMatcher::new(pat1.clone(), vec![], vec![], 1, false, offset).unwrap();
+            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 1, false, offset).unwrap();
 
         let sequence = b"GGGGAAAAATTTT";
         let mut matches = HashSet::new();
@@ -649,7 +641,7 @@ mod matcher_unit_tests {
 
         // Create a matcher with offset=0 to get the baseline positions
         let mut baseline_matcher =
-            FuzzyMatcher::new(pat1.clone(), vec![], vec![], 1, false, 0).unwrap();
+            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 1, false, 0).unwrap();
         let mut baseline_matches = HashSet::new();
         baseline_matcher.match_primary(sequence, &mut baseline_matches, true);
         let baseline_match = baseline_matches.iter().next().unwrap();
@@ -683,7 +675,7 @@ mod matcher_unit_tests {
     fn test_fuzzy_matcher_offset_with_mismatch() {
         let offset = 8;
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(pat1, vec![], vec![], 1, false, offset).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, offset).unwrap();
 
         // One mismatch in the pattern
         let sequence = b"GGGGAACAATTTT";
@@ -706,7 +698,7 @@ mod matcher_unit_tests {
     fn test_fuzzy_matcher_offset_secondary() {
         let offset = 12;
         let pat2 = vec![b"TTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(vec![], pat2, vec![], 1, false, offset).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, offset).unwrap();
 
         let sequence = b"GGGGTTTTCCCC";
         let mut matches = HashSet::new();
