@@ -44,7 +44,7 @@ pub enum PatternMatcher {
     Regex(RegexMatcher),
     AhoCorasick(AhoCorasickMatcher),
     #[cfg(feature = "fuzzy")]
-    Fuzzy(FuzzyMatcher),
+    Fuzzy(Box<FuzzyMatcher>),
 }
 impl PatternMatch for PatternMatcher {
     fn match_primary(
@@ -54,16 +54,10 @@ impl PatternMatch for PatternMatcher {
         and_logic: bool,
     ) -> bool {
         match self {
-            PatternMatcher::Regex(ref mut matcher) => {
-                matcher.match_primary(sequence, matches, and_logic)
-            }
-            PatternMatcher::AhoCorasick(ref mut matcher) => {
-                matcher.match_primary(sequence, matches, and_logic)
-            }
+            PatternMatcher::Regex(ref mut m) => m.match_primary(sequence, matches, and_logic),
+            PatternMatcher::AhoCorasick(ref mut m) => m.match_primary(sequence, matches, and_logic),
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref mut matcher) => {
-                matcher.match_primary(sequence, matches, and_logic)
-            }
+            PatternMatcher::Fuzzy(ref mut m) => m.match_primary(sequence, matches, and_logic),
         }
     }
 
@@ -74,16 +68,12 @@ impl PatternMatch for PatternMatcher {
         and_logic: bool,
     ) -> bool {
         match self {
-            PatternMatcher::Regex(ref mut matcher) => {
-                matcher.match_secondary(sequence, matches, and_logic)
-            }
-            PatternMatcher::AhoCorasick(ref mut matcher) => {
-                matcher.match_secondary(sequence, matches, and_logic)
+            PatternMatcher::Regex(ref mut m) => m.match_secondary(sequence, matches, and_logic),
+            PatternMatcher::AhoCorasick(ref mut m) => {
+                m.match_secondary(sequence, matches, and_logic)
             }
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref mut matcher) => {
-                matcher.match_secondary(sequence, matches, and_logic)
-            }
+            PatternMatcher::Fuzzy(ref mut m) => m.match_secondary(sequence, matches, and_logic),
         }
     }
 
@@ -96,30 +86,31 @@ impl PatternMatch for PatternMatcher {
         and_logic: bool,
     ) -> bool {
         match self {
-            PatternMatcher::Regex(ref mut matcher) => {
-                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            PatternMatcher::Regex(ref mut m) => {
+                m.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
-            PatternMatcher::AhoCorasick(ref mut matcher) => {
-                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            PatternMatcher::AhoCorasick(ref mut m) => {
+                m.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref mut matcher) => {
-                matcher.match_either(primary, secondary, smatches, xmatches, and_logic)
+            PatternMatcher::Fuzzy(ref mut m) => {
+                m.match_either(primary, secondary, smatches, xmatches, and_logic)
             }
         }
     }
 
     fn offset(&self) -> usize {
         match self {
-            PatternMatcher::Regex(ref matcher) => matcher.offset(),
-            PatternMatcher::AhoCorasick(ref matcher) => matcher.offset(),
+            PatternMatcher::Regex(ref m) => m.offset(),
+            PatternMatcher::AhoCorasick(ref m) => m.offset(),
             #[cfg(feature = "fuzzy")]
-            PatternMatcher::Fuzzy(ref matcher) => matcher.offset(),
+            PatternMatcher::Fuzzy(ref m) => m.offset(),
         }
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::similar_names)]
 mod matcher_unit_tests {
     use std::collections::HashSet;
 
