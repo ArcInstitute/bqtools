@@ -19,9 +19,6 @@ jobs:
 
   check-conditional:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        feature: ["gcs", "htslib", "fuzzy"]
     steps:
       - uses: actions/checkout@v3
       - name: Check (default)
@@ -30,6 +27,14 @@ jobs:
         run: cargo check --all-features
       - name: Check (no features)
         run: cargo check --no-default-features
+
+  check-conditional-features:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        feature: ["gcs", "htslib", "fuzzy"]
+    steps:
+      - uses: actions/checkout@v3
       - name: Check (each feature)
         run: cargo check --no-default-features -F ${{ matrix.feature }}
 
