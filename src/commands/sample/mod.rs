@@ -196,6 +196,7 @@ mod tests {
     fn test_sample_half() -> Result<()> {
         let nrec = 1000;
         let fraction = 0.5_f64;
+        #[allow(clippy::cast_sign_loss)]
         let expected = (nrec as f64 * fraction) as usize;
         let tolerance = nrec / 5;
 
