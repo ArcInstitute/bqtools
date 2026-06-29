@@ -36,7 +36,7 @@ pub enum PatternCounter {
     Regex(RegexPatternCounter),
     AhoCorasick(AhoCorasickPatternCounter),
     #[cfg(feature = "fuzzy")]
-    Fuzzy(FuzzyPatternCounter),
+    Fuzzy(Box<FuzzyPatternCounter>),
 }
 impl PatternCount for PatternCounter {
     fn count_patterns(&mut self, primary: &[u8], secondary: &[u8], pattern_count: &mut [usize]) {
