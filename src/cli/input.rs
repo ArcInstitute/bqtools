@@ -89,11 +89,10 @@ impl InputFile {
         } else if self.input.len() == 1 {
             let path = &self.input[0];
             let p = std::path::Path::new(path);
-            if p.extension().is_some_and(|e| {
-                matches!(
-                    e.to_ascii_lowercase().to_string_lossy().as_ref(),
-                    "bam" | "sam" | "cram"
-                )
+            if p.extension().is_some_and(|ext| {
+                ext.eq_ignore_ascii_case("bam")
+                    || ext.eq_ignore_ascii_case("sam")
+                    || ext.eq_ignore_ascii_case("cram")
             }) {
                 Some(FileFormat::Bam)
             } else {
