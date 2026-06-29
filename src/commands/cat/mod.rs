@@ -34,23 +34,24 @@ fn determine_mode(paths: &[String]) -> Result<BinseqMode> {
     let mut mode = None;
     for path in paths {
         let reader = BinseqReader::new(path)?;
-        if mode.is_none() {
-            mode = match reader {
-                BinseqReader::Bq(_) => Some(BinseqMode::Bq),
-                BinseqReader::Vbq(_) => Some(BinseqMode::Vbq),
-                BinseqReader::Cbq(_) => Some(BinseqMode::Cbq),
-            };
-            trace!("Initializing Mode {:?} for path: {}", mode.unwrap(), path);
-        } else {
-            match (mode, reader) {
-                (Some(BinseqMode::Bq), BinseqReader::Bq(_)) => (),
-                (Some(BinseqMode::Vbq), BinseqReader::Vbq(_)) => (),
-                (Some(BinseqMode::Cbq), BinseqReader::Cbq(_)) => (),
+        if let Some(current_mode) = mode {
+            match (current_mode, reader) {
+                (BinseqMode::Bq, BinseqReader::Bq(_))
+                | (BinseqMode::Vbq, BinseqReader::Vbq(_))
+                | (BinseqMode::Cbq, BinseqReader::Cbq(_)) => (),
                 _ => bail!(
                     "Inconsistent modes found, expecting the same BINSEQ mode for all input files."
                 ),
             }
-            trace!("Mode {:?} for path: {}", mode.unwrap(), path);
+            trace!("Mode {current_mode:?} for path: {path}");
+        } else {
+            let detected = match reader {
+                BinseqReader::Bq(_) => BinseqMode::Bq,
+                BinseqReader::Vbq(_) => BinseqMode::Vbq,
+                BinseqReader::Cbq(_) => BinseqMode::Cbq,
+            };
+            trace!("Initializing Mode {detected:?} for path: {path}");
+            mode = Some(detected);
         }
     }
     mode.ok_or_else(|| anyhow::anyhow!("No input files."))
