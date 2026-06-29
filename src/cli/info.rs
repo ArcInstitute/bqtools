@@ -12,6 +12,7 @@ pub struct InfoCommand {
 
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "INFO OPTIONS")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct InfoOpts {
     /// Only print the number of records in the file
     #[clap(short, long, conflicts_with_all=["json", "show_index", "show_headers"])]

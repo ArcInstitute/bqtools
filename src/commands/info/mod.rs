@@ -66,6 +66,7 @@ impl BqInfo {
 }
 
 #[derive(Serialize)]
+#[allow(clippy::struct_excessive_bools)]
 struct VbqInfo {
     path: String,
     format: &'static str,
@@ -145,6 +146,7 @@ impl VbqInfo {
 }
 
 #[derive(Serialize)]
+#[allow(clippy::struct_excessive_bools)]
 struct CbqInfo {
     path: String,
     format: &'static str,

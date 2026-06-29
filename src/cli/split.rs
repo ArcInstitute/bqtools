@@ -33,6 +33,7 @@ impl SplitCommand {
 
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "SPLIT OPTIONS")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct SplitOptions {
     /// Optional base path for output files. If not provided, the current working directory will be used.
     #[clap(long, default_value = "./split_outs")]
