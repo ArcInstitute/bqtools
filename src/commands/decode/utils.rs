@@ -59,31 +59,27 @@ impl SplitWriter {
         Self::Split { left, right }
     }
 
-    #[allow(unused_variables)]
     pub fn is_split(&self) -> bool {
         match self {
-            Self::Interleaved { inner } => false,
-            Self::Split { left, right } => true,
+            Self::Interleaved { .. } => false,
+            Self::Split { .. } => true,
         }
     }
 
-    #[allow(unused_variables)]
     pub fn write_interleaved(&mut self, buf: &[u8]) -> Result<(), std::io::Error> {
         match self {
             SplitWriter::Interleaved { inner } => {
                 inner.write_all(buf)?;
                 Ok(())
             }
-            #[allow(unused_variables)]
-            SplitWriter::Split { left, right } => {
+            SplitWriter::Split { .. } => {
                 panic!("Unable to write to interleaved as the writer is split")
             }
         }
     }
-    #[allow(unused_variables)]
     pub fn write_split(&mut self, buf: &[u8], write_to_left: bool) -> Result<(), std::io::Error> {
         match self {
-            SplitWriter::Interleaved { inner } => {
+            SplitWriter::Interleaved { .. } => {
                 panic!("Unable to write split as the writer is interleaved")
             }
             SplitWriter::Split { left, right } => {
