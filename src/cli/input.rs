@@ -6,9 +6,6 @@ use clap::Parser;
 use log::{debug, error, warn};
 use paraseq::fastx;
 
-#[cfg(not(feature = "gcs"))]
-use log::error;
-
 use crate::{cli::BinseqMode, types::BoxedReader};
 
 use super::FileFormat;
