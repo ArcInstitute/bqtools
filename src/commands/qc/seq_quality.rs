@@ -95,7 +95,7 @@ impl PerSequenceQuality {
         self.seq_xqual.lock().ingest(&mut self.t_seq_xqual);
     }
 
-    pub fn write_to_outdir<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
+    pub fn finish<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
         if !outdir.as_ref().exists() {
             make_directory(outdir)?;
         }

@@ -111,7 +111,7 @@ pub struct PerBaseSequenceQuality {
     n_records: Arc<Mutex<usize>>,
 }
 impl PerBaseSequenceQuality {
-    pub fn write_to_outdir<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
+    pub fn finish<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
         if !outdir.as_ref().exists() {
             make_directory(outdir)?;
         }

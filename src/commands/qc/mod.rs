@@ -1,33 +1,24 @@
 use anyhow::Result;
 use binseq::{BinseqReader, ParallelReader};
 
-use crate::cli::{QcCommand, QcOptions};
+use crate::cli::QcCommand;
 
 mod base_quality;
+mod config;
+mod modules;
 mod proc;
 mod seq_quality;
+
+use config::QcConfig;
+use modules::QcModule;
 
 pub const PHRED_OFFSET: u8 = 33;
 pub type QualAbundance = [usize; 94];
 pub const DEFAULT_QUAL_ABUNDANCE: QualAbundance = [0; 94];
 
-#[derive(Clone, Copy)]
-pub struct QcConfig {
-    per_base_qual: bool,
-    per_seq_qual: bool,
-}
-impl QcConfig {
-    fn from_opts(opts: &QcOptions) -> Self {
-        Self {
-            per_base_qual: !opts.skip_base_qual,
-            per_seq_qual: !opts.skip_seq_qual,
-        }
-    }
-}
-
 pub fn run(args: &QcCommand) -> Result<()> {
     let reader = BinseqReader::new(args.input.path())?;
-    let mut proc = proc::QcProcessor::new(&args.qc.outdir, QcConfig::from_opts(&args.qc));
+    let mut proc = proc::QcProcessor::new(&args.qc.outdir, QcConfig::from_opts(&args.qc))?;
 
     if let Some(mut span) = args.input.span {
         let range = span.get_range(reader.num_records()?)?;

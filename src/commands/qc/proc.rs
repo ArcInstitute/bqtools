@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use super::{base_quality::PerBaseSequenceQuality, seq_quality::PerSequenceQuality, QcConfig};
+use super::{QcConfig, QcModule};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use binseq::ParallelProcessor;
 
 /// TODO: per base sequence quality
@@ -17,26 +17,25 @@ use binseq::ParallelProcessor;
 #[derive(Clone, Default)]
 pub struct QcProcessor {
     outdir: PathBuf,
-    bsq: Option<PerBaseSequenceQuality>,
-    sq: Option<PerSequenceQuality>,
+    modules: Vec<QcModule>,
 }
 impl QcProcessor {
-    pub fn new<P: AsRef<Path>>(outdir: P, config: QcConfig) -> Self {
-        Self {
-            outdir: outdir.as_ref().to_path_buf(),
-            bsq: config.per_base_qual.then(|| Default::default()),
-            sq: config.per_seq_qual.then(|| Default::default()),
+    pub fn new<P: AsRef<Path>>(outdir: P, config: QcConfig) -> Result<Self> {
+        let modules = config.build_qc_modules();
+        if modules.is_empty() {
+            bail!("Must provide at least one QC module to process")
         }
+        Ok(Self {
+            outdir: outdir.as_ref().to_path_buf(),
+            modules,
+        })
     }
 
     pub fn finish(&mut self) -> Result<()> {
-        if let Some(ref mut bsq) = self.bsq {
-            bsq.write_to_outdir(&self.outdir)?;
-        }
-        if let Some(ref mut sq) = self.sq {
-            sq.write_to_outdir(&self.outdir)?;
-        }
-        Ok(())
+        self.modules
+            .iter_mut()
+            .try_for_each(|m| m.finish(&self.outdir))
+            .map_err(Into::into)
     }
 }
 impl ParallelProcessor for QcProcessor {
@@ -44,22 +43,12 @@ impl ParallelProcessor for QcProcessor {
         &mut self,
         record: R,
     ) -> binseq::Result<()> {
-        if let Some(ref mut bsq) = self.bsq {
-            bsq.push(&record);
-        }
-        if let Some(ref mut sq) = self.sq {
-            sq.push(&record);
-        }
+        self.modules.iter_mut().for_each(|m| m.push(&record));
         Ok(())
     }
 
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
-        if let Some(ref mut bsq) = self.bsq {
-            bsq.sync()
-        }
-        if let Some(ref mut sq) = self.sq {
-            sq.sync()
-        }
+        self.modules.iter_mut().for_each(|m| m.sync());
         Ok(())
     }
 }
