@@ -5,7 +5,8 @@ use binseq::BinseqRecord;
 
 use crate::commands::qc::{
     base_content::PerBaseSequenceContent, base_quality::PerBaseSequenceQuality,
-    gc_content::PerSequenceGcContent, seq_quality::PerSequenceQuality,
+    gc_content::PerSequenceGcContent, seq_length::SequenceLengthDistribution,
+    seq_quality::PerSequenceQuality,
 };
 
 pub trait QcModule {
@@ -28,6 +29,7 @@ pub enum QcModuleType {
     Sq(PerSequenceQuality),
     Bc(PerBaseSequenceContent),
     Gc(PerSequenceGcContent),
+    Sl(SequenceLengthDistribution),
 }
 impl QcModuleType {
     pub fn new_bsq() -> Self {
@@ -42,6 +44,9 @@ impl QcModuleType {
     pub fn new_gc() -> Self {
         Self::Gc(Default::default())
     }
+    pub fn new_sl() -> Self {
+        Self::Sl(Default::default())
+    }
 }
 impl QcModule for QcModuleType {
     fn desc(&self) -> &'static str {
@@ -50,6 +55,7 @@ impl QcModule for QcModuleType {
             Self::Sq(x) => x.desc(),
             Self::Bc(x) => x.desc(),
             Self::Gc(x) => x.desc(),
+            Self::Sl(x) => x.desc(),
         }
     }
     fn push<R: BinseqRecord>(&mut self, record: &R) {
@@ -58,6 +64,7 @@ impl QcModule for QcModuleType {
             Self::Sq(x) => x.push(record),
             Self::Bc(x) => x.push(record),
             Self::Gc(x) => x.push(record),
+            Self::Sl(x) => x.push(record),
         }
     }
     fn sync(&mut self) {
@@ -66,6 +73,7 @@ impl QcModule for QcModuleType {
             Self::Sq(x) => x.sync(),
             Self::Bc(x) => x.sync(),
             Self::Gc(x) => x.sync(),
+            Self::Sl(x) => x.sync(),
         }
     }
     fn finish<P: AsRef<Path>>(&mut self, outdir: P) -> Result<()> {
@@ -74,6 +82,7 @@ impl QcModule for QcModuleType {
             Self::Sq(x) => x.finish(&outdir),
             Self::Bc(x) => x.finish(&outdir),
             Self::Gc(x) => x.finish(&outdir),
+            Self::Sl(x) => x.finish(&outdir),
         }
     }
 }

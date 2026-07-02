@@ -34,6 +34,10 @@ pub struct QcOptions {
     #[clap(long)]
     pub skip_seq_gc: bool,
 
+    /// Skip sequence-length-distribution
+    #[clap(long)]
+    pub skip_seq_length: bool,
+
     /// Path to output directory write to
     #[clap(short, long, default_value = "./bqtools-qc")]
     pub outdir: String,

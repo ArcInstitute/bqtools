@@ -9,6 +9,7 @@ mod config;
 mod gc_content;
 mod modules;
 mod proc;
+mod seq_length;
 mod seq_quality;
 
 use config::QcConfig;

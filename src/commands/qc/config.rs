@@ -11,6 +11,7 @@ pub struct QcConfig {
     per_seq_qual: bool,
     per_base_content: bool,
     per_seq_gc: bool,
+    seq_length: bool,
 }
 impl QcConfig {
     pub fn from_opts(opts: &QcOptions) -> Self {
@@ -19,6 +20,7 @@ impl QcConfig {
             per_seq_qual: !opts.skip_seq_qual,
             per_base_content: !opts.skip_base_content,
             per_seq_gc: !opts.skip_seq_gc,
+            seq_length: !opts.skip_seq_length,
         }
     }
 
@@ -38,6 +40,7 @@ impl QcConfig {
         self.per_base_content
             .then(|| add_module(QcModuleType::new_bc()));
         self.per_seq_gc.then(|| add_module(QcModuleType::new_gc()));
+        self.seq_length.then(|| add_module(QcModuleType::new_sl()));
         trace!("Modules loaded.");
         modules
     }
