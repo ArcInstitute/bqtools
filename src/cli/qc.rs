@@ -30,6 +30,10 @@ pub struct QcOptions {
     #[clap(long)]
     pub skip_base_content: bool,
 
+    /// Skip per-sequence-gc-content
+    #[clap(long)]
+    pub skip_seq_gc: bool,
+
     /// Path to output directory write to
     #[clap(short, long, default_value = "./bqtools-qc")]
     pub outdir: String,

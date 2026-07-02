@@ -7,7 +7,6 @@ use super::{QcConfig, QcModule};
 use anyhow::{bail, Result};
 use binseq::ParallelProcessor;
 
-/// TODO: per sequence GC content
 /// TODO: per base N content
 /// TODO: sequence length distribution
 /// TODO: sequence duplication levels

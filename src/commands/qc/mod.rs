@@ -6,6 +6,7 @@ use crate::cli::QcCommand;
 mod base_content;
 mod base_quality;
 mod config;
+mod gc_content;
 mod modules;
 mod proc;
 mod seq_quality;
