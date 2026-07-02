@@ -1,5 +1,6 @@
 use anyhow::Result;
 use binseq::{BinseqReader, ParallelReader};
+use log::trace;
 
 use crate::cli::QcCommand;
 
@@ -25,8 +26,10 @@ pub fn run(args: &QcCommand) -> Result<()> {
 
     if let Some(mut span) = args.input.span {
         let range = span.get_range(reader.num_records()?)?;
+        trace!("Processing span: {}..{}", range.start, range.end);
         reader.process_parallel_range(proc.clone(), args.qc.threads, range)?;
     } else {
+        trace!("Processing all records: n={}", reader.num_records()?);
         reader.process_parallel(proc.clone(), args.qc.threads)?;
     }
     proc.finish()?;
