@@ -41,7 +41,7 @@ impl QcConfig {
             .then(|| add_module(QcModuleType::new_bc()));
         self.per_seq_gc.then(|| add_module(QcModuleType::new_gc()));
         self.seq_length.then(|| add_module(QcModuleType::new_sl()));
-        trace!("Modules loaded.");
+        trace!("{} modules loaded", modules.len());
         modules
     }
 }
