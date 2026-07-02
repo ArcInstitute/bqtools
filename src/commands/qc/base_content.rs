@@ -155,7 +155,7 @@ impl QcModule for PerBaseSequenceContent {
         self.t_base_xcontent.push(record.xseq());
     }
 
-    fn sync(&mut self) {
+    fn sync_final(&mut self) {
         self.base_content.lock().ingest(&mut self.t_base_content);
         self.base_xcontent.lock().ingest(&mut self.t_base_xcontent);
     }

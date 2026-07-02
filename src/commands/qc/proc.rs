@@ -7,8 +7,6 @@ use super::{QcConfig, QcModule};
 use anyhow::{bail, Result};
 use binseq::ParallelProcessor;
 
-/// TODO: sequence length distribution
-/// TODO: sequence duplication levels
 /// TODO: overrepresented sequences
 /// TODO: adapter content
 #[derive(Clone, Default)]
@@ -46,7 +44,14 @@ impl ParallelProcessor for QcProcessor {
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
         self.modules
             .iter_mut()
-            .for_each(super::modules::QcModule::sync);
+            .for_each(super::modules::QcModule::sync_batch);
+        Ok(())
+    }
+
+    fn on_thread_complete(&mut self) -> binseq::Result<()> {
+        self.modules
+            .iter_mut()
+            .for_each(super::modules::QcModule::sync_final);
         Ok(())
     }
 }

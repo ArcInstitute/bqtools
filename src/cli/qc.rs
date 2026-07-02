@@ -38,6 +38,15 @@ pub struct QcOptions {
     #[clap(long)]
     pub skip_seq_length: bool,
 
+    /// Skip sequence-duplication-levels
+    #[clap(long)]
+    pub skip_dup_levels: bool,
+
+    /// Number of leading records (by file order) to sample for duplication
+    /// level estimation [0: use all records]
+    #[clap(long, default_value_t = 100_000)]
+    pub dup_sample_size: usize,
+
     /// Path to output directory write to
     #[clap(short, long, default_value = "./bqtools-qc")]
     pub outdir: String,

@@ -90,7 +90,7 @@ impl QcModule for PerSequenceQuality {
         self.t_seq_xqual.push(record.xqual());
     }
 
-    fn sync(&mut self) {
+    fn sync_final(&mut self) {
         self.seq_squal.lock().ingest(&mut self.t_seq_squal);
         self.seq_xqual.lock().ingest(&mut self.t_seq_xqual);
     }

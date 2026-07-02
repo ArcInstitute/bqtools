@@ -12,6 +12,8 @@ pub struct QcConfig {
     per_base_content: bool,
     per_seq_gc: bool,
     seq_length: bool,
+    dup_levels: bool,
+    dup_sample_size: usize,
 }
 impl QcConfig {
     pub fn from_opts(opts: &QcOptions) -> Self {
@@ -21,6 +23,8 @@ impl QcConfig {
             per_base_content: !opts.skip_base_content,
             per_seq_gc: !opts.skip_seq_gc,
             seq_length: !opts.skip_seq_length,
+            dup_levels: !opts.skip_dup_levels,
+            dup_sample_size: opts.dup_sample_size,
         }
     }
 
@@ -41,6 +45,8 @@ impl QcConfig {
             .then(|| add_module(QcModuleType::new_bc()));
         self.per_seq_gc.then(|| add_module(QcModuleType::new_gc()));
         self.seq_length.then(|| add_module(QcModuleType::new_sl()));
+        self.dup_levels
+            .then(|| add_module(QcModuleType::new_dup(self.dup_sample_size)));
         trace!("{} modules loaded", modules.len());
         modules
     }

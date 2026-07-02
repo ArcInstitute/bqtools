@@ -92,7 +92,7 @@ impl QcModule for SequenceLengthDistribution {
         self.t_xlen.push(record.xlen() as usize);
     }
 
-    fn sync(&mut self) {
+    fn sync_final(&mut self) {
         self.slen.lock().ingest(&mut self.t_slen);
         self.xlen.lock().ingest(&mut self.t_xlen);
     }

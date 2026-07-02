@@ -7,6 +7,7 @@ use crate::cli::QcCommand;
 mod base_content;
 mod base_quality;
 mod config;
+mod dup_levels;
 mod gc_content;
 mod modules;
 mod proc;

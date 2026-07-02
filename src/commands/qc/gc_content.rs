@@ -97,7 +97,7 @@ impl QcModule for PerSequenceGcContent {
         self.t_seq_xgc.push(record.xseq());
     }
 
-    fn sync(&mut self) {
+    fn sync_final(&mut self) {
         self.seq_gc.lock().ingest(&mut self.t_seq_gc);
         self.seq_xgc.lock().ingest(&mut self.t_seq_xgc);
     }

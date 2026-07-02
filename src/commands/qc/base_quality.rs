@@ -117,7 +117,7 @@ impl QcModule for PerBaseSequenceQuality {
         self.t_n_records += 1;
     }
 
-    fn sync(&mut self) {
+    fn sync_final(&mut self) {
         self.base_squal.lock().ingest(&mut self.t_base_squal);
         self.base_xqual.lock().ingest(&mut self.t_base_xqual);
 
