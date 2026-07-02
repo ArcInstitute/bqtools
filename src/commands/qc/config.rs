@@ -9,12 +9,14 @@ use crate::{
 pub struct QcConfig {
     per_base_qual: bool,
     per_seq_qual: bool,
+    per_base_content: bool,
 }
 impl QcConfig {
     pub fn from_opts(opts: &QcOptions) -> Self {
         Self {
             per_base_qual: !opts.skip_base_qual,
             per_seq_qual: !opts.skip_seq_qual,
+            per_base_content: !opts.skip_base_content,
         }
     }
 
@@ -27,12 +29,12 @@ impl QcConfig {
         };
 
         trace!("Loading QC modules...");
-        if self.per_base_qual {
-            add_module(QcModuleType::new_bsq());
-        }
-        if self.per_seq_qual {
-            add_module(QcModuleType::new_sq());
-        }
+        self.per_base_qual
+            .then(|| add_module(QcModuleType::new_bsq()));
+        self.per_seq_qual
+            .then(|| add_module(QcModuleType::new_sq()));
+        self.per_base_content
+            .then(|| add_module(QcModuleType::new_bc()));
         trace!("Modules loaded.");
         modules
     }

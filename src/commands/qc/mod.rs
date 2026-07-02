@@ -3,6 +3,7 @@ use binseq::{BinseqReader, ParallelReader};
 
 use crate::cli::QcCommand;
 
+mod base_content;
 mod base_quality;
 mod config;
 mod modules;
