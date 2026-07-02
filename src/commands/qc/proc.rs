@@ -32,7 +32,6 @@ impl QcProcessor {
         self.modules
             .iter_mut()
             .try_for_each(|m| m.finish(&self.outdir))
-            .map_err(Into::into)
     }
 }
 impl ParallelProcessor for QcProcessor {
@@ -45,7 +44,9 @@ impl ParallelProcessor for QcProcessor {
     }
 
     fn on_batch_complete(&mut self) -> binseq::Result<()> {
-        self.modules.iter_mut().for_each(|m| m.sync());
+        self.modules
+            .iter_mut()
+            .for_each(super::modules::QcModule::sync);
         Ok(())
     }
 }

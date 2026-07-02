@@ -92,8 +92,8 @@ impl BaseContentHistogram {
                     .for_each(|(self_c, other_c)| {
                         *self_c += *other_c;
                         *other_c = 0;
-                    })
-            })
+                    });
+            });
     }
     fn serialize_to<W: Write>(&self, wtr: &mut W) -> Result<()> {
         if self.is_empty() {

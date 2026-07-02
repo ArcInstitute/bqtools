@@ -48,7 +48,7 @@ impl SeqLenHistogram {
             .for_each(|(u, v)| {
                 *u += *v;
                 *v = 0;
-            })
+            });
     }
     fn serialize_to<W: Write>(&self, wtr: &mut W) -> Result<()> {
         if self.is_empty() {

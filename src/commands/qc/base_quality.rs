@@ -8,8 +8,8 @@ use serde::Serialize;
 use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const BSQ_PRIMARY_PATH: &'static str = "bsq_R1.tsv";
-const BSQ_EXTENDED_PATH: &'static str = "bsq_R2.tsv";
+const BSQ_PRIMARY_PATH: &str = "bsq_R1.tsv";
+const BSQ_EXTENDED_PATH: &str = "bsq_R2.tsv";
 
 #[derive(Serialize)]
 pub struct BaseQualityRecord {
@@ -62,8 +62,8 @@ impl BaseHistogram {
                     .for_each(|(self_q, other_q)| {
                         *self_q += *other_q;
                         *other_q = 0;
-                    })
-            })
+                    });
+            });
     }
     fn serialize_to<W: Write>(&self, wtr: &mut W) -> Result<()> {
         if self.is_empty() {

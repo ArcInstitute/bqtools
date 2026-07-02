@@ -52,7 +52,7 @@ impl GcHistogram {
             .for_each(|(u, v)| {
                 *u += *v;
                 *v = 0;
-            })
+            });
     }
 
     fn serialize_to<W: Write>(&self, wtr: &mut W) -> Result<()> {

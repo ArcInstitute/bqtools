@@ -7,8 +7,8 @@ use std::{io::Write, ops::Div, path::Path, sync::Arc};
 use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const SQ_PRIMARY_PATH: &'static str = "sq_R1.tsv";
-const SQ_EXTENDED_PATH: &'static str = "sq_R2.tsv";
+const SQ_PRIMARY_PATH: &str = "sq_R1.tsv";
+const SQ_EXTENDED_PATH: &str = "sq_R2.tsv";
 
 #[derive(Clone)]
 pub struct QualHistogram {
@@ -45,7 +45,7 @@ impl QualHistogram {
             .for_each(|(u, v)| {
                 *u += *v;
                 *v = 0;
-            })
+            });
     }
 
     fn serialize_to<W: Write>(&self, wtr: &mut W) -> Result<()> {

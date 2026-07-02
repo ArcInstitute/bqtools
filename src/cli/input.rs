@@ -181,9 +181,8 @@ fn load_reader(
 
             #[cfg(feature = "gcs")]
             Ok(load_gcs_reader(path, batch_size)?)
-        } else {
-            Ok(load_simple_reader(Some(path), batch_size)?)
         }
+        Ok(load_simple_reader(Some(path), batch_size)?)
     } else {
         Ok(load_simple_reader(None, batch_size)?)
     }
