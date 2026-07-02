@@ -58,8 +58,18 @@ impl QcModuleType {
     pub fn new_sl() -> Self {
         Self::Sl(Default::default())
     }
-    pub fn new_dup(sample_size: usize) -> Self {
-        Self::Dup(SequenceDuplicationLevels::with_sample_size(sample_size))
+    pub fn new_dup(
+        sample_size: usize,
+        emit_levels: bool,
+        emit_overrepresented: bool,
+        overrepresented_threshold: f64,
+    ) -> Self {
+        Self::Dup(SequenceDuplicationLevels::new(
+            sample_size,
+            emit_levels,
+            emit_overrepresented,
+            overrepresented_threshold,
+        ))
     }
 }
 impl QcModule for QcModuleType {

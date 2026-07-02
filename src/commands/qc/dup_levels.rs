@@ -3,6 +3,7 @@ use std::{io::Write, path::Path, sync::Arc};
 use anyhow::Result;
 use binseq::BinseqRecord;
 use hashbrown::HashMap;
+use log::trace;
 use parking_lot::Mutex;
 use serde::Serialize;
 
@@ -10,10 +11,13 @@ use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory
 
 const DUP_PRIMARY_PATH: &str = "dup_R1.tsv";
 const DUP_EXTENDED_PATH: &str = "dup_R2.tsv";
+const OVERREP_PRIMARY_PATH: &str = "overrep_R1.tsv";
+const OVERREP_EXTENDED_PATH: &str = "overrep_R2.tsv";
 
 /// Number of leading records (by global file index) considered for
-/// duplication analysis. Bounding this keeps memory flat regardless of file
-/// size - mirrors `FastQC`'s own subsampling behavior for this module.
+/// duplication and overrepresented-sequence analysis. Bounding this keeps
+/// memory flat regardless of file size - mirrors `FastQC`'s own subsampling
+/// behavior for these modules.
 pub const DEFAULT_DUP_SAMPLE_SIZE: usize = 100_000;
 
 /// FastQC-style duplication level buckets: exact counts 1-9, then cumulative
@@ -24,6 +28,11 @@ const LEVELS: &[usize] = &[
 const LABELS: &[&str] = &[
     "1", "2", "3", "4", "5", "6", "7", "8", "9", ">10", ">50", ">100", ">500", ">1k", ">5k", ">10k",
 ];
+
+/// A sequence occurring in at least this fraction of sampled reads is
+/// reported as overrepresented - mirrors `FastQC`'s own default threshold.
+/// User-configurable via `--overrepresented-threshold`.
+pub const DEFAULT_OVERREPRESENTED_THRESHOLD_PCT: f64 = 0.1;
 
 fn pct(n: usize, total: usize) -> f64 {
     if total == 0 {
@@ -58,6 +67,18 @@ struct DuplicationRecord {
     total_pct: f64,
 }
 
+/// One row of the overrepresented-sequences report: a single exact sequence
+/// that met the configured overrepresented threshold, sorted most-frequent
+/// first.
+#[derive(Serialize)]
+struct OverrepresentedRecord {
+    sequence: String,
+    /// Number of sampled reads with this exact sequence.
+    count: usize,
+    /// `count` as a percentage of all sampled reads.
+    pct: f64,
+}
+
 /// Counts exact-sequence occurrences.
 ///
 /// Keyed on the sequence itself (not a hash of it), so counts can never be
@@ -89,7 +110,8 @@ impl DuplicationCounter {
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    fn serialize_to<W: Write>(&self, wtr: &mut W) -> Result<()> {
+    /// Writes the bucketed duplication-level report (see [`DuplicationRecord`]).
+    fn serialize_levels_to<W: Write>(&self, wtr: &mut W) -> Result<()> {
         if self.is_empty() {
             return Ok(());
         }
@@ -127,6 +149,54 @@ impl DuplicationCounter {
 
         ser.flush().map_err(Into::into)
     }
+
+    /// Sequences at or above `threshold_pct` of the sample, most frequent
+    /// first, paired with their percentage.
+    fn overrepresented(&self, threshold_pct: f64) -> Vec<(&[u8], usize, f64)> {
+        let total_reads: usize = self.inner.values().map(|&count| count as usize).sum();
+
+        let mut overrepresented: Vec<(&[u8], usize, f64)> = self
+            .inner
+            .iter()
+            .map(|(seq, &count)| {
+                (
+                    seq.as_ref(),
+                    count as usize,
+                    pct(count as usize, total_reads),
+                )
+            })
+            .filter(|&(_, _, pct)| pct >= threshold_pct)
+            .collect();
+        overrepresented.sort_unstable_by_key(|&(_, count, _)| std::cmp::Reverse(count));
+        overrepresented
+    }
+
+    /// Writes the overrepresented-sequences report (see [`Self::overrepresented`]).
+    /// This is the same underlying counts as [`Self::serialize_levels_to`],
+    /// just filtered and listed individually instead of bucketed.
+    fn serialize_overrepresented_to<W: Write>(
+        &self,
+        wtr: &mut W,
+        threshold_pct: f64,
+    ) -> Result<()> {
+        let mut ser = csv::WriterBuilder::default()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_writer(wtr);
+
+        self.overrepresented(threshold_pct)
+            .into_iter()
+            .try_for_each(|(seq, count, pct)| -> Result<()> {
+                ser.serialize(&OverrepresentedRecord {
+                    sequence: String::from_utf8_lossy(seq).into_owned(),
+                    count,
+                    pct,
+                })
+                .map_err(Into::into)
+            })?;
+
+        ser.flush().map_err(Into::into)
+    }
 }
 
 #[derive(Clone)]
@@ -134,6 +204,13 @@ pub struct SequenceDuplicationLevels {
     /// Only records with `index() < sample_size` are counted. `0` means
     /// unlimited (every record is considered).
     sample_size: usize,
+    /// Whether to write the bucketed duplication-level report.
+    emit_levels: bool,
+    /// Whether to write the overrepresented-sequences report.
+    emit_overrepresented: bool,
+    /// Minimum percentage of sampled reads a sequence must represent to be
+    /// flagged as overrepresented.
+    overrepresented_threshold: f64,
 
     /// thread - duplication counts (primary)
     t_dup: DuplicationCounter,
@@ -147,13 +224,29 @@ pub struct SequenceDuplicationLevels {
 }
 impl Default for SequenceDuplicationLevels {
     fn default() -> Self {
-        Self::with_sample_size(DEFAULT_DUP_SAMPLE_SIZE)
+        Self::new(
+            DEFAULT_DUP_SAMPLE_SIZE,
+            true,
+            true,
+            DEFAULT_OVERREPRESENTED_THRESHOLD_PCT,
+        )
     }
 }
 impl SequenceDuplicationLevels {
-    pub fn with_sample_size(sample_size: usize) -> Self {
+    /// Both `emit_levels` and `emit_overrepresented` read from the same
+    /// underlying per-sequence counts, so this module only needs
+    /// constructing once even when both reports are wanted.
+    pub fn new(
+        sample_size: usize,
+        emit_levels: bool,
+        emit_overrepresented: bool,
+        overrepresented_threshold: f64,
+    ) -> Self {
         Self {
             sample_size,
+            emit_levels,
+            emit_overrepresented,
+            overrepresented_threshold,
             t_dup: DuplicationCounter::default(),
             t_xdup: DuplicationCounter::default(),
             dup: Arc::default(),
@@ -182,20 +275,50 @@ impl QcModule for SequenceDuplicationLevels {
             make_directory(outdir.as_ref())?;
         }
 
-        let write_to = |counter: &DuplicationCounter, primary: bool| -> Result<()> {
+        let write_to = |counter: &DuplicationCounter,
+                        dup_path: &str,
+                        overrep_path: &str,
+                        label: &str|
+         -> Result<()> {
             if counter.is_empty() {
                 return Ok(());
             }
-            let mut handle = if primary {
-                match_output(Some(outdir.as_ref().join(DUP_PRIMARY_PATH)))
-            } else {
-                match_output(Some(outdir.as_ref().join(DUP_EXTENDED_PATH)))
-            }?;
-            counter.serialize_to(&mut handle)
+            if self.emit_levels {
+                let mut handle = match_output(Some(outdir.as_ref().join(dup_path)))?;
+                counter.serialize_levels_to(&mut handle)?;
+            }
+            if self.emit_overrepresented {
+                if counter
+                    .overrepresented(self.overrepresented_threshold)
+                    .is_empty()
+                {
+                    trace!(
+                        "No {label} sequences met the overrepresented threshold ({}%)",
+                        self.overrepresented_threshold
+                    );
+                } else {
+                    let mut handle = match_output(Some(outdir.as_ref().join(overrep_path)))?;
+                    counter.serialize_overrepresented_to(
+                        &mut handle,
+                        self.overrepresented_threshold,
+                    )?;
+                }
+            }
+            Ok(())
         };
 
-        write_to(&self.dup.lock(), true)?;
-        write_to(&self.xdup.lock(), false)?;
+        write_to(
+            &self.dup.lock(),
+            DUP_PRIMARY_PATH,
+            OVERREP_PRIMARY_PATH,
+            "R1",
+        )?;
+        write_to(
+            &self.xdup.lock(),
+            DUP_EXTENDED_PATH,
+            OVERREP_EXTENDED_PATH,
+            "R2",
+        )?;
 
         Ok(())
     }

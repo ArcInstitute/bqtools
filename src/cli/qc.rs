@@ -42,10 +42,19 @@ pub struct QcOptions {
     #[clap(long)]
     pub skip_dup_levels: bool,
 
+    /// Skip overrepresented-sequences
+    #[clap(long)]
+    pub skip_overrepresented: bool,
+
     /// Number of leading records (by file order) to sample for duplication
-    /// level estimation [0: use all records]
+    /// level and overrepresented-sequence estimation [0: use all records]
     #[clap(long, default_value_t = 100_000)]
     pub dup_sample_size: usize,
+
+    /// Minimum percentage of sampled reads a sequence must represent to be
+    /// flagged as overrepresented
+    #[clap(long, default_value_t = 0.1)]
+    pub overrepresented_threshold: f64,
 
     /// Path to output directory write to
     #[clap(short, long, default_value = "./bqtools-qc")]

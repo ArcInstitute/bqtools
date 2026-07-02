@@ -7,7 +7,6 @@ use super::{QcConfig, QcModule};
 use anyhow::{bail, Result};
 use binseq::ParallelProcessor;
 
-/// TODO: overrepresented sequences
 /// TODO: adapter content
 #[derive(Clone, Default)]
 pub struct QcProcessor {

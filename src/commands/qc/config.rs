@@ -13,7 +13,9 @@ pub struct QcConfig {
     per_seq_gc: bool,
     seq_length: bool,
     dup_levels: bool,
+    overrepresented: bool,
     dup_sample_size: usize,
+    overrepresented_threshold: f64,
 }
 impl QcConfig {
     pub fn from_opts(opts: &QcOptions) -> Self {
@@ -24,7 +26,9 @@ impl QcConfig {
             per_seq_gc: !opts.skip_seq_gc,
             seq_length: !opts.skip_seq_length,
             dup_levels: !opts.skip_dup_levels,
+            overrepresented: !opts.skip_overrepresented,
             dup_sample_size: opts.dup_sample_size,
+            overrepresented_threshold: opts.overrepresented_threshold,
         }
     }
 
@@ -45,8 +49,14 @@ impl QcConfig {
             .then(|| add_module(QcModuleType::new_bc()));
         self.per_seq_gc.then(|| add_module(QcModuleType::new_gc()));
         self.seq_length.then(|| add_module(QcModuleType::new_sl()));
-        self.dup_levels
-            .then(|| add_module(QcModuleType::new_dup(self.dup_sample_size)));
+        if self.dup_levels || self.overrepresented {
+            add_module(QcModuleType::new_dup(
+                self.dup_sample_size,
+                self.dup_levels,
+                self.overrepresented,
+                self.overrepresented_threshold,
+            ));
+        }
         trace!("{} modules loaded", modules.len());
         modules
     }
