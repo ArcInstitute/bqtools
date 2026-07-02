@@ -5,6 +5,9 @@ use crate::{
     commands::qc::modules::{QcModule, QcModuleType},
 };
 
+// Mirrors QcOptions: each bool independently enables one QC module, not a
+// state machine - see the comment on QcOptions in src/cli/qc.rs.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy)]
 pub struct QcConfig {
     per_base_qual: bool,

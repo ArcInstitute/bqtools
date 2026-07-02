@@ -11,6 +11,10 @@ pub struct QcCommand {
     pub qc: QcOptions,
 }
 
+// Each `skip_*` flag independently toggles one QC module on/off - they're
+// orthogonal CLI switches, not states in a state machine, so collapsing them
+// into an enum wouldn't fit clap's flag model or improve readability here.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "QC OPTIONS")]
 pub struct QcOptions {

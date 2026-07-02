@@ -19,6 +19,12 @@ fn is_gc(base: u8) -> bool {
     matches!(base, b'G' | b'g' | b'C' | b'c')
 }
 
+#[derive(Serialize)]
+struct GcContentRecord {
+    pct_gc: usize,
+    count: usize,
+}
+
 #[derive(Clone)]
 pub struct GcHistogram {
     inner: GcAbundance,
@@ -65,18 +71,13 @@ impl GcHistogram {
             .has_headers(true)
             .from_writer(wtr);
 
-        #[derive(Serialize)]
-        struct Record {
-            pct_gc: usize,
-            count: usize,
-        }
-
         self.inner
             .iter()
             .copied()
             .enumerate()
             .try_for_each(|(pct_gc, count)| -> Result<()> {
-                ser.serialize(&Record { pct_gc, count }).map_err(Into::into)
+                ser.serialize(&GcContentRecord { pct_gc, count })
+                    .map_err(Into::into)
             })?;
 
         ser.flush().map_err(Into::into)

@@ -10,6 +10,12 @@ use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory
 const SQ_PRIMARY_PATH: &str = "sq_R1.tsv";
 const SQ_EXTENDED_PATH: &str = "sq_R2.tsv";
 
+#[derive(Serialize)]
+struct SeqQualityRecord {
+    qual: usize,
+    count: usize,
+}
+
 #[derive(Clone)]
 pub struct QualHistogram {
     inner: QualAbundance,
@@ -58,18 +64,13 @@ impl QualHistogram {
             .has_headers(true)
             .from_writer(wtr);
 
-        #[derive(Serialize)]
-        struct Record {
-            qual: usize,
-            count: usize,
-        }
-
         self.inner
             .iter()
             .copied()
             .enumerate()
             .try_for_each(|(qual, count)| -> Result<()> {
-                ser.serialize(&Record { qual, count }).map_err(Into::into)
+                ser.serialize(&SeqQualityRecord { qual, count })
+                    .map_err(Into::into)
             })?;
 
         ser.flush().map_err(Into::into)

@@ -44,19 +44,19 @@ pub enum QcModuleType {
 }
 impl QcModuleType {
     pub fn new_bsq() -> Self {
-        Self::Bsq(Default::default())
+        Self::Bsq(PerBaseSequenceQuality::default())
     }
     pub fn new_sq() -> Self {
-        Self::Sq(Default::default())
+        Self::Sq(PerSequenceQuality::default())
     }
     pub fn new_bc() -> Self {
-        Self::Bc(Default::default())
+        Self::Bc(PerBaseSequenceContent::default())
     }
     pub fn new_gc() -> Self {
-        Self::Gc(Default::default())
+        Self::Gc(PerSequenceGcContent::default())
     }
     pub fn new_sl() -> Self {
-        Self::Sl(Default::default())
+        Self::Sl(SequenceLengthDistribution::default())
     }
     pub fn new_dup(
         sample_size: usize,
