@@ -6,7 +6,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 
 use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
-use crate::commands::{match_output, utils::make_directory};
+use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const BSQ_PRIMARY_PATH: &'static str = "bsq_R1.tsv";
 const BSQ_EXTENDED_PATH: &'static str = "bsq_R2.tsv";
@@ -110,10 +110,25 @@ pub struct PerBaseSequenceQuality {
     /// global - number of records
     n_records: Arc<Mutex<usize>>,
 }
-impl PerBaseSequenceQuality {
-    pub fn finish<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
+impl QcModule for PerBaseSequenceQuality {
+    fn push<R: BinseqRecord>(&mut self, record: &R) {
+        self.t_base_squal.push(record.squal());
+        self.t_base_xqual.push(record.xqual());
+        self.t_n_records += 1;
+    }
+
+    fn sync(&mut self) {
+        self.base_squal.lock().ingest(&mut self.t_base_squal);
+        self.base_xqual.lock().ingest(&mut self.t_base_xqual);
+
+        // handle total
+        *self.n_records.lock() += self.t_n_records;
+        self.t_n_records = 0;
+    }
+
+    fn finish<P: AsRef<Path>>(&mut self, outdir: P) -> Result<()> {
         if !outdir.as_ref().exists() {
-            make_directory(outdir)?;
+            make_directory(outdir.as_ref())?;
         }
 
         let write_to = |base_qual: &BaseHistogram, primary: bool| -> Result<()> {
@@ -132,22 +147,5 @@ impl PerBaseSequenceQuality {
         write_to(&self.base_xqual.lock(), false)?;
 
         Ok(())
-    }
-
-    /// updates on-thread
-    pub fn push<R: BinseqRecord>(&mut self, record: &R) {
-        self.t_base_squal.push(record.squal());
-        self.t_base_xqual.push(record.xqual());
-        self.t_n_records += 1;
-    }
-
-    /// syncs on-thread to global
-    pub fn sync(&mut self) {
-        self.base_squal.lock().ingest(&mut self.t_base_squal);
-        self.base_xqual.lock().ingest(&mut self.t_base_xqual);
-
-        // handle total
-        *self.n_records.lock() += self.t_n_records;
-        self.t_n_records = 0;
     }
 }

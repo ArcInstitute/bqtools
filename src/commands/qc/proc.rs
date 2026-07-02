@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 
+use crate::commands::qc::modules::QcModuleType;
+
 use super::{QcConfig, QcModule};
 
 use anyhow::{bail, Result};
 use binseq::ParallelProcessor;
 
-/// TODO: per base sequence quality
-/// TODO: per sequence quality
 /// TODO: per base sequence content
 /// TODO: per sequence GC content
 /// TODO: per base N content
@@ -17,7 +17,7 @@ use binseq::ParallelProcessor;
 #[derive(Clone, Default)]
 pub struct QcProcessor {
     outdir: PathBuf,
-    modules: Vec<QcModule>,
+    modules: Vec<QcModuleType>,
 }
 impl QcProcessor {
     pub fn new<P: AsRef<Path>>(outdir: P, config: QcConfig) -> Result<Self> {

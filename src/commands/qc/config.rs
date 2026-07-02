@@ -1,5 +1,9 @@
-use super::QcModule;
-use crate::cli::QcOptions;
+use log::trace;
+
+use crate::{
+    cli::QcOptions,
+    commands::qc::modules::{QcModule, QcModuleType},
+};
 
 #[derive(Clone, Copy)]
 pub struct QcConfig {
@@ -14,14 +18,22 @@ impl QcConfig {
         }
     }
 
-    pub fn build_qc_modules(&self) -> Vec<QcModule> {
+    pub fn build_qc_modules(&self) -> Vec<QcModuleType> {
         let mut modules = Vec::default();
+
+        let mut add_module = |module: QcModuleType| {
+            trace!("Loaded: {}", module.desc());
+            modules.push(module);
+        };
+
+        trace!("Loading QC modules...");
         if self.per_base_qual {
-            modules.push(QcModule::PerBaseQual(Default::default()))
+            add_module(QcModuleType::new_bsq());
         }
         if self.per_seq_qual {
-            modules.push(QcModule::PerSeqQual(Default::default()))
+            add_module(QcModuleType::new_sq());
         }
+        trace!("Modules loaded.");
         modules
     }
 }

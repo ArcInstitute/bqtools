@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::{io::Write, ops::Div, path::Path, sync::Arc};
 
 use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
-use crate::commands::{match_output, utils::make_directory};
+use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const SQ_PRIMARY_PATH: &'static str = "sq_R1.tsv";
 const SQ_EXTENDED_PATH: &'static str = "sq_R2.tsv";
@@ -84,20 +84,20 @@ pub struct PerSequenceQuality {
     seq_squal: Arc<Mutex<QualHistogram>>,
     seq_xqual: Arc<Mutex<QualHistogram>>,
 }
-impl PerSequenceQuality {
-    pub fn push<R: BinseqRecord>(&mut self, record: &R) {
+impl QcModule for PerSequenceQuality {
+    fn push<R: BinseqRecord>(&mut self, record: &R) {
         self.t_seq_squal.push(record.squal());
         self.t_seq_xqual.push(record.xqual());
     }
 
-    pub fn sync(&mut self) {
+    fn sync(&mut self) {
         self.seq_squal.lock().ingest(&mut self.t_seq_squal);
         self.seq_xqual.lock().ingest(&mut self.t_seq_xqual);
     }
 
-    pub fn finish<P: AsRef<Path>>(&self, outdir: &P) -> Result<()> {
+    fn finish<P: AsRef<Path>>(&mut self, outdir: P) -> Result<()> {
         if !outdir.as_ref().exists() {
-            make_directory(outdir)?;
+            make_directory(outdir.as_ref())?;
         }
 
         let write_to = |seq_qual: &QualHistogram, primary: bool| -> Result<()> {
