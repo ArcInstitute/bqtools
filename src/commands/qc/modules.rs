@@ -35,36 +35,36 @@ pub trait QcModule {
 
 #[derive(Clone)]
 pub enum QcModuleType {
-    Bsq(PerBaseSequenceQuality),
-    Sq(PerSequenceQuality),
-    Bc(PerBaseSequenceContent),
-    Gc(PerSequenceGcContent),
-    Sl(SequenceLengthDistribution),
-    Dup(SequenceDuplicationLevels),
+    BaseQuality(PerBaseSequenceQuality),
+    SeqQuality(PerSequenceQuality),
+    BaseContent(PerBaseSequenceContent),
+    GcContent(PerSequenceGcContent),
+    SeqLength(SequenceLengthDistribution),
+    Duplication(SequenceDuplicationLevels),
 }
 impl QcModuleType {
-    pub fn new_bsq() -> Self {
-        Self::Bsq(PerBaseSequenceQuality::default())
+    pub fn new_base_quality() -> Self {
+        Self::BaseQuality(PerBaseSequenceQuality::default())
     }
-    pub fn new_sq() -> Self {
-        Self::Sq(PerSequenceQuality::default())
+    pub fn new_seq_quality() -> Self {
+        Self::SeqQuality(PerSequenceQuality::default())
     }
-    pub fn new_bc() -> Self {
-        Self::Bc(PerBaseSequenceContent::default())
+    pub fn new_base_content() -> Self {
+        Self::BaseContent(PerBaseSequenceContent::default())
     }
-    pub fn new_gc() -> Self {
-        Self::Gc(PerSequenceGcContent::default())
+    pub fn new_gc_content() -> Self {
+        Self::GcContent(PerSequenceGcContent::default())
     }
-    pub fn new_sl() -> Self {
-        Self::Sl(SequenceLengthDistribution::default())
+    pub fn new_seq_length() -> Self {
+        Self::SeqLength(SequenceLengthDistribution::default())
     }
-    pub fn new_dup(
+    pub fn new_duplication(
         sample_size: usize,
         emit_levels: bool,
         emit_overrepresented: bool,
         overrepresented_threshold: f64,
     ) -> Self {
-        Self::Dup(SequenceDuplicationLevels::new(
+        Self::Duplication(SequenceDuplicationLevels::new(
             sample_size,
             emit_levels,
             emit_overrepresented,
@@ -75,52 +75,52 @@ impl QcModuleType {
 impl QcModule for QcModuleType {
     fn desc(&self) -> &'static str {
         match self {
-            Self::Bsq(x) => x.desc(),
-            Self::Sq(x) => x.desc(),
-            Self::Bc(x) => x.desc(),
-            Self::Gc(x) => x.desc(),
-            Self::Sl(x) => x.desc(),
-            Self::Dup(x) => x.desc(),
+            Self::BaseQuality(x) => x.desc(),
+            Self::SeqQuality(x) => x.desc(),
+            Self::BaseContent(x) => x.desc(),
+            Self::GcContent(x) => x.desc(),
+            Self::SeqLength(x) => x.desc(),
+            Self::Duplication(x) => x.desc(),
         }
     }
     fn push<R: BinseqRecord>(&mut self, record: &R) {
         match self {
-            Self::Bsq(x) => x.push(record),
-            Self::Sq(x) => x.push(record),
-            Self::Bc(x) => x.push(record),
-            Self::Gc(x) => x.push(record),
-            Self::Sl(x) => x.push(record),
-            Self::Dup(x) => x.push(record),
+            Self::BaseQuality(x) => x.push(record),
+            Self::SeqQuality(x) => x.push(record),
+            Self::BaseContent(x) => x.push(record),
+            Self::GcContent(x) => x.push(record),
+            Self::SeqLength(x) => x.push(record),
+            Self::Duplication(x) => x.push(record),
         }
     }
     fn sync_batch(&mut self) {
         match self {
-            Self::Bsq(x) => x.sync_batch(),
-            Self::Sq(x) => x.sync_batch(),
-            Self::Bc(x) => x.sync_batch(),
-            Self::Gc(x) => x.sync_batch(),
-            Self::Sl(x) => x.sync_batch(),
-            Self::Dup(x) => x.sync_batch(),
+            Self::BaseQuality(x) => x.sync_batch(),
+            Self::SeqQuality(x) => x.sync_batch(),
+            Self::BaseContent(x) => x.sync_batch(),
+            Self::GcContent(x) => x.sync_batch(),
+            Self::SeqLength(x) => x.sync_batch(),
+            Self::Duplication(x) => x.sync_batch(),
         }
     }
     fn sync_final(&mut self) {
         match self {
-            Self::Bsq(x) => x.sync_final(),
-            Self::Sq(x) => x.sync_final(),
-            Self::Bc(x) => x.sync_final(),
-            Self::Gc(x) => x.sync_final(),
-            Self::Sl(x) => x.sync_final(),
-            Self::Dup(x) => x.sync_final(),
+            Self::BaseQuality(x) => x.sync_final(),
+            Self::SeqQuality(x) => x.sync_final(),
+            Self::BaseContent(x) => x.sync_final(),
+            Self::GcContent(x) => x.sync_final(),
+            Self::SeqLength(x) => x.sync_final(),
+            Self::Duplication(x) => x.sync_final(),
         }
     }
     fn finish<P: AsRef<Path>>(&mut self, outdir: P) -> Result<()> {
         match self {
-            Self::Bsq(x) => x.finish(&outdir),
-            Self::Sq(x) => x.finish(&outdir),
-            Self::Bc(x) => x.finish(&outdir),
-            Self::Gc(x) => x.finish(&outdir),
-            Self::Sl(x) => x.finish(&outdir),
-            Self::Dup(x) => x.finish(&outdir),
+            Self::BaseQuality(x) => x.finish(&outdir),
+            Self::SeqQuality(x) => x.finish(&outdir),
+            Self::BaseContent(x) => x.finish(&outdir),
+            Self::GcContent(x) => x.finish(&outdir),
+            Self::SeqLength(x) => x.finish(&outdir),
+            Self::Duplication(x) => x.finish(&outdir),
         }
     }
 }

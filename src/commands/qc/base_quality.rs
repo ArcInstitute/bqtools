@@ -8,8 +8,8 @@ use serde::Serialize;
 use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const BSQ_PRIMARY_PATH: &str = "bsq_R1.tsv";
-const BSQ_EXTENDED_PATH: &str = "bsq_R2.tsv";
+const BASE_QUALITY_PRIMARY_PATH: &str = "base_quality_R1.tsv";
+const BASE_QUALITY_EXTENDED_PATH: &str = "base_quality_R2.tsv";
 
 #[derive(Serialize)]
 pub struct BaseQualityRecord {
@@ -136,9 +136,9 @@ impl QcModule for PerBaseSequenceQuality {
                 return Ok(());
             }
             let mut handle = if primary {
-                match_output(Some(outdir.as_ref().join(BSQ_PRIMARY_PATH)))
+                match_output(Some(outdir.as_ref().join(BASE_QUALITY_PRIMARY_PATH)))
             } else {
-                match_output(Some(outdir.as_ref().join(BSQ_EXTENDED_PATH)))
+                match_output(Some(outdir.as_ref().join(BASE_QUALITY_EXTENDED_PATH)))
             }?;
             base_qual.serialize_to(&mut handle)
         };

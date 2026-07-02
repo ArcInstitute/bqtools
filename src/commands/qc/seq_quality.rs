@@ -7,8 +7,8 @@ use std::{io::Write, ops::Div, path::Path, sync::Arc};
 use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const SQ_PRIMARY_PATH: &str = "sq_R1.tsv";
-const SQ_EXTENDED_PATH: &str = "sq_R2.tsv";
+const SEQ_QUALITY_PRIMARY_PATH: &str = "seq_quality_R1.tsv";
+const SEQ_QUALITY_EXTENDED_PATH: &str = "seq_quality_R2.tsv";
 
 #[derive(Serialize)]
 struct SeqQualityRecord {
@@ -106,9 +106,9 @@ impl QcModule for PerSequenceQuality {
                 return Ok(());
             }
             let mut handle = if primary {
-                match_output(Some(outdir.as_ref().join(SQ_PRIMARY_PATH)))
+                match_output(Some(outdir.as_ref().join(SEQ_QUALITY_PRIMARY_PATH)))
             } else {
-                match_output(Some(outdir.as_ref().join(SQ_EXTENDED_PATH)))
+                match_output(Some(outdir.as_ref().join(SEQ_QUALITY_EXTENDED_PATH)))
             }?;
             seq_qual.serialize_to(&mut handle)
         };

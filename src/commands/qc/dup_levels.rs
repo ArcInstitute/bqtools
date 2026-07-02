@@ -9,10 +9,10 @@ use serde::Serialize;
 
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const DUP_PRIMARY_PATH: &str = "dup_R1.tsv";
-const DUP_EXTENDED_PATH: &str = "dup_R2.tsv";
-const OVERREP_PRIMARY_PATH: &str = "overrep_R1.tsv";
-const OVERREP_EXTENDED_PATH: &str = "overrep_R2.tsv";
+const DUPLICATION_LEVELS_PRIMARY_PATH: &str = "duplication_levels_R1.tsv";
+const DUPLICATION_LEVELS_EXTENDED_PATH: &str = "duplication_levels_R2.tsv";
+const OVERREPRESENTED_PRIMARY_PATH: &str = "overrepresented_sequences_R1.tsv";
+const OVERREPRESENTED_EXTENDED_PATH: &str = "overrepresented_sequences_R2.tsv";
 
 /// Number of leading records (by global file index) considered for
 /// duplication and overrepresented-sequence analysis. Bounding this keeps
@@ -309,14 +309,14 @@ impl QcModule for SequenceDuplicationLevels {
 
         write_to(
             &self.dup.lock(),
-            DUP_PRIMARY_PATH,
-            OVERREP_PRIMARY_PATH,
+            DUPLICATION_LEVELS_PRIMARY_PATH,
+            OVERREPRESENTED_PRIMARY_PATH,
             "R1",
         )?;
         write_to(
             &self.xdup.lock(),
-            DUP_EXTENDED_PATH,
-            OVERREP_EXTENDED_PATH,
+            DUPLICATION_LEVELS_EXTENDED_PATH,
+            OVERREPRESENTED_EXTENDED_PATH,
             "R2",
         )?;
 

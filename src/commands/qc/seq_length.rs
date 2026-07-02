@@ -7,8 +7,8 @@ use serde::Serialize;
 
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const SLEN_PRIMARY_PATH: &str = "slen_R1.tsv";
-const SLEN_EXTENDED_PATH: &str = "slen_R2.tsv";
+const SEQ_LENGTH_PRIMARY_PATH: &str = "seq_length_R1.tsv";
+const SEQ_LENGTH_EXTENDED_PATH: &str = "seq_length_R2.tsv";
 
 #[derive(Serialize)]
 pub struct SeqLenRecord {
@@ -107,9 +107,9 @@ impl QcModule for SequenceLengthDistribution {
                 return Ok(());
             }
             let mut handle = if primary {
-                match_output(Some(outdir.as_ref().join(SLEN_PRIMARY_PATH)))
+                match_output(Some(outdir.as_ref().join(SEQ_LENGTH_PRIMARY_PATH)))
             } else {
-                match_output(Some(outdir.as_ref().join(SLEN_EXTENDED_PATH)))
+                match_output(Some(outdir.as_ref().join(SEQ_LENGTH_EXTENDED_PATH)))
             }?;
             hist.serialize_to(&mut handle)
         };

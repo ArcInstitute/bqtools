@@ -7,8 +7,8 @@ use serde::Serialize;
 
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const BC_PRIMARY_PATH: &str = "bc_R1.tsv";
-const BC_EXTENDED_PATH: &str = "bc_R2.tsv";
+const BASE_CONTENT_PRIMARY_PATH: &str = "base_content_R1.tsv";
+const BASE_CONTENT_EXTENDED_PATH: &str = "base_content_R2.tsv";
 
 const NUM_BASES: usize = 5;
 const IDX_A: usize = 0;
@@ -170,9 +170,9 @@ impl QcModule for PerBaseSequenceContent {
                 return Ok(());
             }
             let mut handle = if primary {
-                match_output(Some(outdir.as_ref().join(BC_PRIMARY_PATH)))
+                match_output(Some(outdir.as_ref().join(BASE_CONTENT_PRIMARY_PATH)))
             } else {
-                match_output(Some(outdir.as_ref().join(BC_EXTENDED_PATH)))
+                match_output(Some(outdir.as_ref().join(BASE_CONTENT_EXTENDED_PATH)))
             }?;
             base_content.serialize_to(&mut handle)
         };

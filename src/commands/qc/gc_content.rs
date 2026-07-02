@@ -6,8 +6,8 @@ use std::{io::Write, path::Path, sync::Arc};
 
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
-const GC_PRIMARY_PATH: &str = "gc_R1.tsv";
-const GC_EXTENDED_PATH: &str = "gc_R2.tsv";
+const GC_CONTENT_PRIMARY_PATH: &str = "gc_content_R1.tsv";
+const GC_CONTENT_EXTENDED_PATH: &str = "gc_content_R2.tsv";
 
 /// Percentage bins: 0..=100
 const NUM_GC_BINS: usize = 101;
@@ -113,9 +113,9 @@ impl QcModule for PerSequenceGcContent {
                 return Ok(());
             }
             let mut handle = if primary {
-                match_output(Some(outdir.as_ref().join(GC_PRIMARY_PATH)))
+                match_output(Some(outdir.as_ref().join(GC_CONTENT_PRIMARY_PATH)))
             } else {
-                match_output(Some(outdir.as_ref().join(GC_EXTENDED_PATH)))
+                match_output(Some(outdir.as_ref().join(GC_CONTENT_EXTENDED_PATH)))
             }?;
             seq_gc.serialize_to(&mut handle)
         };

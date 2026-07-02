@@ -45,15 +45,17 @@ impl QcConfig {
 
         trace!("Loading QC modules...");
         self.per_base_qual
-            .then(|| add_module(QcModuleType::new_bsq()));
+            .then(|| add_module(QcModuleType::new_base_quality()));
         self.per_seq_qual
-            .then(|| add_module(QcModuleType::new_sq()));
+            .then(|| add_module(QcModuleType::new_seq_quality()));
         self.per_base_content
-            .then(|| add_module(QcModuleType::new_bc()));
-        self.per_seq_gc.then(|| add_module(QcModuleType::new_gc()));
-        self.seq_length.then(|| add_module(QcModuleType::new_sl()));
+            .then(|| add_module(QcModuleType::new_base_content()));
+        self.per_seq_gc
+            .then(|| add_module(QcModuleType::new_gc_content()));
+        self.seq_length
+            .then(|| add_module(QcModuleType::new_seq_length()));
         if self.dup_levels || self.overrepresented {
-            add_module(QcModuleType::new_dup(
+            add_module(QcModuleType::new_duplication(
                 self.dup_sample_size,
                 self.dup_levels,
                 self.overrepresented,
