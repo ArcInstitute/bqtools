@@ -5,6 +5,7 @@ use binseq::BinseqRecord;
 use parking_lot::Mutex;
 use serde::Serialize;
 
+use super::report::table;
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const SEQ_LENGTH_PRIMARY_PATH: &str = "seq_length_R1.tsv";
@@ -72,6 +73,52 @@ impl SeqLenHistogram {
 
         ser.flush().map_err(Into::into)
     }
+
+    fn total(&self) -> usize {
+        self.inner.iter().sum()
+    }
+
+    fn min_len(&self) -> Option<usize> {
+        self.inner.iter().position(|&c| c > 0)
+    }
+
+    fn max_len(&self) -> Option<usize> {
+        self.inner.iter().rposition(|&c| c > 0)
+    }
+
+    fn mean(&self) -> f64 {
+        let total = self.total();
+        if total == 0 {
+            0.0
+        } else {
+            let sum: usize = self.inner.iter().enumerate().map(|(len, &c)| len * c).sum();
+            sum as f64 / total as f64
+        }
+    }
+
+    fn mode(&self) -> usize {
+        self.inner
+            .iter()
+            .enumerate()
+            .max_by_key(|&(_, &c)| c)
+            .map_or(0, |(len, _)| len)
+    }
+
+    fn summary_table(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+        Some(table(
+            &["Metric", "Value"],
+            &[
+                vec!["Reads".into(), self.total().to_string()],
+                vec!["Min Length".into(), self.min_len().unwrap_or(0).to_string()],
+                vec!["Max Length".into(), self.max_len().unwrap_or(0).to_string()],
+                vec!["Mean Length".into(), format!("{:.2}", self.mean())],
+                vec!["Mode Length".into(), self.mode().to_string()],
+            ],
+        ))
+    }
 }
 
 #[derive(Clone, Default)]
@@ -118,5 +165,11 @@ impl QcModule for SequenceLengthDistribution {
         write_to(&self.xlen.lock(), false)?;
 
         Ok(())
+    }
+
+    fn summarize(&self) -> String {
+        let primary = self.slen.lock().summary_table();
+        let extended = self.xlen.lock().summary_table();
+        super::report::dual_section("Sequence Length Distribution", primary, extended)
     }
 }

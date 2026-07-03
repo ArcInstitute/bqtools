@@ -5,6 +5,7 @@ use binseq::BinseqRecord;
 use parking_lot::Mutex;
 use serde::Serialize;
 
+use super::report::table;
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const BASE_CONTENT_PRIMARY_PATH: &str = "base_content_R1.tsv";
@@ -135,6 +136,64 @@ impl BaseContentHistogram {
 
         ser.flush().map_err(Into::into)
     }
+
+    /// Aggregate base composition across all positions.
+    fn totals(&self) -> BaseAbundance {
+        let mut totals = DEFAULT_BASE_ABUNDANCE;
+        for counts in &self.inner {
+            for (t, &c) in totals.iter_mut().zip(counts.iter()) {
+                *t += c;
+            }
+        }
+        totals
+    }
+
+    fn summary_table(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let totals = self.totals();
+        let total: usize = totals.iter().sum();
+        let pct = |c: usize| {
+            if total == 0 {
+                0.0
+            } else {
+                (c as f64 / total as f64) * 100.0
+            }
+        };
+
+        Some(table(
+            &["Base", "Count", "Pct"],
+            &[
+                vec![
+                    "A".into(),
+                    totals[IDX_A].to_string(),
+                    format!("{:.2}%", pct(totals[IDX_A])),
+                ],
+                vec![
+                    "C".into(),
+                    totals[IDX_C].to_string(),
+                    format!("{:.2}%", pct(totals[IDX_C])),
+                ],
+                vec![
+                    "G".into(),
+                    totals[IDX_G].to_string(),
+                    format!("{:.2}%", pct(totals[IDX_G])),
+                ],
+                vec![
+                    "T".into(),
+                    totals[IDX_T].to_string(),
+                    format!("{:.2}%", pct(totals[IDX_T])),
+                ],
+                vec![
+                    "N".into(),
+                    totals[IDX_N].to_string(),
+                    format!("{:.2}%", pct(totals[IDX_N])),
+                ],
+            ],
+        ))
+    }
 }
 
 #[derive(Clone, Default)]
@@ -181,5 +240,11 @@ impl QcModule for PerBaseSequenceContent {
         write_to(&self.base_xcontent.lock(), false)?;
 
         Ok(())
+    }
+
+    fn summarize(&self) -> String {
+        let primary = self.base_content.lock().summary_table();
+        let extended = self.base_xcontent.lock().summary_table();
+        super::report::dual_section("Per-Base Sequence Content", primary, extended)
     }
 }

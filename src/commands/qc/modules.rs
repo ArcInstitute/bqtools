@@ -31,6 +31,13 @@ pub trait QcModule {
     fn sync_final(&mut self);
 
     fn finish<P: AsRef<Path>>(&mut self, outdir: P) -> Result<()>;
+
+    /// Renders this module's headline stats as a markdown section for the
+    /// top-level QC report. Default: no section (e.g. nothing worth
+    /// summarizing beyond the module's own TSV output).
+    fn summarize(&self) -> String {
+        String::new()
+    }
 }
 
 #[derive(Clone)]
@@ -121,6 +128,16 @@ impl QcModule for QcModuleType {
             Self::GcContent(x) => x.finish(&outdir),
             Self::SeqLength(x) => x.finish(&outdir),
             Self::Duplication(x) => x.finish(&outdir),
+        }
+    }
+    fn summarize(&self) -> String {
+        match self {
+            Self::BaseQuality(x) => x.summarize(),
+            Self::SeqQuality(x) => x.summarize(),
+            Self::BaseContent(x) => x.summarize(),
+            Self::GcContent(x) => x.summarize(),
+            Self::SeqLength(x) => x.summarize(),
+            Self::Duplication(x) => x.summarize(),
         }
     }
 }

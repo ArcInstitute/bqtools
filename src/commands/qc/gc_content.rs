@@ -4,6 +4,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use std::{io::Write, path::Path, sync::Arc};
 
+use super::report::table;
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const GC_CONTENT_PRIMARY_PATH: &str = "gc_content_R1.tsv";
@@ -82,6 +83,59 @@ impl GcHistogram {
 
         ser.flush().map_err(Into::into)
     }
+
+    fn total(&self) -> usize {
+        self.inner.iter().sum()
+    }
+
+    fn mean(&self) -> f64 {
+        let total = self.total();
+        if total == 0 {
+            0.0
+        } else {
+            let sum: usize = self.inner.iter().enumerate().map(|(pct, &c)| pct * c).sum();
+            sum as f64 / total as f64
+        }
+    }
+
+    fn median(&self) -> usize {
+        let total = self.total();
+        if total == 0 {
+            return 0;
+        }
+        let half = total / 2;
+        let mut cum = 0;
+        for (pct, &c) in self.inner.iter().enumerate() {
+            cum += c;
+            if cum > half {
+                return pct;
+            }
+        }
+        0
+    }
+
+    fn mode(&self) -> usize {
+        self.inner
+            .iter()
+            .enumerate()
+            .max_by_key(|&(_, &c)| c)
+            .map_or(0, |(pct, _)| pct)
+    }
+
+    fn summary_table(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+        Some(table(
+            &["Metric", "Value"],
+            &[
+                vec!["Reads".into(), self.total().to_string()],
+                vec!["Mean GC%".into(), format!("{:.2}%", self.mean())],
+                vec!["Median GC%".into(), format!("{}%", self.median())],
+                vec!["Mode GC%".into(), format!("{}%", self.mode())],
+            ],
+        ))
+    }
 }
 
 #[derive(Default, Clone)]
@@ -124,5 +178,11 @@ impl QcModule for PerSequenceGcContent {
         write_to(&self.seq_xgc.lock(), false)?;
 
         Ok(())
+    }
+
+    fn summarize(&self) -> String {
+        let primary = self.seq_gc.lock().summary_table();
+        let extended = self.seq_xgc.lock().summary_table();
+        super::report::dual_section("Per-Sequence GC Content", primary, extended)
     }
 }

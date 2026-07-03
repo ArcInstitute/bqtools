@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use std::{io::Write, ops::Div, path::Path, sync::Arc};
 
-use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
+use super::{report::table, QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const SEQ_QUALITY_PRIMARY_PATH: &str = "seq_quality_R1.tsv";
@@ -30,6 +30,50 @@ impl Default for QualHistogram {
 impl QualHistogram {
     fn is_empty(&self) -> bool {
         self.inner.iter().copied().sum::<usize>() == 0
+    }
+
+    fn total(&self) -> usize {
+        self.inner.iter().sum()
+    }
+
+    fn mean(&self) -> f64 {
+        let total = self.total();
+        if total == 0 {
+            0.0
+        } else {
+            let sum: usize = self.inner.iter().enumerate().map(|(q, &c)| q * c).sum();
+            sum as f64 / total as f64
+        }
+    }
+
+    fn median(&self) -> usize {
+        let total = self.total();
+        if total == 0 {
+            return 0;
+        }
+        let half = total / 2;
+        let mut cum = 0;
+        for (q, &c) in self.inner.iter().enumerate() {
+            cum += c;
+            if cum > half {
+                return q;
+            }
+        }
+        0
+    }
+
+    fn summary_table(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+        Some(table(
+            &["Metric", "Value"],
+            &[
+                vec!["Reads".into(), self.total().to_string()],
+                vec!["Mean Quality".into(), format!("{:.2}", self.mean())],
+                vec!["Median Quality".into(), self.median().to_string()],
+            ],
+        ))
     }
 
     fn push(&mut self, qual: &[u8]) {
@@ -117,5 +161,11 @@ impl QcModule for PerSequenceQuality {
         write_to(&self.seq_xqual.lock(), false)?;
 
         Ok(())
+    }
+
+    fn summarize(&self) -> String {
+        let primary = self.seq_squal.lock().summary_table();
+        let extended = self.seq_xqual.lock().summary_table();
+        super::report::dual_section("Per-Sequence Quality", primary, extended)
     }
 }

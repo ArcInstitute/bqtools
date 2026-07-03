@@ -7,6 +7,7 @@ use log::trace;
 use parking_lot::Mutex;
 use serde::Serialize;
 
+use super::report::{dual_section, table};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const DUPLICATION_LEVELS_PRIMARY_PATH: &str = "duplication_levels_R1.tsv";
@@ -39,6 +40,22 @@ fn pct(n: usize, total: usize) -> f64 {
         0.0
     } else {
         (n as f64 / total as f64) * 100.0
+    }
+}
+
+/// Max number of overrepresented sequences shown in the summary report (the
+/// full list still goes to the TSV).
+const OVERREPRESENTED_SUMMARY_LIMIT: usize = 5;
+
+/// Truncates a sequence for display in the summary report so a single long
+/// read doesn't blow out the table width.
+fn truncate_sequence(seq: &[u8]) -> String {
+    const MAX_LEN: usize = 40;
+    let seq = String::from_utf8_lossy(seq);
+    if seq.len() > MAX_LEN {
+        format!("{}...", &seq[..MAX_LEN])
+    } else {
+        seq.into_owned()
     }
 }
 
@@ -197,6 +214,47 @@ impl DuplicationCounter {
 
         ser.flush().map_err(Into::into)
     }
+
+    fn total_reads(&self) -> usize {
+        self.inner.values().map(|&count| count as usize).sum()
+    }
+
+    fn summary_table(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+        let distinct = self.inner.len();
+        let total = self.total_reads();
+        Some(table(
+            &["Metric", "Value"],
+            &[
+                vec!["Sampled Reads".into(), total.to_string()],
+                vec!["Distinct Sequences".into(), distinct.to_string()],
+                vec!["Pct Unique".into(), format!("{:.2}%", pct(distinct, total))],
+            ],
+        ))
+    }
+
+    /// Top overrepresented sequences (most frequent first), capped at
+    /// [`OVERREPRESENTED_SUMMARY_LIMIT`] for the summary report.
+    fn overrepresented_table(&self, threshold_pct: f64) -> Option<String> {
+        let overrepresented = self.overrepresented(threshold_pct);
+        if overrepresented.is_empty() {
+            return None;
+        }
+        let rows = overrepresented
+            .into_iter()
+            .take(OVERREPRESENTED_SUMMARY_LIMIT)
+            .map(|(seq, count, pct)| {
+                vec![
+                    truncate_sequence(seq),
+                    count.to_string(),
+                    format!("{pct:.3}%"),
+                ]
+            })
+            .collect::<Vec<_>>();
+        Some(table(&["Sequence", "Count", "Pct"], &rows))
+    }
 }
 
 #[derive(Clone)]
@@ -321,5 +379,39 @@ impl QcModule for SequenceDuplicationLevels {
         )?;
 
         Ok(())
+    }
+
+    fn summarize(&self) -> String {
+        let mut out = String::new();
+
+        if self.emit_levels {
+            let primary = self.dup.lock().summary_table();
+            let extended = self.xdup.lock().summary_table();
+            out.push_str(&dual_section(
+                "Sequence Duplication Levels",
+                primary,
+                extended,
+            ));
+        }
+
+        if self.emit_overrepresented {
+            let primary = self
+                .dup
+                .lock()
+                .overrepresented_table(self.overrepresented_threshold);
+            let extended = self
+                .xdup
+                .lock()
+                .overrepresented_table(self.overrepresented_threshold);
+            let section = dual_section("Overrepresented Sequences", primary, extended);
+            if !section.is_empty() {
+                if !out.is_empty() {
+                    out.push('\n');
+                }
+                out.push_str(&section);
+            }
+        }
+
+        out
     }
 }

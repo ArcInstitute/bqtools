@@ -5,7 +5,7 @@ use binseq::BinseqRecord;
 use parking_lot::Mutex;
 use serde::Serialize;
 
-use super::{QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
+use super::{report::table, QualAbundance, DEFAULT_QUAL_ABUNDANCE, PHRED_OFFSET};
 use crate::commands::{match_output, qc::modules::QcModule, utils::make_directory};
 
 const BASE_QUALITY_PRIMARY_PATH: &str = "base_quality_R1.tsv";
@@ -92,6 +92,72 @@ impl BaseHistogram {
 
         ser.flush().map_err(Into::into)
     }
+
+    /// Mean quality score at each position.
+    fn position_means(&self) -> Vec<f64> {
+        self.inner
+            .iter()
+            .map(|counts| {
+                let total: usize = counts.iter().sum();
+                if total == 0 {
+                    0.0
+                } else {
+                    let sum: usize = counts.iter().enumerate().map(|(q, &c)| q * c).sum();
+                    sum as f64 / total as f64
+                }
+            })
+            .collect()
+    }
+
+    fn summary_table(&self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let mut num = 0usize;
+        let mut den = 0usize;
+        for counts in &self.inner {
+            for (q, &c) in counts.iter().enumerate() {
+                num += q * c;
+                den += c;
+            }
+        }
+        let overall_mean = if den == 0 {
+            0.0
+        } else {
+            num as f64 / den as f64
+        };
+
+        let means = self.position_means();
+        let (min_pos, min_mean) = means
+            .iter()
+            .copied()
+            .enumerate()
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .unwrap_or((0, 0.0));
+        let (max_pos, max_mean) = means
+            .iter()
+            .copied()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .unwrap_or((0, 0.0));
+
+        Some(table(
+            &["Metric", "Value"],
+            &[
+                vec!["Positions".into(), means.len().to_string()],
+                vec!["Mean Quality".into(), format!("{overall_mean:.2}")],
+                vec![
+                    "Lowest Mean Quality".into(),
+                    format!("{min_mean:.2} (pos {min_pos})"),
+                ],
+                vec![
+                    "Highest Mean Quality".into(),
+                    format!("{max_mean:.2} (pos {max_pos})"),
+                ],
+            ],
+        ))
+    }
 }
 
 #[derive(Clone, Default)]
@@ -147,5 +213,11 @@ impl QcModule for PerBaseSequenceQuality {
         write_to(&self.base_xqual.lock(), false)?;
 
         Ok(())
+    }
+
+    fn summarize(&self) -> String {
+        let primary = self.base_squal.lock().summary_table();
+        let extended = self.base_xqual.lock().summary_table();
+        super::report::dual_section("Per-Base Sequence Quality", primary, extended)
     }
 }
