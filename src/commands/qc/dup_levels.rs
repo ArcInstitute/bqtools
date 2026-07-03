@@ -415,3 +415,125 @@ impl QcModule for SequenceDuplicationLevels {
         out
     }
 }
+
+#[cfg(test)]
+// Expected values below are exact (small-integer division that lands on a
+// representable value), so strict float equality is correct here.
+#[allow(clippy::float_cmp)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pct_handles_zero_total() {
+        assert_eq!(pct(5, 0), 0.0);
+    }
+
+    #[test]
+    fn pct_computes_percentage() {
+        assert_eq!(pct(1, 4), 25.0);
+    }
+
+    #[test]
+    fn truncate_sequence_passes_through_short_sequences() {
+        assert_eq!(truncate_sequence(b"ACGT"), "ACGT");
+    }
+
+    #[test]
+    fn truncate_sequence_truncates_long_sequences() {
+        let long = vec![b'A'; 50];
+        assert_eq!(truncate_sequence(&long), format!("{}...", "A".repeat(40)));
+    }
+
+    #[test]
+    fn counter_starts_empty() {
+        assert!(DuplicationCounter::default().is_empty());
+    }
+
+    #[test]
+    fn push_counts_exact_sequence_occurrences() {
+        let mut counter = DuplicationCounter::default();
+        counter.push(b"ACGT");
+        counter.push(b"ACGT");
+        counter.push(b"TTTT");
+        assert!(!counter.is_empty());
+        assert_eq!(counter.inner.len(), 2);
+        assert_eq!(counter.total_reads(), 3);
+    }
+
+    #[test]
+    fn ingest_merges_and_drains_source() {
+        let mut a = DuplicationCounter::default();
+        let mut b = DuplicationCounter::default();
+        a.push(b"ACGT");
+        b.push(b"ACGT");
+        b.push(b"TTTT");
+
+        a.ingest(&mut b);
+
+        assert_eq!(a.total_reads(), 3);
+        assert_eq!(a.inner.len(), 2);
+        assert!(b.is_empty());
+    }
+
+    #[test]
+    fn summary_table_none_when_empty() {
+        assert!(DuplicationCounter::default().summary_table().is_none());
+    }
+
+    #[test]
+    fn summary_table_reports_distinct_and_unique_pct() {
+        let mut counter = DuplicationCounter::default();
+        counter.push(b"ACGT");
+        counter.push(b"ACGT");
+        counter.push(b"TTTT");
+        let summary = counter.summary_table().expect("non-empty counter");
+        assert!(summary.contains("| Sampled Reads | 3 |"));
+        assert!(summary.contains("| Distinct Sequences | 2 |"));
+        assert!(summary.contains("66.67%"));
+    }
+
+    #[test]
+    fn overrepresented_filters_by_threshold_and_sorts_descending() {
+        let mut counter = DuplicationCounter::default();
+        for _ in 0..8 {
+            counter.push(b"COMMON");
+        }
+        for _ in 0..2 {
+            counter.push(b"RARE");
+        }
+        counter.push(b"SINGLETON");
+
+        // total = 11 reads; 50% threshold only keeps COMMON (8/11 ~= 72.7%)
+        let over = counter.overrepresented(50.0);
+        assert_eq!(over.len(), 1);
+        assert_eq!(over[0].0, b"COMMON".as_slice());
+        assert_eq!(over[0].1, 8);
+
+        // lower threshold keeps both, sorted most-frequent first
+        let over = counter.overrepresented(10.0);
+        assert_eq!(over.len(), 2);
+        assert_eq!(over[0].0, b"COMMON".as_slice());
+        assert_eq!(over[1].0, b"RARE".as_slice());
+    }
+
+    #[test]
+    fn overrepresented_table_none_when_nothing_meets_threshold() {
+        let mut counter = DuplicationCounter::default();
+        counter.push(b"ACGT");
+        assert!(counter.overrepresented_table(150.0).is_none());
+    }
+
+    #[test]
+    fn overrepresented_table_caps_at_summary_limit() {
+        let mut counter = DuplicationCounter::default();
+        for i in 0..(OVERREPRESENTED_SUMMARY_LIMIT + 3) {
+            let seq = format!("SEQ{i}");
+            for _ in 0..(OVERREPRESENTED_SUMMARY_LIMIT + 3 - i) {
+                counter.push(seq.as_bytes());
+            }
+        }
+        let rendered = counter.overrepresented_table(0.0).expect("non-empty");
+        let row_count = rendered.lines().count() - 2; // minus header + separator
+        assert_eq!(row_count, OVERREPRESENTED_SUMMARY_LIMIT);
+    }
+}

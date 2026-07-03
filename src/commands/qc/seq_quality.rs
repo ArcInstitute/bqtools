@@ -169,3 +169,77 @@ impl QcModule for PerSequenceQuality {
         super::report::dual_section("Per-Sequence Quality", primary, extended)
     }
 }
+
+#[cfg(test)]
+// Expected values below are exact (small-integer division that lands on a
+// representable value), so strict float equality is correct here.
+#[allow(clippy::float_cmp)]
+mod tests {
+    use super::*;
+
+    fn phred(scores: &[u8]) -> Vec<u8> {
+        scores.iter().map(|&s| s + PHRED_OFFSET).collect()
+    }
+
+    #[test]
+    fn starts_empty() {
+        assert!(QualHistogram::default().is_empty());
+    }
+
+    #[test]
+    fn push_ignores_empty_quality() {
+        let mut hist = QualHistogram::default();
+        hist.push(&[]);
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn push_bins_by_rounded_mean_quality() {
+        let mut hist = QualHistogram::default();
+        hist.push(&phred(&[10, 20])); // mean 15
+        assert!(!hist.is_empty());
+        assert_eq!(hist.total(), 1);
+        assert_eq!(hist.mean(), 15.0);
+    }
+
+    #[test]
+    fn mean_and_median_over_multiple_reads() {
+        let mut hist = QualHistogram::default();
+        hist.push(&phred(&[10]));
+        hist.push(&phred(&[20]));
+        hist.push(&phred(&[30]));
+        assert_eq!(hist.total(), 3);
+        assert_eq!(hist.mean(), 20.0);
+        assert_eq!(hist.median(), 20);
+    }
+
+    #[test]
+    fn summary_table_none_when_empty() {
+        assert!(QualHistogram::default().summary_table().is_none());
+    }
+
+    #[test]
+    fn summary_table_reports_headline_stats() {
+        let mut hist = QualHistogram::default();
+        hist.push(&phred(&[10]));
+        hist.push(&phred(&[30]));
+        let summary = hist.summary_table().expect("non-empty histogram");
+        assert!(summary.contains("| Reads | 2 |"));
+        assert!(summary.contains("| Mean Quality | 20.00 |"));
+        assert!(summary.contains("| Median Quality | 30 |"));
+    }
+
+    #[test]
+    fn ingest_merges_counts_and_zeroes_source() {
+        let mut a = QualHistogram::default();
+        let mut b = QualHistogram::default();
+        a.push(&phred(&[10]));
+        b.push(&phred(&[30]));
+
+        a.ingest(&mut b);
+
+        assert_eq!(a.total(), 2);
+        assert_eq!(a.mean(), 20.0);
+        assert!(b.is_empty());
+    }
+}

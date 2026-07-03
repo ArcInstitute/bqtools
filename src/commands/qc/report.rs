@@ -48,3 +48,60 @@ pub fn dual_section(title: &str, primary: Option<String>, extended: Option<Strin
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn table_with_no_rows_is_empty() {
+        assert_eq!(table(&["A", "B"], &[]), "");
+    }
+
+    #[test]
+    fn table_renders_header_separator_and_rows() {
+        let rows = vec![
+            vec!["1".to_string(), "2".to_string()],
+            vec!["3".to_string(), "4".to_string()],
+        ];
+        assert_eq!(
+            table(&["A", "B"], &rows),
+            "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n"
+        );
+    }
+
+    #[test]
+    fn dual_section_with_neither_side_is_empty() {
+        assert_eq!(dual_section("Title", None, None), "");
+    }
+
+    #[test]
+    fn dual_section_primary_only_has_no_r1_r2_headings() {
+        let out = dual_section("Title", Some("body\n".to_string()), None);
+        assert!(out.contains("## Title"));
+        assert!(out.contains("body"));
+        assert!(!out.contains("### R1"));
+        assert!(!out.contains("### R2"));
+    }
+
+    #[test]
+    fn dual_section_extended_only_has_no_r1_r2_headings() {
+        let out = dual_section("Title", None, Some("body\n".to_string()));
+        assert!(out.contains("## Title"));
+        assert!(out.contains("body"));
+        assert!(!out.contains("### R1"));
+        assert!(!out.contains("### R2"));
+    }
+
+    #[test]
+    fn dual_section_both_sides_split_r1_before_r2() {
+        let out = dual_section(
+            "Title",
+            Some("primary body\n".to_string()),
+            Some("extended body\n".to_string()),
+        );
+        assert!(out.contains("primary body"));
+        assert!(out.contains("extended body"));
+        assert!(out.find("### R1").unwrap() < out.find("### R2").unwrap());
+    }
+}

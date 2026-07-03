@@ -52,3 +52,99 @@ pub fn run(args: &QcCommand) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+    use clap::Parser;
+    use tempfile::{tempdir, NamedTempFile};
+
+    use crate::testutils::write_fastx;
+
+    fn encode(paths: &[&Path], out_path: &Path) -> Result<()> {
+        let mut args: Vec<String> = vec!["encode".into()];
+        args.extend(paths.iter().map(|p| p.to_str().unwrap().to_string()));
+        args.push("-o".into());
+        args.push(out_path.to_str().unwrap().to_string());
+        let cmd = crate::cli::EncodeCommand::try_parse_from(args)?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    fn run_qc(bq_path: &Path, outdir: &Path, extra_args: &[&str]) -> Result<()> {
+        let mut args: Vec<String> = vec!["qc".into(), bq_path.to_str().unwrap().to_string()];
+        args.extend(extra_args.iter().map(ToString::to_string));
+        args.push("-o".into());
+        args.push(outdir.to_str().unwrap().to_string());
+        let cmd = crate::cli::QcCommand::try_parse_from(args)?;
+        super::run(&cmd)
+    }
+
+    #[test]
+    fn test_qc_single_end_summary_report() -> Result<()> {
+        let fq = write_fastx().nrec(200).call()?;
+        let bq = NamedTempFile::with_suffix(".cbq")?;
+        encode(&[fq.path()], bq.path())?;
+
+        let outdir = tempdir()?;
+        run_qc(bq.path(), outdir.path(), &[])?;
+
+        let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
+        assert!(summary.contains("# BQtools QC Report"));
+        assert!(summary.contains("| Reads | 200 |"));
+        assert!(summary.contains("| Paired | false |"));
+        assert!(summary.contains("## Per-Base Sequence Quality"));
+        assert!(summary.contains("## Per-Sequence Quality"));
+        assert!(summary.contains("## Per-Base Sequence Content"));
+        assert!(summary.contains("## Per-Sequence GC Content"));
+        assert!(summary.contains("## Sequence Length Distribution"));
+        assert!(summary.contains("## Sequence Duplication Levels"));
+
+        // single-end input has no extended (R2) side, so no split headings
+        assert!(!summary.contains("### R1"));
+        assert!(!summary.contains("### R2"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_qc_paired_end_summary_report_splits_r1_r2() -> Result<()> {
+        let r1 = write_fastx().nrec(150).call()?;
+        let r2 = write_fastx().nrec(150).call()?;
+        let bq = NamedTempFile::with_suffix(".cbq")?;
+        encode(&[r1.path(), r2.path()], bq.path())?;
+
+        let outdir = tempdir()?;
+        run_qc(bq.path(), outdir.path(), &[])?;
+
+        let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
+        assert!(summary.contains("| Reads | 150 |"));
+        assert!(summary.contains("| Paired | true |"));
+        assert!(summary.contains("### R1"));
+        assert!(summary.contains("### R2"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_qc_summary_omits_disabled_modules() -> Result<()> {
+        let fq = write_fastx().nrec(100).call()?;
+        let bq = NamedTempFile::with_suffix(".cbq")?;
+        encode(&[fq.path()], bq.path())?;
+
+        let outdir = tempdir()?;
+        run_qc(
+            bq.path(),
+            outdir.path(),
+            &["--skip-dup-levels", "--skip-overrepresented"],
+        )?;
+
+        let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
+        assert!(!summary.contains("## Sequence Duplication Levels"));
+        assert!(!summary.contains("## Overrepresented Sequences"));
+        assert!(!outdir.path().join("duplication_levels_R1.tsv").exists());
+
+        Ok(())
+    }
+}

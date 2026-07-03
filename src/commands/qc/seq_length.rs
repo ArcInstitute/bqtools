@@ -173,3 +173,75 @@ impl QcModule for SequenceLengthDistribution {
         super::report::dual_section("Sequence Length Distribution", primary, extended)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starts_empty() {
+        assert!(SeqLenHistogram::default().is_empty());
+    }
+
+    #[test]
+    fn push_ignores_zero_length() {
+        let mut hist = SeqLenHistogram::default();
+        hist.push(0);
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn push_tracks_length_counts() {
+        let mut hist = SeqLenHistogram::default();
+        hist.push(100);
+        hist.push(100);
+        hist.push(150);
+        assert!(!hist.is_empty());
+        assert_eq!(hist.total(), 3);
+        assert_eq!(hist.min_len(), Some(100));
+        assert_eq!(hist.max_len(), Some(150));
+        assert_eq!(hist.mode(), 100);
+    }
+
+    #[test]
+    fn mean_is_weighted_by_count() {
+        let mut hist = SeqLenHistogram::default();
+        hist.push(100);
+        hist.push(100);
+        hist.push(200);
+        assert!((hist.mean() - 133.333_333_333_333_33).abs() < 1e-6);
+    }
+
+    #[test]
+    fn summary_table_none_when_empty() {
+        assert!(SeqLenHistogram::default().summary_table().is_none());
+    }
+
+    #[test]
+    fn summary_table_reports_headline_stats() {
+        let mut hist = SeqLenHistogram::default();
+        hist.push(50);
+        hist.push(50);
+        let summary = hist.summary_table().expect("non-empty histogram");
+        assert!(summary.contains("| Reads | 2 |"));
+        assert!(summary.contains("| Min Length | 50 |"));
+        assert!(summary.contains("| Max Length | 50 |"));
+        assert!(summary.contains("| Mean Length | 50.00 |"));
+        assert!(summary.contains("| Mode Length | 50 |"));
+    }
+
+    #[test]
+    fn ingest_merges_counts_and_zeroes_source() {
+        let mut a = SeqLenHistogram::default();
+        let mut b = SeqLenHistogram::default();
+        a.push(100);
+        b.push(200);
+
+        a.ingest(&mut b);
+
+        assert_eq!(a.total(), 2);
+        assert_eq!(a.min_len(), Some(100));
+        assert_eq!(a.max_len(), Some(200));
+        assert!(b.is_empty());
+    }
+}

@@ -248,3 +248,71 @@ impl QcModule for PerBaseSequenceContent {
         super::report::dual_section("Per-Base Sequence Content", primary, extended)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starts_empty() {
+        assert!(BaseContentHistogram::default().is_empty());
+    }
+
+    #[test]
+    fn push_ignores_empty_sequence() {
+        let mut hist = BaseContentHistogram::default();
+        hist.push(b"");
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn push_tracks_base_identity_per_position() {
+        let mut hist = BaseContentHistogram::default();
+        hist.push(b"ACGTN");
+        assert!(!hist.is_empty());
+        assert_eq!(hist.len(), 5);
+    }
+
+    #[test]
+    fn push_folds_ambiguity_codes_and_lowercase_into_expected_buckets() {
+        let mut hist = BaseContentHistogram::default();
+        hist.push(b"ACGTRacgt");
+        let totals = hist.totals();
+        assert_eq!(totals[IDX_A], 2); // 'A' and 'a'
+        assert_eq!(totals[IDX_C], 2); // 'C' and 'c'
+        assert_eq!(totals[IDX_G], 2); // 'G' and 'g'
+        assert_eq!(totals[IDX_T], 2); // 'T' and 't'
+        assert_eq!(totals[IDX_N], 1); // 'R' (ambiguity code)
+    }
+
+    #[test]
+    fn summary_table_none_when_empty() {
+        assert!(BaseContentHistogram::default().summary_table().is_none());
+    }
+
+    #[test]
+    fn summary_table_reports_base_composition() {
+        let mut hist = BaseContentHistogram::default();
+        hist.push(b"AACG");
+        let summary = hist.summary_table().expect("non-empty histogram");
+        assert!(summary.contains("| A | 2 | 50.00% |"));
+        assert!(summary.contains("| C | 1 | 25.00% |"));
+        assert!(summary.contains("| G | 1 | 25.00% |"));
+        assert!(summary.contains("| T | 0 | 0.00% |"));
+        assert!(summary.contains("| N | 0 | 0.00% |"));
+    }
+
+    #[test]
+    fn ingest_merges_counts() {
+        let mut a = BaseContentHistogram::default();
+        let mut b = BaseContentHistogram::default();
+        a.push(b"AA");
+        b.push(b"CC");
+
+        a.ingest(&mut b);
+
+        let totals = a.totals();
+        assert_eq!(totals[IDX_A], 2);
+        assert_eq!(totals[IDX_C], 2);
+    }
+}

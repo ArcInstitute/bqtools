@@ -186,3 +186,84 @@ impl QcModule for PerSequenceGcContent {
         super::report::dual_section("Per-Sequence GC Content", primary, extended)
     }
 }
+
+#[cfg(test)]
+// Expected values below are exact (small-integer division that lands on a
+// representable value), so strict float equality is correct here.
+#[allow(clippy::float_cmp)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starts_empty() {
+        assert!(GcHistogram::default().is_empty());
+    }
+
+    #[test]
+    fn is_gc_matches_c_and_g_case_insensitively() {
+        assert!(is_gc(b'G'));
+        assert!(is_gc(b'g'));
+        assert!(is_gc(b'C'));
+        assert!(is_gc(b'c'));
+        assert!(!is_gc(b'A'));
+        assert!(!is_gc(b'T'));
+        assert!(!is_gc(b'N'));
+    }
+
+    #[test]
+    fn push_ignores_empty_sequence() {
+        let mut hist = GcHistogram::default();
+        hist.push(b"");
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn push_bins_by_rounded_gc_percentage() {
+        let mut hist = GcHistogram::default();
+        hist.push(b"GCAT"); // 2/4 = 50% GC
+        assert!(!hist.is_empty());
+        assert_eq!(hist.total(), 1);
+        assert_eq!(hist.mean(), 50.0);
+    }
+
+    #[test]
+    fn mean_median_mode_over_multiple_reads() {
+        let mut hist = GcHistogram::default();
+        hist.push(b"AAAA"); // 0% GC
+        hist.push(b"AAAA"); // 0% GC
+        hist.push(b"GGGG"); // 100% GC
+        assert_eq!(hist.total(), 3);
+        assert!((hist.mean() - 33.333_333_333_333_336).abs() < 1e-9);
+        assert_eq!(hist.median(), 0);
+        assert_eq!(hist.mode(), 0);
+    }
+
+    #[test]
+    fn summary_table_none_when_empty() {
+        assert!(GcHistogram::default().summary_table().is_none());
+    }
+
+    #[test]
+    fn summary_table_reports_headline_stats() {
+        let mut hist = GcHistogram::default();
+        hist.push(b"GCGC"); // 100% GC
+        hist.push(b"ATAT"); // 0% GC
+        let summary = hist.summary_table().expect("non-empty histogram");
+        assert!(summary.contains("| Reads | 2 |"));
+        assert!(summary.contains("| Mean GC% | 50.00% |"));
+    }
+
+    #[test]
+    fn ingest_merges_counts_and_zeroes_source() {
+        let mut a = GcHistogram::default();
+        let mut b = GcHistogram::default();
+        a.push(b"AAAA"); // 0%
+        b.push(b"GGGG"); // 100%
+
+        a.ingest(&mut b);
+
+        assert_eq!(a.total(), 2);
+        assert_eq!(a.mean(), 50.0);
+        assert!(b.is_empty());
+    }
+}

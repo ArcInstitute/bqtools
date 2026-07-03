@@ -221,3 +221,70 @@ impl QcModule for PerBaseSequenceQuality {
         super::report::dual_section("Per-Base Sequence Quality", primary, extended)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn phred(scores: &[u8]) -> Vec<u8> {
+        scores.iter().map(|&s| s + PHRED_OFFSET).collect()
+    }
+
+    #[test]
+    fn starts_empty() {
+        assert!(BaseHistogram::default().is_empty());
+    }
+
+    #[test]
+    fn push_ignores_empty_quality() {
+        let mut hist = BaseHistogram::default();
+        hist.push(&[]);
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn push_tracks_per_position_quality() {
+        let mut hist = BaseHistogram::default();
+        hist.push(&phred(&[10, 20, 30]));
+        assert!(!hist.is_empty());
+        assert_eq!(hist.len(), 3);
+        assert_eq!(hist.position_means(), vec![10.0, 20.0, 30.0]);
+    }
+
+    #[test]
+    fn push_accumulates_across_reads() {
+        let mut hist = BaseHistogram::default();
+        hist.push(&phred(&[10, 10]));
+        hist.push(&phred(&[30, 30]));
+        assert_eq!(hist.position_means(), vec![20.0, 20.0]);
+    }
+
+    #[test]
+    fn summary_table_none_when_empty() {
+        assert!(BaseHistogram::default().summary_table().is_none());
+    }
+
+    #[test]
+    fn summary_table_reports_overall_and_extreme_positions() {
+        let mut hist = BaseHistogram::default();
+        hist.push(&phred(&[10, 40]));
+        let summary = hist.summary_table().expect("non-empty histogram");
+        assert!(summary.contains("| Positions | 2 |"));
+        assert!(summary.contains("| Mean Quality | 25.00 |"));
+        assert!(summary.contains("| Lowest Mean Quality | 10.00 (pos 0) |"));
+        assert!(summary.contains("| Highest Mean Quality | 40.00 (pos 1) |"));
+    }
+
+    #[test]
+    fn ingest_merges_counts_and_zeroes_source() {
+        let mut a = BaseHistogram::default();
+        let mut b = BaseHistogram::default();
+        a.push(&phred(&[10, 10]));
+        b.push(&phred(&[30, 30]));
+
+        a.ingest(&mut b);
+
+        assert_eq!(a.position_means(), vec![20.0, 20.0]);
+        assert_eq!(b.position_means(), vec![0.0, 0.0]);
+    }
+}
