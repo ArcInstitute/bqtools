@@ -21,18 +21,31 @@ const IDX_N: usize = 4;
 pub type BaseAbundance = [usize; NUM_BASES];
 pub const DEFAULT_BASE_ABUNDANCE: BaseAbundance = [0; NUM_BASES];
 
+/// Byte -> histogram index, built once at compile time.
+///
+/// A `match` on `A/C/G/T` (case-insensitive) compiles to a chain of
+/// unpredictable branches, since those bytes aren't a contiguous range. A
+/// 256-entry table turns the per-base lookup into one branchless load.
+const BASE_LUT: [u8; 256] = {
+    let mut lut = [IDX_N as u8; 256];
+    lut[b'A' as usize] = IDX_A as u8;
+    lut[b'a' as usize] = IDX_A as u8;
+    lut[b'C' as usize] = IDX_C as u8;
+    lut[b'c' as usize] = IDX_C as u8;
+    lut[b'G' as usize] = IDX_G as u8;
+    lut[b'g' as usize] = IDX_G as u8;
+    lut[b'T' as usize] = IDX_T as u8;
+    lut[b't' as usize] = IDX_T as u8;
+    lut
+};
+
 /// Buckets a decoded base into its histogram index.
 ///
 /// Anything outside `ACGT` (case-insensitive) - ambiguity codes included -
 /// is folded into the `N` bucket.
+#[inline]
 fn base_index(base: u8) -> usize {
-    match base {
-        b'A' | b'a' => IDX_A,
-        b'C' | b'c' => IDX_C,
-        b'G' | b'g' => IDX_G,
-        b'T' | b't' => IDX_T,
-        _ => IDX_N,
-    }
+    BASE_LUT[base as usize] as usize
 }
 
 #[derive(Serialize)]
