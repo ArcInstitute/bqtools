@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use hashbrown::HashSet;
 
 mod ac_matcher;
 #[cfg(feature = "fuzzy")]
@@ -112,9 +112,7 @@ impl PatternMatch for PatternMatcher {
 #[cfg(test)]
 #[allow(clippy::similar_names)]
 mod matcher_unit_tests {
-    use std::collections::HashSet;
-
-    use super::{PatternMatch, RegexMatcher};
+    use super::{HashSet, PatternMatch, RegexMatcher};
 
     #[cfg(feature = "fuzzy")]
     use super::FuzzyMatcher;

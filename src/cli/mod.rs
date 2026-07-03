@@ -8,6 +8,7 @@ mod info;
 mod input;
 mod output;
 mod pipe;
+mod qc;
 mod sample;
 mod split;
 
@@ -23,5 +24,6 @@ pub use info::InfoCommand;
 pub use input::{InputBinseq, InputFile, MultiInputBinseq};
 pub use output::{BinseqConfig, BinseqMode, Mate, OutputBinseq, OutputFile};
 pub use pipe::PipeCommand;
+pub use qc::{QcCommand, QcOptions};
 pub use sample::SampleCommand;
 pub use split::SplitCommand;

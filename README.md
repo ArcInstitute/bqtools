@@ -117,6 +117,7 @@ bqtools info --help
 bqtools grep --help
 bqtools split --help
 bqtools pipe --help
+bqtools qc --help
 ```
 
 ### Encoding
@@ -537,6 +538,62 @@ Notes:
 - Pipes can be read sequentially _or_ in parallel without blocking.
 
 > Note: This feature is not available on Windows.
+
+### QC
+
+Run [FastQC](https://github.com/s-andrews/fastqc)-inspired quality control on a BINSEQ file and write a Markdown
+summary report plus per-module TSV files to an output directory.
+
+```bash
+# Run all QC modules with default settings
+bqtools qc input.cbq
+
+# Write results to a specific directory (default: ./bqtools-qc)
+bqtools qc input.cbq -o qc-results
+
+# Only QC a span of records
+bqtools qc input.cbq --span 0..100000
+
+# Skip specific modules
+bqtools qc input.cbq --skip-dup-levels --skip-overrepresented
+
+# Set the number of leading records sampled for duplication-level and
+# overrepresented-sequence estimation (0 uses all records)
+bqtools qc input.cbq --dup-sample-size 50000
+
+# Set the minimum percentage of sampled reads a sequence must represent
+# to be flagged as overrepresented
+bqtools qc input.cbq --overrepresented-threshold 0.5
+
+# Set threads for parallel processing
+bqtools qc input.cbq -T 8
+```
+
+Modules (each toggled off independently with a `--skip-*` flag):
+
+- Per-base sequence quality (`--skip-base-qual`)
+- Per-sequence quality (`--skip-seq-qual`)
+- Per-base sequence content (`--skip-base-content`)
+- Per-sequence GC content (`--skip-seq-gc`)
+- Sequence length distribution (`--skip-seq-length`)
+- Sequence duplication levels (`--skip-dup-levels`)
+- Overrepresented sequences (`--skip-overrepresented`)
+
+Output directory contents:
+
+- `summary.md` — overview table (read/pair counts) and a headline section per
+  enabled module
+- `base_quality_R1.tsv` / `base_quality_R2.tsv`
+- `seq_quality_R1.tsv` / `seq_quality_R2.tsv`
+- `base_content_R1.tsv` / `base_content_R2.tsv`
+- `gc_content_R1.tsv` / `gc_content_R2.tsv`
+- `seq_length_R1.tsv` / `seq_length_R2.tsv`
+- `duplication_levels_R1.tsv` / `duplication_levels_R2.tsv`
+- `overrepresented_sequences_R1.tsv` / `overrepresented_sequences_R2.tsv`
+
+For paired-end input, each module writes separate `_R1`/`_R2` files and the
+summary report splits its section into `### R1`/`### R2` subsections;
+single-end input only produces the `_R1` files and an unsplit section.
 
 # Citation
 

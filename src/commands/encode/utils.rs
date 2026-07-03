@@ -1,6 +1,7 @@
-use std::{collections::HashMap, io::Read, path::PathBuf};
+use std::{io::Read, path::PathBuf};
 
 use anyhow::{bail, Result};
+use hashbrown::HashMap;
 use log::{error, warn};
 use paraseq::{fastx, Record};
 use regex::Regex;

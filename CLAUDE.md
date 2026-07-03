@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-bqtools is a Rust CLI for working with BINSEQ files — a binary format family for high-performance DNA sequence processing. It encodes, decodes, greps, concatenates, samples, and pipes BINSEQ files (`.bq`, `.vbq`, `.cbq`). CBQ is the recommended format for most applications.
+bqtools is a Rust CLI for working with BINSEQ files — a binary format family for high-performance DNA sequence processing. It encodes, decodes, greps, concatenates, samples, pipes, and runs QC on BINSEQ files (`.bq`, `.vbq`, `.cbq`). CBQ is the recommended format for most applications.
 
 ## Build & Test Commands
 
@@ -53,6 +53,8 @@ Build without defaults: `cargo build --no-default-features -F fuzzy,gcs`
 **Writer abstraction**: `SplitWriter` supports interleaved (single file) and split (separate R1/R2) output modes with polymorphic writers (file, stdout, compressed, chunked).
 
 **Pipe exec modes**: The pipe command (`src/commands/pipe/`) splits a BINSEQ file across named FIFOs (one writer thread per pipe). It can optionally spawn and supervise the consumer processes via `ExecMode` (`exec.rs`): `PerFifo` (`-x`/`--exec`) runs one shell command per pipe, while `Batch` (`-X`/`--exec-batch`) runs a single command with all FIFO paths space-joined. Templates use `{}` (single-end), `{R1}`/`{R2}` (paired-end), and `{n}` (pipe index, `-x` only). Templates are validated up front so a malformed template fails before any FIFO is opened (an unread FIFO would hang). `PairedChannels` (`mod.rs`) is derived from the template's tokens so referencing only `{R1}` or `{R2}` suppresses the unused channel's FIFOs and writer threads entirely. Consumers must be spawned before writer threads open the FIFOs, since opening a FIFO for writing blocks until a reader connects.
+
+**QC modules**: The qc command (`src/commands/qc/`) runs a FastQC-style suite of independent modules (per-base quality, per-sequence quality, per-base content, per-sequence GC content, sequence length distribution, sequence duplication levels, overrepresented sequences) behind the `QcModule` trait, dispatched through a `QcModuleType` enum (`modules.rs`). Each module implements `push` (per-record), `sync_batch`/`sync_final` (thread-local → shared merge), `finish` (writes its own `<name>_R1.tsv`/`_R2.tsv`), and an optional `summarize` (renders its headline stats into the shared `summary.md`, built via `report.rs`'s `table`/`dual_section` helpers). `QcConfig` (`config.rs`) turns `--skip-*` CLI flags into the enabled module list; duplication-level and overrepresented-sequence estimation only sample the first `--dup-sample-size` records.
 
 ### Core Dependencies
 
