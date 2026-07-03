@@ -1,8 +1,9 @@
+use std::io::Write;
+
 use anyhow::Result;
+use hashbrown::HashSet;
 
 use crate::cli::{FileFormat, Mate};
-
-use std::{collections::HashSet, io::Write};
 
 // ANSI color codes as byte constants
 const RESET: &[u8] = b"\x1b[0m";
