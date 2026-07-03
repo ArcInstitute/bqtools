@@ -51,6 +51,7 @@ fn main() -> Result<()> {
         Commands::Sample(ref sample) => commands::sample::run(sample),
         Commands::Split(ref split) => commands::split::run(split),
         Commands::Pipe(ref pipe) => commands::pipe::run(pipe),
+        Commands::Qc(ref qc) => commands::qc::run(qc),
     }?;
     trace!("done");
     Ok(())
