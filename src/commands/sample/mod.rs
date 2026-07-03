@@ -255,7 +255,7 @@ mod tests {
             })
             .collect::<Result<_>>()?;
 
-        let unique: std::collections::HashSet<_> = counts.iter().collect();
+        let unique: hashbrown::HashSet<_> = counts.iter().collect();
         assert!(
             unique.len() > 1,
             "all seeds produced the same count — suspicious: {counts:?}"
