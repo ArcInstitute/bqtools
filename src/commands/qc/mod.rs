@@ -61,6 +61,7 @@ mod tests {
     use clap::Parser;
     use tempfile::{tempdir, NamedTempFile};
 
+    use crate::cli::BinseqMode;
     use crate::testutils::write_fastx;
 
     fn encode(paths: &[&Path], out_path: &Path) -> Result<()> {
@@ -83,67 +84,97 @@ mod tests {
 
     #[test]
     fn test_qc_single_end_summary_report() -> Result<()> {
-        let fq = write_fastx().nrec(200).call()?;
-        let bq = NamedTempFile::with_suffix(".cbq")?;
-        encode(&[fq.path()], bq.path())?;
+        for mode in BinseqMode::enum_iter() {
+            let fq = write_fastx().nrec(200).call()?;
+            let bq = NamedTempFile::with_suffix(mode.extension())?;
+            encode(&[fq.path()], bq.path())?;
 
-        let outdir = tempdir()?;
-        run_qc(bq.path(), outdir.path(), &[])?;
+            let outdir = tempdir()?;
+            run_qc(bq.path(), outdir.path(), &[])?;
 
-        let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
-        assert!(summary.contains("# BQtools QC Report"));
-        assert!(summary.contains("| Reads | 200 |"));
-        assert!(summary.contains("| Paired | false |"));
-        assert!(summary.contains("## Per-Base Sequence Quality"));
-        assert!(summary.contains("## Per-Sequence Quality"));
-        assert!(summary.contains("## Per-Base Sequence Content"));
-        assert!(summary.contains("## Per-Sequence GC Content"));
-        assert!(summary.contains("## Sequence Length Distribution"));
-        assert!(summary.contains("## Sequence Duplication Levels"));
+            let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
+            assert!(summary.contains("# BQtools QC Report"), "mode={mode:?}");
+            assert!(summary.contains("| Reads | 200 |"), "mode={mode:?}");
+            assert!(summary.contains("| Paired | false |"), "mode={mode:?}");
+            assert!(
+                summary.contains("## Per-Base Sequence Quality"),
+                "mode={mode:?}"
+            );
+            assert!(summary.contains("## Per-Sequence Quality"), "mode={mode:?}");
+            assert!(
+                summary.contains("## Per-Base Sequence Content"),
+                "mode={mode:?}"
+            );
+            assert!(
+                summary.contains("## Per-Sequence GC Content"),
+                "mode={mode:?}"
+            );
+            assert!(
+                summary.contains("## Sequence Length Distribution"),
+                "mode={mode:?}"
+            );
+            assert!(
+                summary.contains("## Sequence Duplication Levels"),
+                "mode={mode:?}"
+            );
 
-        // single-end input has no extended (R2) side, so no split headings
-        assert!(!summary.contains("### R1"));
-        assert!(!summary.contains("### R2"));
+            // single-end input has no extended (R2) side, so no split headings
+            assert!(!summary.contains("### R1"), "mode={mode:?}");
+            assert!(!summary.contains("### R2"), "mode={mode:?}");
+        }
 
         Ok(())
     }
 
     #[test]
     fn test_qc_paired_end_summary_report_splits_r1_r2() -> Result<()> {
-        let r1 = write_fastx().nrec(150).call()?;
-        let r2 = write_fastx().nrec(150).call()?;
-        let bq = NamedTempFile::with_suffix(".cbq")?;
-        encode(&[r1.path(), r2.path()], bq.path())?;
+        for mode in BinseqMode::enum_iter() {
+            let r1 = write_fastx().nrec(150).call()?;
+            let r2 = write_fastx().nrec(150).call()?;
+            let bq = NamedTempFile::with_suffix(mode.extension())?;
+            encode(&[r1.path(), r2.path()], bq.path())?;
 
-        let outdir = tempdir()?;
-        run_qc(bq.path(), outdir.path(), &[])?;
+            let outdir = tempdir()?;
+            run_qc(bq.path(), outdir.path(), &[])?;
 
-        let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
-        assert!(summary.contains("| Reads | 150 |"));
-        assert!(summary.contains("| Paired | true |"));
-        assert!(summary.contains("### R1"));
-        assert!(summary.contains("### R2"));
+            let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
+            assert!(summary.contains("| Reads | 150 |"), "mode={mode:?}");
+            assert!(summary.contains("| Paired | true |"), "mode={mode:?}");
+            assert!(summary.contains("### R1"), "mode={mode:?}");
+            assert!(summary.contains("### R2"), "mode={mode:?}");
+        }
 
         Ok(())
     }
 
     #[test]
     fn test_qc_summary_omits_disabled_modules() -> Result<()> {
-        let fq = write_fastx().nrec(100).call()?;
-        let bq = NamedTempFile::with_suffix(".cbq")?;
-        encode(&[fq.path()], bq.path())?;
+        for mode in BinseqMode::enum_iter() {
+            let fq = write_fastx().nrec(100).call()?;
+            let bq = NamedTempFile::with_suffix(mode.extension())?;
+            encode(&[fq.path()], bq.path())?;
 
-        let outdir = tempdir()?;
-        run_qc(
-            bq.path(),
-            outdir.path(),
-            &["--skip-dup-levels", "--skip-overrepresented"],
-        )?;
+            let outdir = tempdir()?;
+            run_qc(
+                bq.path(),
+                outdir.path(),
+                &["--skip-dup-levels", "--skip-overrepresented"],
+            )?;
 
-        let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
-        assert!(!summary.contains("## Sequence Duplication Levels"));
-        assert!(!summary.contains("## Overrepresented Sequences"));
-        assert!(!outdir.path().join("duplication_levels_R1.tsv").exists());
+            let summary = std::fs::read_to_string(outdir.path().join("summary.md"))?;
+            assert!(
+                !summary.contains("## Sequence Duplication Levels"),
+                "mode={mode:?}"
+            );
+            assert!(
+                !summary.contains("## Overrepresented Sequences"),
+                "mode={mode:?}"
+            );
+            assert!(
+                !outdir.path().join("duplication_levels_R1.tsv").exists(),
+                "mode={mode:?}"
+            );
+        }
 
         Ok(())
     }
