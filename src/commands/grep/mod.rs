@@ -93,6 +93,13 @@ impl AllPatterns {
     pub fn are_fixed(&self) -> bool {
         all_patterns_fixed(&[&self.pat1, &self.pat2, &self.pat])
     }
+
+    /// Total number of patterns across all three collections. AND vs OR
+    /// logic only changes behavior when combining 2+ patterns, so callers
+    /// use this to avoid treating AND logic as active for a single pattern.
+    pub fn total_len(&self) -> usize {
+        self.pat1.len() + self.pat2.len() + self.pat.len()
+    }
 }
 
 fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
@@ -150,10 +157,16 @@ fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
     Ok(())
 }
 
-fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
+/// Builds the pattern matcher, plus the effective AND-logic flag to use with
+/// it. AND vs OR only changes behavior when combining 2+ patterns, so with
+/// a single pattern AND logic is downgraded to OR — this keeps Aho-Corasick
+/// eligible (it doesn't implement AND) and matches the returned matcher to
+/// the logic value callers must pass alongside it.
+fn build_matcher(args: &GrepCommand) -> Result<(PatternMatcher, bool)> {
     #[cfg(feature = "fuzzy")]
     if args.grep.fuzzy_args.fuzzy {
         let patterns = load_patterns(args)?;
+        let and_logic = args.grep.and_logic() && patterns.total_len() > 1;
         let matcher = FuzzyMatcher::new(
             &patterns.pat1.bytes(),
             &patterns.pat2.bytes(),
@@ -162,7 +175,7 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
-        return Ok(PatternMatcher::Fuzzy(Box::new(matcher)));
+        return Ok((PatternMatcher::Fuzzy(Box::new(matcher)), and_logic));
     }
 
     let patterns = load_patterns(args)?;
@@ -171,7 +184,10 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
         log::debug!("All patterns are fixed strings — auto-selecting Aho-Corasick");
     }
 
-    if use_fixed && !args.grep.and_logic() {
+    // AND vs OR logic is only meaningful when combining 2+ patterns.
+    let and_logic = args.grep.and_logic() && patterns.total_len() > 1;
+
+    if use_fixed && !and_logic {
         let matcher = AhoCorasickMatcher::new(
             &patterns.pat1.bytes(),
             &patterns.pat2.bytes(),
@@ -179,7 +195,7 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
             args.grep.no_dfa,
             args.grep.range.map_or(0, |r| r.offset()),
         )?;
-        Ok(PatternMatcher::AhoCorasick(matcher))
+        Ok((PatternMatcher::AhoCorasick(matcher), and_logic))
     } else {
         if use_fixed {
             warn!("`-x/--fixed provided but ignored when using AND logic");
@@ -190,7 +206,7 @@ fn build_matcher(args: &GrepCommand) -> Result<PatternMatcher> {
             patterns.pat.regexes()?,
             args.grep.range.map_or(0, |r| r.offset()),
         );
-        Ok(PatternMatcher::Regex(matcher))
+        Ok((PatternMatcher::Regex(matcher), and_logic))
     }
 }
 
@@ -202,10 +218,10 @@ fn run_grep(
     mate: Option<Mate>,
 ) -> Result<()> {
     let count = args.grep.count || args.grep.frac;
-    let matcher = build_matcher(args)?;
+    let (matcher, and_logic) = build_matcher(args)?;
     let proc = FilterProcessor::new(
         matcher,
-        args.grep.and_logic(),
+        and_logic,
         args.grep.invert,
         count,
         args.grep.frac,
@@ -302,6 +318,39 @@ mod tests {
             assert!(
                 count <= DEFAULT_NUM_RECORDS,
                 "grep count {count} exceeds total for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// A single fixed-string pattern under the default AND logic must not
+    /// panic (Aho-Corasick doesn't support AND) and must match the count
+    /// produced with explicit OR logic, since AND/OR are equivalent with
+    /// only one pattern.
+    #[test]
+    fn test_grep_single_fixed_pattern_with_default_and_logic() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            let in_tmp = write_fastx().call()?;
+            let bq_tmp = NamedTempFile::with_suffix(mode.extension())?;
+            encode(in_tmp.path(), bq_tmp.path())?;
+
+            let and_count = grep_count(bq_tmp.path(), "AAAA", false)?;
+
+            let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+            let cmd = crate::cli::GrepCommand::try_parse_from([
+                "grep",
+                bq_tmp.path().to_str().unwrap(),
+                "AAAA",
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+                "--or-logic",
+            ])?;
+            super::run(&cmd)?;
+            let or_count = count_fastx_records(out_tmp.path())?;
+
+            assert_eq!(
+                and_count, or_count,
+                "AND and OR logic should match for a single pattern, mode={mode:?}"
             );
         }
         Ok(())
