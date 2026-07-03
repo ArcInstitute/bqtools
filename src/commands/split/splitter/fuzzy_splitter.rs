@@ -81,8 +81,8 @@ impl FuzzySplitter {
         for name in pat1
             .names()
             .into_iter()
-            .chain(pat2.names().into_iter())
-            .chain(pat.names().into_iter())
+            .chain(pat2.names())
+            .chain(pat.names())
         {
             let idx = if let Some(idx) = map.get(&name) {
                 *idx
