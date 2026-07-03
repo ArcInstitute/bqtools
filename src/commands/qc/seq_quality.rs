@@ -76,6 +76,7 @@ impl QualHistogram {
         ))
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn push(&mut self, qual: &[u8]) {
         if qual.is_empty() {
             return;

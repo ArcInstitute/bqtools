@@ -43,6 +43,7 @@ impl GcHistogram {
     }
 
     /// Bin a whole read by the percentage of G/C bases it contains.
+    #[allow(clippy::cast_sign_loss)]
     fn push(&mut self, seq: &[u8]) {
         if seq.is_empty() {
             return;
