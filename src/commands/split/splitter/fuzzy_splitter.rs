@@ -80,9 +80,9 @@ impl FuzzySplitter {
         let mut map = HashMap::new();
         for name in pat1
             .names()
-            .iter()
-            .chain(pat2.names().iter())
-            .chain(pat.names().iter())
+            .into_iter()
+            .chain(pat2.names().into_iter())
+            .chain(pat.names().into_iter())
         {
             let idx = if let Some(idx) = map.get(&name) {
                 *idx
