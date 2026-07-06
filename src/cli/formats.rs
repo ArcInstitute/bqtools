@@ -25,6 +25,7 @@ impl FileFormat {
             "fasta" | "fa" => Some(Self::Fasta),
             "fastq" | "fq" => Some(Self::Fastq),
             "sam" | "bam" | "cram" => Some(Self::Bam),
+            "tsv" | "txt" => Some(Self::Tsv),
             _ => None,
         }
     }
