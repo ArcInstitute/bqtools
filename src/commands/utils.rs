@@ -10,6 +10,8 @@ use gzp::{
     par::compress::{ParCompress, ParCompressBuilder},
 };
 use log::trace;
+#[cfg(feature = "fuzzy")]
+use sassy::{profiles::Iupac, EncodedPatterns, Searcher};
 
 pub fn make_directory<P: AsRef<Path>>(path: P) -> Result<()> {
     if path.as_ref().exists() {
@@ -132,4 +134,22 @@ pub fn validate_uniform_pattern_length(patterns: &[Vec<u8>]) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// Builds a fuzzy (sassy) searcher for one pattern set: validates uniform
+/// pattern length, resolves the `max_n_frac` filter (defaulting to
+/// `k / pattern_length` when unset), and encodes the patterns into the
+/// searcher if any were provided.
+#[cfg(feature = "fuzzy")]
+pub fn build_fuzzy_searcher(
+    patterns: &[Vec<u8>],
+    k: usize,
+    max_n_frac: Option<f32>,
+) -> Result<(Searcher<Iupac>, Option<EncodedPatterns<Iupac>>)> {
+    validate_uniform_pattern_length(patterns)?;
+    let frac =
+        max_n_frac.unwrap_or_else(|| default_max_n_frac(k, patterns.first().map_or(0, Vec::len)));
+    let mut searcher = Searcher::new_fwd().with_max_n_frac(frac);
+    let encoded = (!patterns.is_empty()).then(|| searcher.encode_patterns(patterns));
+    Ok((searcher, encoded))
 }

@@ -17,3 +17,6 @@ test:
 
 test-all:
     cargo test --all-features
+
+install:
+    cargo install --path .

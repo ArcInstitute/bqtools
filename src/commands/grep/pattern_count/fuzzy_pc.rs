@@ -4,7 +4,7 @@ use anyhow::Result;
 use fixedbitset::FixedBitSet;
 use sassy::{profiles::Iupac, EncodedPatterns, Match, Searcher};
 
-use crate::commands::utils::{default_max_n_frac, validate_uniform_pattern_length};
+use crate::commands::utils::build_fuzzy_searcher;
 
 type Profile = Iupac;
 
@@ -45,32 +45,10 @@ impl FuzzyPatternCounter {
         invert: bool,
         max_n_frac: Option<f32>,
     ) -> Result<Self> {
-        // sassy requires uniform pattern lengths within a searcher
-        validate_uniform_pattern_length(&pat1.bytes())?;
-        validate_uniform_pattern_length(&pat2.bytes())?;
-        validate_uniform_pattern_length(&pat.bytes())?;
-
-        // default max_n_frac (when unset) is k/pattern_length, computed per
-        // pattern set since their pattern lengths may differ
-        let frac1 = max_n_frac.unwrap_or_else(|| {
-            default_max_n_frac(k, pat1.iter().next().map_or(0, |p| p.sequence.len()))
-        });
-        let frac2 = max_n_frac.unwrap_or_else(|| {
-            default_max_n_frac(k, pat2.iter().next().map_or(0, |p| p.sequence.len()))
-        });
-        let frac = max_n_frac.unwrap_or_else(|| {
-            default_max_n_frac(k, pat.iter().next().map_or(0, |p| p.sequence.len()))
-        });
-
-        // initialize a searcher for each pattern collection
-        let mut searcher_1 = Searcher::new_fwd().with_max_n_frac(frac1);
-        let mut searcher_2 = Searcher::new_fwd().with_max_n_frac(frac2);
-        let mut searcher = Searcher::new_fwd().with_max_n_frac(frac);
-
-        // encode the patterns for each collection/searcher combination
-        let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(&pat1.bytes()));
-        let enc_pat2 = (!pat2.is_empty()).then(|| searcher_2.encode_patterns(&pat2.bytes()));
-        let enc_pat = (!pat.is_empty()).then(|| searcher.encode_patterns(&pat.bytes()));
+        // validate lengths, resolve max_n_frac, and encode patterns per pattern set
+        let (searcher_1, enc_pat1) = build_fuzzy_searcher(&pat1.bytes(), k, max_n_frac)?;
+        let (searcher_2, enc_pat2) = build_fuzzy_searcher(&pat2.bytes(), k, max_n_frac)?;
+        let (searcher, enc_pat) = build_fuzzy_searcher(&pat.bytes(), k, max_n_frac)?;
 
         let bits1 = FixedBitSet::with_capacity(pat1.len());
         let bits2 = FixedBitSet::with_capacity(pat2.len());
