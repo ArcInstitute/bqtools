@@ -285,7 +285,8 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_single_pattern() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, false, None);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, false, None)
+                .unwrap();
 
         assert_eq!(counter.num_patterns(), 1);
 
@@ -312,7 +313,8 @@ mod pattern_count_tests {
             false,
             false,
             None,
-        );
+        )
+        .unwrap();
 
         let primary = b"NNNNNNNNNNNNNNNNNN";
         let secondary = b"";
@@ -336,7 +338,8 @@ mod pattern_count_tests {
             false,
             false,
             Some(1.0),
-        );
+        )
+        .unwrap();
 
         let primary = b"NNNNNNNNNNNNNNNNNN";
         let secondary = b"";
@@ -360,7 +363,8 @@ mod pattern_count_tests {
             false,
             false,
             Some(0.0),
-        );
+        )
+        .unwrap();
 
         // A single N substituted for an A is within edit distance 1, and would
         // pass the default k/pattern_len threshold (1/8), but max_n_frac=0.0
@@ -380,11 +384,84 @@ mod pattern_count_tests {
         assert_eq!(counts_clean[0], 1);
     }
 
+    // sassy's `Searcher::encode_patterns` panics (`assert!`) when a pattern set
+    // contains mixed lengths; these tests confirm we catch that up front and
+    // return an `Err` instead of letting the panic reach the caller.
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_rejects_mismatched_pattern_lengths_primary() {
+        let result = FuzzyPatternCounter::new(
+            pc(&[b"AAAA", b"AAAAA"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "mismatched primary pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_rejects_mismatched_pattern_lengths_secondary() {
+        let result = FuzzyPatternCounter::new(
+            pc(&[]),
+            pc(&[b"AAAA", b"AAAAA"]),
+            pc(&[]),
+            1,
+            false,
+            false,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "mismatched secondary pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_rejects_mismatched_pattern_lengths_either() {
+        let result = FuzzyPatternCounter::new(
+            pc(&[]),
+            pc(&[]),
+            pc(&[b"AAAA", b"AAAAA"]),
+            1,
+            false,
+            false,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "mismatched either-set pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_accepts_uniform_pattern_lengths() {
+        let result = FuzzyPatternCounter::new(
+            pc(&[b"AAAA", b"TTTT", b"CCCC"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+            None,
+        );
+        assert!(result.is_ok(), "uniform pattern lengths should not error");
+    }
+
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_with_mismatches() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, false, false, None);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, false, false, None)
+                .unwrap();
 
         // Exact match
         let primary1 = b"GGGGAAAAAAAATTTT";
@@ -412,7 +489,8 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_inexact_only() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, true, false, None);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, true, false, None)
+                .unwrap();
 
         // Exact match (should not count with inexact_only)
         let primary1 = b"GGGGAAAAAAAATTTT";
@@ -436,7 +514,8 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_invert() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, true, None);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, true, None)
+                .unwrap();
 
         // Sequence without pattern (should count when inverted)
         let primary1 = b"GGGGCCCCTTTT";
@@ -464,7 +543,8 @@ mod pattern_count_tests {
             false,
             false,
             None,
-        );
+        )
+        .unwrap();
 
         assert_eq!(counter.num_patterns(), 3);
 
@@ -483,7 +563,8 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_secondary() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[]), pc(&[b"TTTTTTTT"]), pc(&[]), 1, false, false, None);
+            FuzzyPatternCounter::new(pc(&[]), pc(&[b"TTTTTTTT"]), pc(&[]), 1, false, false, None)
+                .unwrap();
 
         let primary = b"GGGGAAAACCCC";
         let secondary = b"GGGGTTTTTTTTCCCC";
@@ -498,7 +579,8 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_either() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCCCCCC"]), 1, false, false, None);
+            FuzzyPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCCCCCC"]), 1, false, false, None)
+                .unwrap();
 
         // Test match in primary
         let primary1 = b"GGGGCCCCCCCCTTTT";
@@ -526,7 +608,8 @@ mod pattern_count_tests {
             false,
             false,
             None,
-        );
+        )
+        .unwrap();
 
         let patterns = counter.pattern_strings();
         assert_eq!(patterns.len(), 2);
@@ -538,7 +621,8 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_edit_distance_zero() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 0, false, false, None);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 0, false, false, None)
+                .unwrap();
 
         // Exact match (should count)
         let primary1 = b"GGGGAAAAAAAATTTT";

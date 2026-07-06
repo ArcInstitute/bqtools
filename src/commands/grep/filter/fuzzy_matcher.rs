@@ -2,10 +2,9 @@ use super::{MatchRanges, PatternMatch};
 
 use anyhow::Result;
 use fixedbitset::FixedBitSet;
-use log::error;
 use sassy::{profiles::Iupac, EncodedPatterns, Searcher};
 
-use crate::commands::utils::default_max_n_frac;
+use crate::commands::utils::{default_max_n_frac, validate_uniform_pattern_length};
 
 type Profile = Iupac;
 type Patterns = Vec<Vec<u8>>;
@@ -51,10 +50,10 @@ impl FuzzyMatcher {
         offset: usize,
         max_n_frac: Option<f32>,
     ) -> Result<Self> {
-        // validate pattern lengths
-        validate_single_pattern_length(pat1)?;
-        validate_single_pattern_length(pat2)?;
-        validate_single_pattern_length(pat)?;
+        // validate pattern lengths (sassy requires uniform lengths within a searcher)
+        validate_uniform_pattern_length(pat1)?;
+        validate_uniform_pattern_length(pat2)?;
+        validate_uniform_pattern_length(pat)?;
 
         // default max_n_frac (when unset) is k/pattern_length, computed per
         // pattern set since their pattern lengths may differ
@@ -227,19 +226,4 @@ impl PatternMatch for FuzzyMatcher {
             true
         }
     }
-}
-
-fn validate_single_pattern_length(patterns: &Patterns) -> Result<()> {
-    if patterns.len() < 2 {
-        return Ok(());
-    }
-    let plen = patterns[0].len();
-    for pattern in patterns {
-        if pattern.len() != plen {
-            error!("Multiple pattern lengths provided - currently cannot handle variable-length patterns in fuzzy matching");
-            return Err(anyhow::anyhow!("Pattern length mismatch"));
-        }
-    }
-
-    Ok(())
 }

@@ -114,7 +114,7 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
             args.grep.fuzzy_args.max_n_frac,
-        );
+        )?;
         return Ok(PatternCounter::Fuzzy(Box::new(counter)));
     }
 

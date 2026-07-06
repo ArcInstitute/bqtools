@@ -2,11 +2,12 @@ use hashbrown::HashMap;
 
 use anyhow::Result;
 use fixedbitset::FixedBitSet;
-use log::error;
 use sassy::{profiles::Iupac, EncodedPatterns, Match, Searcher};
 
 use crate::commands::{
-    grep::PatternCollection, split::splitter::SequenceSplit, utils::default_max_n_frac,
+    grep::PatternCollection,
+    split::splitter::SequenceSplit,
+    utils::{default_max_n_frac, validate_uniform_pattern_length},
 };
 
 type Profile = Iupac;
@@ -62,9 +63,9 @@ impl FuzzySplitter {
         max_n_frac: Option<f32>,
     ) -> Result<Self> {
         // sassy requires uniform pattern lengths within a searcher
-        validate_single_pattern_length(&pat1.bytes())?;
-        validate_single_pattern_length(&pat2.bytes())?;
-        validate_single_pattern_length(&pat.bytes())?;
+        validate_uniform_pattern_length(&pat1.bytes())?;
+        validate_uniform_pattern_length(&pat2.bytes())?;
+        validate_uniform_pattern_length(&pat.bytes())?;
 
         // default max_n_frac (when unset) is k/pattern_length, computed per
         // pattern set since their pattern lengths may differ
@@ -247,20 +248,6 @@ fn get_single_hit(bitset: &FixedBitSet) -> Option<usize> {
     }
 }
 
-fn validate_single_pattern_length(patterns: &[Vec<u8>]) -> Result<()> {
-    if patterns.len() < 2 {
-        return Ok(());
-    }
-    let plen = patterns[0].len();
-    for pattern in patterns {
-        if pattern.len() != plen {
-            error!("Multiple pattern lengths provided - currently cannot handle variable-length patterns in fuzzy matching");
-            return Err(anyhow::anyhow!("Pattern length mismatch"));
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::FuzzySplitter;
@@ -308,5 +295,49 @@ mod tests {
             Some(0),
             "max_n_frac=1.0 should disable the N-fraction filter"
         );
+    }
+
+    // sassy's `Searcher::encode_patterns` panics (`assert!`) when a pattern set
+    // contains mixed lengths; these tests confirm we catch that up front and
+    // return an `Err` instead of letting the panic reach the caller.
+    #[test]
+    fn test_fuzzy_splitter_rejects_mismatched_pattern_lengths_primary() {
+        let pat1 = pc(&[b"AAAA", b"AAAAA"], "alias");
+        let empty = PatternCollection(vec![]);
+        let result = FuzzySplitter::new(&pat1, &empty, &empty, 1, false, None);
+        assert!(
+            result.is_err(),
+            "mismatched primary pattern lengths should error, not panic"
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_splitter_rejects_mismatched_pattern_lengths_secondary() {
+        let pat2 = pc(&[b"AAAA", b"AAAAA"], "alias");
+        let empty = PatternCollection(vec![]);
+        let result = FuzzySplitter::new(&empty, &pat2, &empty, 1, false, None);
+        assert!(
+            result.is_err(),
+            "mismatched secondary pattern lengths should error, not panic"
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_splitter_rejects_mismatched_pattern_lengths_either() {
+        let pat = pc(&[b"AAAA", b"AAAAA"], "alias");
+        let empty = PatternCollection(vec![]);
+        let result = FuzzySplitter::new(&empty, &empty, &pat, 1, false, None);
+        assert!(
+            result.is_err(),
+            "mismatched either-set pattern lengths should error, not panic"
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_splitter_accepts_uniform_pattern_lengths() {
+        let pat1 = pc(&[b"AAAA", b"TTTT", b"CCCC"], "alias");
+        let empty = PatternCollection(vec![]);
+        let result = FuzzySplitter::new(&pat1, &empty, &empty, 1, false, None);
+        assert!(result.is_ok(), "uniform pattern lengths should not error");
     }
 }

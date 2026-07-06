@@ -176,7 +176,9 @@ impl GrepArgs {
 pub struct FuzzyArgs {
     /// Fuzzy finding using `sassy`
     ///
-    /// Note that regex expressions are not supported with this flag.
+    /// Note that regex expressions are not supported with this flag. All
+    /// patterns within a given pattern set (primary/secondary/either) must
+    /// have the same length; mismatched lengths are rejected with an error.
     #[clap(short = 'z', long)]
     pub fuzzy: bool,
 

@@ -1,9 +1,10 @@
 use super::{PatternCollection, PatternCount};
 
+use anyhow::Result;
 use fixedbitset::FixedBitSet;
 use sassy::{profiles::Iupac, EncodedPatterns, Match, Searcher};
 
-use crate::commands::utils::default_max_n_frac;
+use crate::commands::utils::{default_max_n_frac, validate_uniform_pattern_length};
 
 type Profile = Iupac;
 
@@ -43,7 +44,12 @@ impl FuzzyPatternCounter {
         inexact: bool,
         invert: bool,
         max_n_frac: Option<f32>,
-    ) -> Self {
+    ) -> Result<Self> {
+        // sassy requires uniform pattern lengths within a searcher
+        validate_uniform_pattern_length(&pat1.bytes())?;
+        validate_uniform_pattern_length(&pat2.bytes())?;
+        validate_uniform_pattern_length(&pat.bytes())?;
+
         // default max_n_frac (when unset) is k/pattern_length, computed per
         // pattern set since their pattern lengths may differ
         let frac1 = max_n_frac.unwrap_or_else(|| {
@@ -73,7 +79,7 @@ impl FuzzyPatternCounter {
         // combine all patterns into a single collection for reporting
         let all_patterns = PatternCollection(pat1.into_iter().chain(pat2).chain(pat).collect());
 
-        Self {
+        Ok(Self {
             pat1: enc_pat1,
             pat2: enc_pat2,
             pat: enc_pat,
@@ -87,7 +93,7 @@ impl FuzzyPatternCounter {
             searcher_1,
             searcher_2,
             searcher,
-        }
+        })
     }
 
     fn match_primary(&mut self, sequence: &[u8]) {

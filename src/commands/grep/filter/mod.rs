@@ -435,6 +435,50 @@ mod matcher_unit_tests {
         assert!(matcher.match_primary(seq_no_n, &mut matches_clean, true));
     }
 
+    // sassy's `Searcher::encode_patterns` panics (`assert!`) when a pattern set
+    // contains mixed lengths; these tests confirm we catch that up front and
+    // return an `Err` instead of letting the panic reach the caller.
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_rejects_mismatched_pattern_lengths_primary() {
+        let pat1 = vec![b"AAAA".to_vec(), b"AAAAA".to_vec()];
+        let result = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None);
+        assert!(
+            result.is_err(),
+            "mismatched primary pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_rejects_mismatched_pattern_lengths_secondary() {
+        let pat2 = vec![b"AAAA".to_vec(), b"AAAAA".to_vec()];
+        let result = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, 0, None);
+        assert!(
+            result.is_err(),
+            "mismatched secondary pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_rejects_mismatched_pattern_lengths_either() {
+        let pat = vec![b"AAAA".to_vec(), b"AAAAA".to_vec()];
+        let result = FuzzyMatcher::new(&vec![], &vec![], &pat, 1, false, 0, None);
+        assert!(
+            result.is_err(),
+            "mismatched either-set pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_accepts_uniform_pattern_lengths() {
+        let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec(), b"CCCC".to_vec()];
+        let result = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None);
+        assert!(result.is_ok(), "uniform pattern lengths should not error");
+    }
+
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_matcher_secondary() {
