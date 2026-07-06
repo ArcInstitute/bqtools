@@ -17,11 +17,12 @@ pub enum FileFormat {
 }
 impl FileFormat {
     pub fn from_path(path: &str) -> Option<Self> {
-        let ext = match path.split('.').next_back()? {
-            "gz" | "zst" => path.split('.').nth_back(1)?,
-            ext => ext,
+        let last = path.split('.').next_back()?.to_ascii_lowercase();
+        let ext = match last.as_str() {
+            "gz" | "zst" => path.split('.').nth_back(1)?.to_ascii_lowercase(),
+            _ => last,
         };
-        match ext {
+        match ext.as_str() {
             "fasta" | "fa" => Some(Self::Fasta),
             "fastq" | "fq" => Some(Self::Fastq),
             "sam" | "bam" | "cram" => Some(Self::Bam),
@@ -158,5 +159,44 @@ mod tests {
         // Only the compression suffix present with no recognizable format extension.
         assert_eq!(FileFormat::from_path("reads.gz"), None);
         assert_eq!(FileFormat::from_path("reads.zst"), None);
+    }
+
+    #[test]
+    fn from_path_is_case_insensitive() {
+        assert_eq!(
+            FileFormat::from_path("reads.FASTA"),
+            Some(FileFormat::Fasta)
+        );
+        assert_eq!(FileFormat::from_path("reads.Fa"), Some(FileFormat::Fasta));
+        assert_eq!(
+            FileFormat::from_path("reads.FASTQ"),
+            Some(FileFormat::Fastq)
+        );
+        assert_eq!(FileFormat::from_path("reads.Fq"), Some(FileFormat::Fastq));
+        assert_eq!(FileFormat::from_path("reads.SAM"), Some(FileFormat::Bam));
+        assert_eq!(FileFormat::from_path("reads.Bam"), Some(FileFormat::Bam));
+        assert_eq!(FileFormat::from_path("reads.CRAM"), Some(FileFormat::Bam));
+        assert_eq!(FileFormat::from_path("reads.TSV"), Some(FileFormat::Tsv));
+        assert_eq!(FileFormat::from_path("reads.TXT"), Some(FileFormat::Tsv));
+        assert_eq!(FileFormat::from_path("reads.Txt"), Some(FileFormat::Tsv));
+    }
+
+    #[test]
+    fn from_path_case_insensitive_compression_suffix() {
+        // Both the format extension and the compression suffix should match
+        // regardless of case.
+        assert_eq!(
+            FileFormat::from_path("reads.FASTQ.GZ"),
+            Some(FileFormat::Fastq)
+        );
+        assert_eq!(
+            FileFormat::from_path("reads.TSV.Zst"),
+            Some(FileFormat::Tsv)
+        );
+        assert_eq!(FileFormat::from_path("reads.Txt.GZ"), Some(FileFormat::Tsv));
+        assert_eq!(
+            FileFormat::from_path("reads.Fa.ZST"),
+            Some(FileFormat::Fasta)
+        );
     }
 }
