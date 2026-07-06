@@ -99,3 +99,37 @@ pub fn compress_zstd_passthrough(
     let encoder = encoder.auto_finish();
     Ok(Box::new(encoder))
 }
+
+/// Default `max_n_frac` for fuzzy (sassy) matching: `k / pattern_length`.
+///
+/// Mirrors sassy's semantics for the fraction of `N` bases tolerated within a
+/// match. Falls back to `1.0` (no restriction) when there is no pattern to
+/// measure a length from.
+#[cfg(feature = "fuzzy")]
+pub fn default_max_n_frac(k: usize, pattern_len: usize) -> f32 {
+    if pattern_len == 0 {
+        1.0
+    } else {
+        (k as f32 / pattern_len as f32).min(1.0)
+    }
+}
+
+/// Validates that every pattern in a fuzzy pattern set has the same length.
+///
+/// `sassy::Searcher::encode_patterns` requires uniform pattern lengths within a
+/// single batch and otherwise panics via an internal `assert!`. Calling this
+/// first turns that panic into a catchable error before patterns ever reach sassy.
+#[cfg(feature = "fuzzy")]
+pub fn validate_uniform_pattern_length(patterns: &[Vec<u8>]) -> Result<()> {
+    let Some(expected) = patterns.first().map(Vec::len) else {
+        return Ok(());
+    };
+    if let Some(bad) = patterns.iter().find(|p| p.len() != expected) {
+        log::error!("Multiple pattern lengths provided - currently cannot handle variable-length patterns in fuzzy matching");
+        bail!(
+            "Pattern length mismatch: expected length {expected}, found length {}",
+            bad.len()
+        );
+    }
+    Ok(())
+}

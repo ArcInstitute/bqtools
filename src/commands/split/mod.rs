@@ -54,6 +54,7 @@ fn build_splitter(args: &SplitCommand) -> Result<Splitter> {
             &patterns.pat,
             args.fuzzy_args.distance,
             args.fuzzy_args.inexact,
+            args.fuzzy_args.max_n_frac,
         )?;
         return Ok(Splitter::Fuzzy(Box::new(splitter)));
     }

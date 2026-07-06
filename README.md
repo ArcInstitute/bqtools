@@ -315,7 +315,12 @@ bqtools grep input.bq "ACGT[AG]TCCA" --range 80..
 
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
 
-This requires installing using the `fuzzy` feature flag (see installation above):
+This requires installing using the `fuzzy` feature flag (see installation above).
+
+Unlike the regex and Aho-Corasick backends, fuzzy matching requires all patterns
+within a given pattern set (primary/secondary/either) to have the same length —
+this is a `sassy` requirement. Mismatched lengths are rejected with an error
+rather than a crash.
 
 ```bash
 # Run grep with fuzzy matching (-z)
@@ -326,6 +331,17 @@ bqtools grep input.bq "ACGTACGT" -z -k2
 
 # Run fuzzy matching but only write inexact matches
 bqtools grep input.bq "ACGTACGT" -zi
+```
+
+Fuzzy matching also filters out matches with too many ambiguous `N` bases, controlled by `--max-n-frac`.
+By default this is `k / pattern_length` (computed separately for each of the primary/secondary/either pattern sets), but it can be set explicitly:
+
+```bash
+# Reject any match containing an N
+bqtools grep input.bq "ACGTACGT" -z --max-n-frac 0.0
+
+# Disable the N-fraction filter entirely
+bqtools grep input.bq "ACGTACGT" -z --max-n-frac 1.0
 ```
 
 `bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
