@@ -5,6 +5,8 @@ use fixedbitset::FixedBitSet;
 use log::error;
 use sassy::{profiles::Iupac, EncodedPatterns, Searcher};
 
+use crate::commands::utils::default_max_n_frac;
+
 type Profile = Iupac;
 type Patterns = Vec<Vec<u8>>;
 
@@ -47,16 +49,26 @@ impl FuzzyMatcher {
         k: usize,
         inexact: bool,
         offset: usize,
+        max_n_frac: Option<f32>,
     ) -> Result<Self> {
-        // initialize a searcher for each pattern collection
-        let mut searcher_1 = Searcher::new_fwd();
-        let mut searcher_2 = Searcher::new_fwd();
-        let mut searcher = Searcher::new_fwd();
-
         // validate pattern lengths
         validate_single_pattern_length(pat1)?;
         validate_single_pattern_length(pat2)?;
         validate_single_pattern_length(pat)?;
+
+        // default max_n_frac (when unset) is k/pattern_length, computed per
+        // pattern set since their pattern lengths may differ
+        let frac1 =
+            max_n_frac.unwrap_or_else(|| default_max_n_frac(k, pat1.first().map_or(0, Vec::len)));
+        let frac2 =
+            max_n_frac.unwrap_or_else(|| default_max_n_frac(k, pat2.first().map_or(0, Vec::len)));
+        let frac =
+            max_n_frac.unwrap_or_else(|| default_max_n_frac(k, pat.first().map_or(0, Vec::len)));
+
+        // initialize a searcher for each pattern collection
+        let mut searcher_1 = Searcher::new_fwd().with_max_n_frac(frac1);
+        let mut searcher_2 = Searcher::new_fwd().with_max_n_frac(frac2);
+        let mut searcher = Searcher::new_fwd().with_max_n_frac(frac);
 
         // encode the patterns for each collection/searcher combination
         let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(pat1));

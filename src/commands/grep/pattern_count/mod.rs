@@ -285,7 +285,7 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_single_pattern() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, false);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, false, None);
 
         assert_eq!(counter.num_patterns(), 1);
 
@@ -298,11 +298,93 @@ mod pattern_count_tests {
         assert_eq!(counts[0], 1, "Pattern should be found in primary");
     }
 
+    // Mirrors https://github.com/RagnarGrootKoerkamp/sassy/issues/66: the Iupac
+    // profile treats `N` as a wildcard, so without an N-fraction filter a needle
+    // matches a haystack made entirely of `N`s.
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_default_max_n_frac_rejects_all_n_match() {
+        let mut counter = FuzzyPatternCounter::new(
+            pc(&[b"ACGTACGTACGT"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+            None,
+        );
+
+        let primary = b"NNNNNNNNNNNNNNNNNN";
+        let secondary = b"";
+        let mut counts = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(
+            counts[0], 0,
+            "default max_n_frac (k/pattern_len) should reject an all-N match"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_max_n_frac_override_allows_all_n_match() {
+        let mut counter = FuzzyPatternCounter::new(
+            pc(&[b"ACGTACGTACGT"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+            Some(1.0),
+        );
+
+        let primary = b"NNNNNNNNNNNNNNNNNN";
+        let secondary = b"";
+        let mut counts = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary, secondary, &mut counts);
+
+        assert_eq!(
+            counts[0], 1,
+            "max_n_frac=1.0 should disable the N-fraction filter"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_pattern_counter_max_n_frac_explicit_zero_rejects_any_n() {
+        let mut counter = FuzzyPatternCounter::new(
+            pc(&[b"AAAAAAAA"]),
+            pc(&[]),
+            pc(&[]),
+            1,
+            false,
+            false,
+            Some(0.0),
+        );
+
+        // A single N substituted for an A is within edit distance 1, and would
+        // pass the default k/pattern_len threshold (1/8), but max_n_frac=0.0
+        // should reject any match containing an N.
+        let primary_with_n = b"GGGGAAAAAAANTTTT";
+        let mut counts = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary_with_n, b"", &mut counts);
+        assert_eq!(
+            counts[0], 0,
+            "max_n_frac=0.0 should reject a match containing any N"
+        );
+
+        // A match with no N's at all should still be counted.
+        let primary_no_n = b"GGGGAAAAAAAATTTT";
+        let mut counts_clean = vec![0; counter.num_patterns()];
+        counter.count_patterns(primary_no_n, b"", &mut counts_clean);
+        assert_eq!(counts_clean[0], 1);
+    }
+
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_pattern_counter_with_mismatches() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, false, false);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, false, false, None);
 
         // Exact match
         let primary1 = b"GGGGAAAAAAAATTTT";
@@ -330,7 +412,7 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_inexact_only() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, true, false);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 2, true, false, None);
 
         // Exact match (should not count with inexact_only)
         let primary1 = b"GGGGAAAAAAAATTTT";
@@ -354,7 +436,7 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_invert() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, true);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 1, false, true, None);
 
         // Sequence without pattern (should count when inverted)
         let primary1 = b"GGGGCCCCTTTT";
@@ -381,6 +463,7 @@ mod pattern_count_tests {
             1,
             false,
             false,
+            None,
         );
 
         assert_eq!(counter.num_patterns(), 3);
@@ -400,7 +483,7 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_secondary() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[]), pc(&[b"TTTTTTTT"]), pc(&[]), 1, false, false);
+            FuzzyPatternCounter::new(pc(&[]), pc(&[b"TTTTTTTT"]), pc(&[]), 1, false, false, None);
 
         let primary = b"GGGGAAAACCCC";
         let secondary = b"GGGGTTTTTTTTCCCC";
@@ -415,7 +498,7 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_either() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCCCCCC"]), 1, false, false);
+            FuzzyPatternCounter::new(pc(&[]), pc(&[]), pc(&[b"CCCCCCCC"]), 1, false, false, None);
 
         // Test match in primary
         let primary1 = b"GGGGCCCCCCCCTTTT";
@@ -442,6 +525,7 @@ mod pattern_count_tests {
             1,
             false,
             false,
+            None,
         );
 
         let patterns = counter.pattern_strings();
@@ -454,7 +538,7 @@ mod pattern_count_tests {
     #[test]
     fn test_fuzzy_pattern_counter_edit_distance_zero() {
         let mut counter =
-            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 0, false, false);
+            FuzzyPatternCounter::new(pc(&[b"AAAAAAAA"]), pc(&[]), pc(&[]), 0, false, false, None);
 
         // Exact match (should count)
         let primary1 = b"GGGGAAAAAAAATTTT";

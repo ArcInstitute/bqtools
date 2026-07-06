@@ -5,7 +5,9 @@ use fixedbitset::FixedBitSet;
 use log::error;
 use sassy::{profiles::Iupac, EncodedPatterns, Match, Searcher};
 
-use crate::commands::{grep::PatternCollection, split::splitter::SequenceSplit};
+use crate::commands::{
+    grep::PatternCollection, split::splitter::SequenceSplit, utils::default_max_n_frac,
+};
 
 type Profile = Iupac;
 
@@ -57,16 +59,29 @@ impl FuzzySplitter {
         pat: &PatternCollection,
         k: usize,
         inexact: bool,
+        max_n_frac: Option<f32>,
     ) -> Result<Self> {
         // sassy requires uniform pattern lengths within a searcher
         validate_single_pattern_length(&pat1.bytes())?;
         validate_single_pattern_length(&pat2.bytes())?;
         validate_single_pattern_length(&pat.bytes())?;
 
+        // default max_n_frac (when unset) is k/pattern_length, computed per
+        // pattern set since their pattern lengths may differ
+        let frac1 = max_n_frac.unwrap_or_else(|| {
+            default_max_n_frac(k, pat1.iter().next().map_or(0, |p| p.sequence.len()))
+        });
+        let frac2 = max_n_frac.unwrap_or_else(|| {
+            default_max_n_frac(k, pat2.iter().next().map_or(0, |p| p.sequence.len()))
+        });
+        let frac = max_n_frac.unwrap_or_else(|| {
+            default_max_n_frac(k, pat.iter().next().map_or(0, |p| p.sequence.len()))
+        });
+
         // initialize a searcher for each pattern collection
-        let mut searcher_1 = Searcher::new_fwd();
-        let mut searcher_2 = Searcher::new_fwd();
-        let mut searcher = Searcher::new_fwd();
+        let mut searcher_1 = Searcher::new_fwd().with_max_n_frac(frac1);
+        let mut searcher_2 = Searcher::new_fwd().with_max_n_frac(frac2);
+        let mut searcher = Searcher::new_fwd().with_max_n_frac(frac);
 
         // encode the patterns for each collection/searcher combination
         let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(&pat1.bytes()));
@@ -244,4 +259,54 @@ fn validate_single_pattern_length(patterns: &[Vec<u8>]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FuzzySplitter;
+    use crate::commands::grep::Pattern;
+    use crate::commands::{grep::PatternCollection, split::splitter::SequenceSplit};
+
+    fn pc(patterns: &[&[u8]], name: &str) -> PatternCollection {
+        PatternCollection(
+            patterns
+                .iter()
+                .map(|p| Pattern {
+                    name: Some(name.to_string()),
+                    sequence: p.to_vec(),
+                })
+                .collect(),
+        )
+    }
+
+    // Mirrors https://github.com/RagnarGrootKoerkamp/sassy/issues/66: the Iupac
+    // profile treats `N` as a wildcard, so without an N-fraction filter a needle
+    // matches a haystack made entirely of `N`s.
+    #[test]
+    fn test_fuzzy_splitter_default_max_n_frac_rejects_all_n_match() {
+        let pat1 = pc(&[b"ACGTACGTACGT"], "alias");
+        let empty = PatternCollection(vec![]);
+        let mut splitter = FuzzySplitter::new(&pat1, &empty, &empty, 1, false, None).unwrap();
+
+        let all_n = b"NNNNNNNNNNNNNNNNNN";
+        assert_eq!(
+            splitter.split_idx(all_n, b""),
+            None,
+            "default max_n_frac (k/pattern_len) should reject an all-N match"
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_splitter_max_n_frac_override_allows_all_n_match() {
+        let pat1 = pc(&[b"ACGTACGTACGT"], "alias");
+        let empty = PatternCollection(vec![]);
+        let mut splitter = FuzzySplitter::new(&pat1, &empty, &empty, 1, false, Some(1.0)).unwrap();
+
+        let all_n = b"NNNNNNNNNNNNNNNNNN";
+        assert_eq!(
+            splitter.split_idx(all_n, b""),
+            Some(0),
+            "max_n_frac=1.0 should disable the N-fraction filter"
+        );
+    }
 }

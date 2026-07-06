@@ -99,3 +99,17 @@ pub fn compress_zstd_passthrough(
     let encoder = encoder.auto_finish();
     Ok(Box::new(encoder))
 }
+
+/// Default `max_n_frac` for fuzzy (sassy) matching: `k / pattern_length`.
+///
+/// Mirrors sassy's semantics for the fraction of `N` bases tolerated within a
+/// match. Falls back to `1.0` (no restriction) when there is no pattern to
+/// measure a length from.
+#[cfg(feature = "fuzzy")]
+pub fn default_max_n_frac(k: usize, pattern_len: usize) -> f32 {
+    if pattern_len == 0 {
+        1.0
+    } else {
+        k as f32 / pattern_len as f32
+    }
+}

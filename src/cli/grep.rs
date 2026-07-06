@@ -191,6 +191,15 @@ pub struct FuzzyArgs {
     /// This will capture matches that are not exact, but are within the specified edit distance.
     #[clap(short = 'i', long)]
     pub inexact: bool,
+
+    /// Maximum fraction of `N` bases allowed within a fuzzy match
+    ///
+    /// Only used with fuzzy matching. Defaults to `k / pattern_length`, computed
+    /// separately for each pattern set (primary/secondary/either) since their
+    /// pattern lengths may differ. Set explicitly to override, e.g. `0.0` to
+    /// reject any `N` in a match, or `1.0` to disable the filter entirely.
+    #[clap(long)]
+    pub max_n_frac: Option<f32>,
 }
 
 #[derive(Parser, Debug)]
