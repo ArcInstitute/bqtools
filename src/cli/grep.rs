@@ -200,8 +200,51 @@ pub struct FuzzyArgs {
     /// separately for each pattern set (primary/secondary/either) since their
     /// pattern lengths may differ. Set explicitly to override, e.g. `0.0` to
     /// reject any `N` in a match, or `1.0` to disable the filter entirely.
-    #[clap(long)]
+    /// Must be between `0.0` and `1.0` (inclusive).
+    #[clap(long, value_parser = parse_max_n_frac)]
     pub max_n_frac: Option<f32>,
+}
+
+#[cfg(feature = "fuzzy")]
+fn parse_max_n_frac(input: &str) -> Result<f32, String> {
+    let value: f32 = input
+        .parse()
+        .map_err(|_| format!("Invalid max-n-frac value: {input}"))?;
+    if !(0.0..=1.0).contains(&value) {
+        return Err(format!(
+            "max-n-frac must be between 0.0 and 1.0 (inclusive), got {value}"
+        ));
+    }
+    Ok(value)
+}
+
+#[cfg(all(test, feature = "fuzzy"))]
+mod max_n_frac_tests {
+    use super::parse_max_n_frac;
+
+    #[test]
+    fn accepts_boundary_and_mid_range_values() {
+        assert_eq!(parse_max_n_frac("0.0"), Ok(0.0));
+        assert_eq!(parse_max_n_frac("1.0"), Ok(1.0));
+        assert_eq!(parse_max_n_frac("0.5"), Ok(0.5));
+    }
+
+    #[test]
+    fn rejects_negative_values() {
+        assert!(parse_max_n_frac("-1.0").is_err());
+        assert!(parse_max_n_frac("-0.001").is_err());
+    }
+
+    #[test]
+    fn rejects_values_above_one() {
+        assert!(parse_max_n_frac("1.001").is_err());
+        assert!(parse_max_n_frac("5.0").is_err());
+    }
+
+    #[test]
+    fn rejects_unparseable_input() {
+        assert!(parse_max_n_frac("not-a-number").is_err());
+    }
 }
 
 #[derive(Parser, Debug)]
