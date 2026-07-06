@@ -110,7 +110,7 @@ pub fn default_max_n_frac(k: usize, pattern_len: usize) -> f32 {
     if pattern_len == 0 {
         1.0
     } else {
-        k as f32 / pattern_len as f32
+        (k as f32 / pattern_len as f32).min(1.0)
     }
 }
 
