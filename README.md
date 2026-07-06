@@ -328,6 +328,17 @@ bqtools grep input.bq "ACGTACGT" -z -k2
 bqtools grep input.bq "ACGTACGT" -zi
 ```
 
+Fuzzy matching also filters out matches with too many ambiguous `N` bases, controlled by `--max-n-frac`.
+By default this is `k / pattern_length` (computed separately for each of the primary/secondary/either pattern sets), but it can be set explicitly:
+
+```bash
+# Reject any match containing an N
+bqtools grep input.bq "ACGTACGT" -z --max-n-frac 0.0
+
+# Disable the N-fraction filter entirely
+bqtools grep input.bq "ACGTACGT" -z --max-n-frac 1.0
+```
+
 `bqtools` can also handle a large collection of patterns which can be provided on the CLI as a file.
 Pattern files can be **plain text** (one pattern per line), **FASTA** (sequences are used as patterns), or **TSV** (two columns: alias and pattern). The format is auto-detected.
 For FASTA and TSV files the header/alias is used as the pattern name in output; plain text patterns use the pattern string itself.
