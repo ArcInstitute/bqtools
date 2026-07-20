@@ -69,22 +69,17 @@ impl OutputFile {
     }
 
     pub fn format(&self) -> Result<FileFormat> {
-        let format = if let Some(format) = self.format {
-            format
-        } else if let Some(path) = self.output.as_ref() {
-            FileFormat::from_path(path)
-                .ok_or_else(|| anyhow::anyhow!("Could not infer file format."))?
+        if let Some(format) = self.format {
+            Ok(format)
         } else {
-            FileFormat::Tsv
-        };
-
-        if format == FileFormat::Bam {
-            anyhow::bail!(
-                "BAM output is not supported here; use FASTA (-f a), FASTQ (-f q), or TSV (-f t) instead"
-            );
+            if let Some(path) = self.output.as_ref() {
+                if let Some(format) = FileFormat::from_path(path) {
+                    return Ok(format);
+                }
+                bail!("Could not infer file format.")
+            }
+            Ok(FileFormat::Tsv)
         }
-
-        Ok(format)
     }
 
     /// Returns the number of threads to use for parallel compression
