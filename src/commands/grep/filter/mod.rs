@@ -321,7 +321,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_basic() {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None).unwrap();
 
         // Exact match
         let seq_exact = b"GGGGAAAAAAAATTTT";
@@ -347,7 +347,7 @@ mod matcher_unit_tests {
 
         // Test with k=0 (exact match only)
         let mut matcher_k0 =
-            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 0, false, 0).unwrap();
+            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 0, false, 0, None).unwrap();
         let seq_exact = b"GGGGAAAAAAAATTTT";
         let seq_mismatch = b"GGGGAAAAACAATTTT";
         let mut matches1 = HashSet::new();
@@ -357,7 +357,7 @@ mod matcher_unit_tests {
         assert!(!matcher_k0.match_primary(seq_mismatch, &mut matches2, true));
 
         // Test with k=2 (up to 2 edits)
-        let mut matcher_k2 = FuzzyMatcher::new(&pat1, &vec![], &vec![], 2, false, 0).unwrap();
+        let mut matcher_k2 = FuzzyMatcher::new(&pat1, &vec![], &vec![], 2, false, 0, None).unwrap();
         let mut matches3 = HashSet::new();
 
         assert!(matcher_k2.match_primary(seq_mismatch, &mut matches3, true));
@@ -367,7 +367,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_inexact_only() {
         let pat1 = vec![b"AAAAAAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 2, true, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 2, true, 0, None).unwrap();
 
         // Exact match should not be reported with inexact_only
         let seq_exact = b"GGGGAAAAAAAATTTT";
@@ -380,11 +380,110 @@ mod matcher_unit_tests {
         assert!(matcher.match_primary(seq_inexact, &mut matches2, true));
     }
 
+    // Mirrors https://github.com/RagnarGrootKoerkamp/sassy/issues/66: the Iupac
+    // profile treats `N` as a wildcard, so without an N-fraction filter a needle
+    // matches a haystack made entirely of `N`s.
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_default_max_n_frac_rejects_all_n_match() {
+        let pat1 = vec![b"ACGTACGTACGT".to_vec()];
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None).unwrap();
+
+        let all_n = b"NNNNNNNNNNNNNNNNNN";
+        let mut matches = HashSet::new();
+        assert!(
+            !matcher.match_primary(all_n, &mut matches, true),
+            "default max_n_frac (k/pattern_len) should reject an all-N match"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_max_n_frac_override_allows_all_n_match() {
+        let pat1 = vec![b"ACGTACGTACGT".to_vec()];
+        let mut matcher =
+            FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, Some(1.0)).unwrap();
+
+        let all_n = b"NNNNNNNNNNNNNNNNNN";
+        let mut matches = HashSet::new();
+        assert!(
+            matcher.match_primary(all_n, &mut matches, true),
+            "max_n_frac=1.0 should disable the N-fraction filter"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_max_n_frac_explicit_zero_rejects_any_n() {
+        let pat1 = vec![b"AAAAAAAA".to_vec()];
+        let mut matcher =
+            FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, Some(0.0)).unwrap();
+
+        // A single N substituted for an A is within edit distance 1, and would
+        // pass the default k/pattern_len threshold (1/8), but max_n_frac=0.0
+        // should reject any match containing an N.
+        let seq_with_n = b"GGGGAAAAAAANTTTT";
+        let mut matches = HashSet::new();
+        assert!(
+            !matcher.match_primary(seq_with_n, &mut matches, true),
+            "max_n_frac=0.0 should reject a match containing any N"
+        );
+
+        // A match with no N's at all should still be found.
+        let seq_no_n = b"GGGGAAAAAAAATTTT";
+        let mut matches_clean = HashSet::new();
+        assert!(matcher.match_primary(seq_no_n, &mut matches_clean, true));
+    }
+
+    // sassy's `Searcher::encode_patterns` panics (`assert!`) when a pattern set
+    // contains mixed lengths; these tests confirm we catch that up front and
+    // return an `Err` instead of letting the panic reach the caller.
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_rejects_mismatched_pattern_lengths_primary() {
+        let pat1 = vec![b"AAAA".to_vec(), b"AAAAA".to_vec()];
+        let result = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None);
+        assert!(
+            result.is_err(),
+            "mismatched primary pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_rejects_mismatched_pattern_lengths_secondary() {
+        let pat2 = vec![b"AAAA".to_vec(), b"AAAAA".to_vec()];
+        let result = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, 0, None);
+        assert!(
+            result.is_err(),
+            "mismatched secondary pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_rejects_mismatched_pattern_lengths_either() {
+        let pat = vec![b"AAAA".to_vec(), b"AAAAA".to_vec()];
+        let result = FuzzyMatcher::new(&vec![], &vec![], &pat, 1, false, 0, None);
+        assert!(
+            result.is_err(),
+            "mismatched either-set pattern lengths should error, not panic"
+        );
+    }
+
+    #[cfg(feature = "fuzzy")]
+    #[test]
+    fn test_fuzzy_matcher_accepts_uniform_pattern_lengths() {
+        let pat1 = vec![b"AAAA".to_vec(), b"TTTT".to_vec(), b"CCCC".to_vec()];
+        let result = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None);
+        assert!(result.is_ok(), "uniform pattern lengths should not error");
+    }
+
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_matcher_secondary() {
         let pat2 = vec![b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, 0, None).unwrap();
 
         let sequence = b"GGGGTTTTTTTTCCCC";
         let mut matches = HashSet::new();
@@ -396,7 +495,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_either() {
         let pat = vec![b"CCCCCCCC".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&vec![], &vec![], &pat, 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &vec![], &pat, 1, false, 0, None).unwrap();
 
         let primary = b"GGGGAAAATTTT";
         let secondary = b"GGGGCCCCCCCCTTTT";
@@ -414,7 +513,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_and_logic() {
         let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None).unwrap();
 
         // Sequence with both patterns
         let seq_both = b"AAAAAAAATTTTTTTT";
@@ -431,7 +530,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_or_logic() {
         let pat1 = vec![b"AAAAAAAA".to_vec(), b"TTTTTTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, 0, None).unwrap();
 
         // Sequence with only one pattern
         let seq = b"AAAAAAAACCCCCCCC";
@@ -442,7 +541,7 @@ mod matcher_unit_tests {
     #[cfg(feature = "fuzzy")]
     #[test]
     fn test_fuzzy_matcher_empty_patterns() {
-        let mut matcher = FuzzyMatcher::new(&vec![], &vec![], &vec![], 1, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&vec![], &vec![], &vec![], 1, false, 0, None).unwrap();
 
         let sequence = b"GGGGAAAATTTT";
         let mut matches = HashSet::new();
@@ -607,7 +706,7 @@ mod matcher_unit_tests {
     #[test]
     fn test_fuzzy_matcher_offset_zero() {
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 0, false, 0).unwrap();
+        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 0, false, 0, None).unwrap();
 
         let sequence = b"GGGGAAAAATTTT";
         let mut matches = HashSet::new();
@@ -627,7 +726,7 @@ mod matcher_unit_tests {
         let offset = 15;
         let pat1 = vec![b"AAAA".to_vec()];
         let mut matcher =
-            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 1, false, offset).unwrap();
+            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 1, false, offset, None).unwrap();
 
         let sequence = b"GGGGAAAAATTTT";
         let mut matches = HashSet::new();
@@ -639,7 +738,7 @@ mod matcher_unit_tests {
 
         // Create a matcher with offset=0 to get the baseline positions
         let mut baseline_matcher =
-            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 1, false, 0).unwrap();
+            FuzzyMatcher::new(&pat1.clone(), &vec![], &vec![], 1, false, 0, None).unwrap();
         let mut baseline_matches = HashSet::new();
         baseline_matcher.match_primary(sequence, &mut baseline_matches, true);
         let baseline_match = baseline_matches.iter().next().unwrap();
@@ -673,7 +772,8 @@ mod matcher_unit_tests {
     fn test_fuzzy_matcher_offset_with_mismatch() {
         let offset = 8;
         let pat1 = vec![b"AAAA".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, offset).unwrap();
+        let mut matcher =
+            FuzzyMatcher::new(&pat1, &vec![], &vec![], 1, false, offset, None).unwrap();
 
         // One mismatch in the pattern
         let sequence = b"GGGGAACAATTTT";
@@ -696,7 +796,8 @@ mod matcher_unit_tests {
     fn test_fuzzy_matcher_offset_secondary() {
         let offset = 12;
         let pat2 = vec![b"TTTT".to_vec()];
-        let mut matcher = FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, offset).unwrap();
+        let mut matcher =
+            FuzzyMatcher::new(&vec![], &pat2, &vec![], 1, false, offset, None).unwrap();
 
         let sequence = b"GGGGTTTTCCCC";
         let mut matches = HashSet::new();

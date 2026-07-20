@@ -113,7 +113,8 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.invert,
-        );
+            args.grep.fuzzy_args.max_n_frac,
+        )?;
         return Ok(PatternCounter::Fuzzy(Box::new(counter)));
     }
 
@@ -174,6 +175,7 @@ fn build_matcher(args: &GrepCommand) -> Result<(PatternMatcher, bool)> {
             args.grep.fuzzy_args.distance,
             args.grep.fuzzy_args.inexact,
             args.grep.range.map_or(0, |r| r.offset()),
+            args.grep.fuzzy_args.max_n_frac,
         )?;
         return Ok((PatternMatcher::Fuzzy(Box::new(matcher)), and_logic));
     }

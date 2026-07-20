@@ -1,7 +1,10 @@
 use super::{PatternCollection, PatternCount};
 
+use anyhow::Result;
 use fixedbitset::FixedBitSet;
 use sassy::{profiles::Iupac, EncodedPatterns, Match, Searcher};
+
+use crate::commands::utils::build_fuzzy_searcher;
 
 type Profile = Iupac;
 
@@ -40,16 +43,12 @@ impl FuzzyPatternCounter {
         k: usize,
         inexact: bool,
         invert: bool,
-    ) -> Self {
-        // initialize a searcher for each pattern collection
-        let mut searcher_1 = Searcher::new_fwd();
-        let mut searcher_2 = Searcher::new_fwd();
-        let mut searcher = Searcher::new_fwd();
-
-        // encode the patterns for each collection/searcher combination
-        let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(&pat1.bytes()));
-        let enc_pat2 = (!pat2.is_empty()).then(|| searcher_2.encode_patterns(&pat2.bytes()));
-        let enc_pat = (!pat.is_empty()).then(|| searcher.encode_patterns(&pat.bytes()));
+        max_n_frac: Option<f32>,
+    ) -> Result<Self> {
+        // validate lengths, resolve max_n_frac, and encode patterns per pattern set
+        let (searcher_1, enc_pat1) = build_fuzzy_searcher(&pat1.bytes(), k, max_n_frac)?;
+        let (searcher_2, enc_pat2) = build_fuzzy_searcher(&pat2.bytes(), k, max_n_frac)?;
+        let (searcher, enc_pat) = build_fuzzy_searcher(&pat.bytes(), k, max_n_frac)?;
 
         let bits1 = FixedBitSet::with_capacity(pat1.len());
         let bits2 = FixedBitSet::with_capacity(pat2.len());
@@ -58,7 +57,7 @@ impl FuzzyPatternCounter {
         // combine all patterns into a single collection for reporting
         let all_patterns = PatternCollection(pat1.into_iter().chain(pat2).chain(pat).collect());
 
-        Self {
+        Ok(Self {
             pat1: enc_pat1,
             pat2: enc_pat2,
             pat: enc_pat,
@@ -72,7 +71,7 @@ impl FuzzyPatternCounter {
             searcher_1,
             searcher_2,
             searcher,
-        }
+        })
     }
 
     fn match_primary(&mut self, sequence: &[u8]) {

@@ -2,8 +2,9 @@ use super::{MatchRanges, PatternMatch};
 
 use anyhow::Result;
 use fixedbitset::FixedBitSet;
-use log::error;
 use sassy::{profiles::Iupac, EncodedPatterns, Searcher};
+
+use crate::commands::utils::build_fuzzy_searcher;
 
 type Profile = Iupac;
 type Patterns = Vec<Vec<u8>>;
@@ -47,21 +48,12 @@ impl FuzzyMatcher {
         k: usize,
         inexact: bool,
         offset: usize,
+        max_n_frac: Option<f32>,
     ) -> Result<Self> {
-        // initialize a searcher for each pattern collection
-        let mut searcher_1 = Searcher::new_fwd();
-        let mut searcher_2 = Searcher::new_fwd();
-        let mut searcher = Searcher::new_fwd();
-
-        // validate pattern lengths
-        validate_single_pattern_length(pat1)?;
-        validate_single_pattern_length(pat2)?;
-        validate_single_pattern_length(pat)?;
-
-        // encode the patterns for each collection/searcher combination
-        let enc_pat1 = (!pat1.is_empty()).then(|| searcher_1.encode_patterns(pat1));
-        let enc_pat2 = (!pat2.is_empty()).then(|| searcher_2.encode_patterns(pat2));
-        let enc_pat = (!pat.is_empty()).then(|| searcher.encode_patterns(pat));
+        // validate lengths, resolve max_n_frac, and encode patterns per pattern set
+        let (searcher_1, enc_pat1) = build_fuzzy_searcher(pat1, k, max_n_frac)?;
+        let (searcher_2, enc_pat2) = build_fuzzy_searcher(pat2, k, max_n_frac)?;
+        let (searcher, enc_pat) = build_fuzzy_searcher(pat, k, max_n_frac)?;
 
         // initialize fixed-bitsets for each pattern collection
         let bs1 = FixedBitSet::with_capacity(pat1.len());
@@ -215,19 +207,4 @@ impl PatternMatch for FuzzyMatcher {
             true
         }
     }
-}
-
-fn validate_single_pattern_length(patterns: &Patterns) -> Result<()> {
-    if patterns.len() < 2 {
-        return Ok(());
-    }
-    let plen = patterns[0].len();
-    for pattern in patterns {
-        if pattern.len() != plen {
-            error!("Multiple pattern lengths provided - currently cannot handle variable-length patterns in fuzzy matching");
-            return Err(anyhow::anyhow!("Pattern length mismatch"));
-        }
-    }
-
-    Ok(())
 }
