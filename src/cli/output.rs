@@ -76,7 +76,7 @@ impl OutputFile {
                 if let Some(format) = FileFormat::from_path(path) {
                     return Ok(format);
                 }
-                bail!("Could not infer file format.")
+                anyhow::bail!("Could not infer file format.")
             }
             Ok(FileFormat::Tsv)
         }
