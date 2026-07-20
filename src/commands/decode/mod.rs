@@ -152,6 +152,34 @@ mod tests {
         Ok(())
     }
 
+    /// Requesting BAM output on decode must fail cleanly instead of panicking.
+    ///
+    /// `write_record` has no BAM implementation (only encode reads BAM via
+    /// htslib); decode previously let this reach worker threads and panic
+    /// with `unimplemented!`, which then poisoned shared reader state and
+    /// cascaded into a second panic on the main thread.
+    #[test]
+    fn test_decode_bam_output_rejected() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let out_tmp = NamedTempFile::with_suffix(".bam")?;
+        let cmd = crate::cli::DecodeCommand::try_parse_from([
+            "decode",
+            bq_tmp.path().to_str().unwrap(),
+            "-o",
+            out_tmp.path().to_str().unwrap(),
+            "-f",
+            "b",
+        ])?;
+        assert!(
+            super::run(&cmd).is_err(),
+            "decode to BAM should return an error, not panic"
+        );
+        Ok(())
+    }
+
     #[test]
     fn test_decode_output_formats() -> Result<()> {
         let in_tmp = write_fastx().call()?;
