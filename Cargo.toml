@@ -11,9 +11,9 @@ keywords = ["bioinformatics", "binseq", "fastx", "file-format", "sequencing"]
 
 [dependencies]
 aho-corasick = "1.1.4"
-anyhow = "1.0.103"
-binseq = "0.9.3"
-clap = { version = "4.6.1", features = ["derive"] }
+anyhow = "1.0.104"
+binseq = "0.9.4"
+clap = { version = "4.6.3", features = ["derive"] }
 csv = "1.4.0"
 env_logger = "0.11.11"
 fixedbitset = "0.5.7"
@@ -26,13 +26,13 @@ memmap2 = "0.9.11"
 niffler = "3.0.1"
 nix = { version = "0.31.3", features = ["fs"] }
 num_cpus = "1.17.0"
-paraseq = "0.4.13"
+paraseq = "0.4.14"
 parking_lot = "0.12.5"
 rand = "0.10.2"
-regex = "1.12.4"
+regex = "1.13.1"
 sassy = { version = "0.2.6", default-features = false, optional = true }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 thousands = "0.2.0"
 walkdir = "2.5.0"
 zstd = { version = "0.13.3", features = ["zstdmt"] }
