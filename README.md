@@ -322,6 +322,16 @@ complementing a regex is undefined.
 bqtools grep input.bq "ACGTACGT" --rc
 ```
 
+Patterns can be matched against the record header instead of the sequence with `--header`/`-H`.
+This conflicts with `--rc` (reverse complement is undefined for header text) and `--range`
+(a coordinate range is meaningless against header text). Colorized output is also disabled in
+this mode, since match positions would refer to the header rather than the sequence.
+
+```bash
+# Search for a substring in the header instead of the sequence
+bqtools grep input.bq "sample_alpha" --header -x
+```
+
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
 
 This requires installing using the `fuzzy` feature flag (see installation above).
@@ -403,6 +413,7 @@ Some important notes are:
 3. Providing multiple patterns will match records with `OR` logic (this is different behavior from `bqtools grep` default which uses `AND` logic when multiple patterns are provided)
 4. Regular expressions are supported and treated as a single pattern (e.g. `ACGT|TCGA` will return a single output row but match on both `ACGT` and `TCGA`).
 5. Invert is supported for counting patterns and will return the number of records a pattern does not occur in.
+6. `--header` is supported and counts matches against the record header instead of the sequence.
 
 If your patterns are all fixed strings (and not regex), you can improve performance by using the `-x/--fixed` flag.
 This will use the more efficient [Aho-Corasick algorithm](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) to match patterns.
