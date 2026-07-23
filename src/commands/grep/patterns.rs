@@ -32,18 +32,16 @@ impl Pattern {
                 String::from_utf8_lossy(&self.sequence)
             );
         }
-        self.sequence = self
-            .sequence
-            .iter()
-            .rev()
-            .map(|b| match b {
+        self.sequence.reverse();
+        self.sequence.iter_mut().for_each(|b| {
+            *b = match b {
                 b'A' => b'T',
                 b'T' => b'A',
                 b'C' => b'G',
                 b'G' => b'C',
                 _ => unreachable!("is_fixed guarantees only ACGT bytes"),
-            })
-            .collect();
+            }
+        });
         Ok(())
     }
 }
