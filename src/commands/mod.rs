@@ -9,5 +9,6 @@ pub mod revcomp;
 pub mod sample;
 pub mod split;
 mod utils;
+pub mod verify;
 
 pub use utils::{compress_passthrough, match_output, CompressionType};

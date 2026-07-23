@@ -53,6 +53,7 @@ fn main() -> Result<()> {
         Commands::Pipe(ref pipe) => commands::pipe::run(pipe),
         Commands::Qc(ref qc) => commands::qc::run(qc),
         Commands::Revcomp(ref revcomp) => commands::revcomp::run(revcomp),
+        Commands::Verify(ref verify) => commands::verify::run(verify),
     }?;
     trace!("done");
     Ok(())

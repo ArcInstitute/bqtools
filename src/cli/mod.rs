@@ -12,6 +12,7 @@ mod qc;
 mod revcomp;
 mod sample;
 mod split;
+mod verify;
 
 pub use cat::CatCommand;
 pub use cli::{Cli, Commands};
@@ -29,3 +30,4 @@ pub use qc::{QcCommand, QcOptions};
 pub use revcomp::RevcompCommand;
 pub use sample::SampleCommand;
 pub use split::SplitCommand;
+pub use verify::{VerifyCommand, VerifyOptions};
