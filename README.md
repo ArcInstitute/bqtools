@@ -46,6 +46,7 @@ It is the _fastest_ variant but _is lossy_ by design.
 - **Split**: Split a BINSEQ file into multiple files based on matching patterns.
 - **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ, optionally spawning and supervising the consumer commands directly (`-x`/`-X`).
 - **Revcomp**: Reverse complement the sequences in a BINSEQ file.
+- **Verify**: Compute an order-independent checksum over a BINSEQ file.
 
 ## Installation
 
@@ -120,6 +121,7 @@ bqtools split --help
 bqtools pipe --help
 bqtools qc --help
 bqtools revcomp --help
+bqtools verify --help
 ```
 
 ### Encoding
@@ -300,6 +302,52 @@ bqtools info input.cbq --json
 
 > Note: using `info` without the `--json` flag will format the number of records to include underscores to delimit the thousands.
 > To avoid this behavior or to pass raw numerical values forward use the `--json` flag.
+
+### Verify
+
+Compute a checksum over a BINSEQ file to confirm its contents. Because BINSEQ files are
+frequently produced by parallel encoders, record order is not guaranteed to match the input
+FASTQ/FASTA. `verify` accounts for this by hashing each record independently (with `xxh3-64`)
+and combining the per-record hashes with a commutative operation (wrapping sum), so the
+resulting checksum is identical regardless of record order.
+
+```bash
+bqtools verify input.cbq
+```
+
+This prints a tab-separated `<checksum>  <num_records>  <path>`, so two files (or two encode
+runs of the same input) can be confirmed to carry the same data - even if a parallel encoder
+wrote them in different record orders - by comparing checksums:
+
+```bash
+bqtools verify original.cbq
+bqtools verify reencoded.cbq
+```
+
+By default the checksum covers sequence, quality, headers, and the record flag. Use the
+`--skip-*` flags to exclude fields you don't care about (e.g. to ignore header differences
+introduced by a re-encode):
+
+```bash
+bqtools verify input.cbq --skip-headers
+bqtools verify input.cbq --skip-qual --skip-flags
+```
+
+For paired files, both mates are included by default. Use `-M/--mate` to restrict the checksum
+to a single mate:
+
+```bash
+bqtools verify input.cbq -M 1
+```
+
+Export the checksum report (including the field list, mate, and algorithm) as JSON with `--json`:
+
+```bash
+bqtools verify input.cbq --json
+```
+
+> Note: `verify`'s checksum is a fast integrity/reorder check (via `xxh3-64`), not a
+> cryptographic digest - it is not designed to detect deliberate tampering.
 
 ### Grep
 
