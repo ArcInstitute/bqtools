@@ -47,7 +47,9 @@ pub struct VerifyOptions {
 
     /// Which mate(s) to include in the checksum for paired records
     ///
-    /// Ignored (with a warning) on single-end files.
+    /// `1` and `both` work on single-end files (both resolve to the primary
+    /// channel, which always exists). `2` errors on single-end files, since
+    /// there is no extended/mate-2 channel to checksum.
     ///
     /// Note: `-m` is already used by `--mode` on other commands, so this
     /// flag uses `-M` for consistency with `revcomp`.

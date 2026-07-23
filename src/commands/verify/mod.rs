@@ -2,7 +2,6 @@ mod processor;
 
 use anyhow::{bail, Result};
 use binseq::{BinseqReader, ParallelReader};
-use log::warn;
 use serde::Serialize;
 
 use crate::cli::{Mate, VerifyCommand, VerifyOptions};
@@ -60,8 +59,12 @@ fn compute(args: &VerifyCommand) -> Result<VerifyResult> {
     let fields = field_mask(&args.opts)?;
 
     let reader = BinseqReader::new(args.input.path())?;
-    if !reader.is_paired() && args.opts.mate != Mate::Both {
-        warn!("Ignoring `--mate/-M` flag as only single channel found in file");
+    if args.opts.mate == Mate::Two && !reader.is_paired() {
+        bail!(
+            "`--mate/-M 2` was requested but `{}` is single-channel (no extended/mate-2 \
+             sequence); the checksum would be computed over no fields",
+            args.input.path()
+        );
     }
 
     let processor = VerifyProcessor::new(fields, args.opts.mate);
@@ -246,6 +249,23 @@ mod tests {
             assert_ne!(both, mate2, "mode={mode:?}");
             assert_ne!(mate1, mate2, "mode={mode:?}");
         }
+        Ok(())
+    }
+
+    /// Requesting mate 2 on a single-channel (unpaired) file must hard-error
+    /// rather than silently produce a checksum over no fields. Mate 1 and
+    /// mate "both" are unaffected, since the primary channel always exists.
+    #[test]
+    fn test_verify_rejects_mate_two_on_single_channel_file() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let err = checksum(bq_tmp.path(), &["-M", "2"]).unwrap_err();
+        assert!(err.to_string().contains("--mate/-M 2"));
+
+        assert!(checksum(bq_tmp.path(), &["-M", "1"]).is_ok());
+        assert!(checksum(bq_tmp.path(), &["-M", "both"]).is_ok());
         Ok(())
     }
 
