@@ -5,6 +5,7 @@ pub mod grep;
 pub mod info;
 pub mod pipe;
 pub mod qc;
+pub mod revcomp;
 pub mod sample;
 pub mod split;
 mod utils;
