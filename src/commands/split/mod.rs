@@ -29,7 +29,12 @@ impl AllPatterns {
 }
 
 fn load_patterns(args: &SplitCommand) -> Result<AllPatterns> {
-    let (pat1, pat2, pat) = args.patterns.load_all_patterns()?;
+    let (mut pat1, mut pat2, mut pat) = args.patterns.load_all_patterns()?;
+    if args.split.rc {
+        pat1.reverse_complement()?;
+        pat2.reverse_complement()?;
+        pat.reverse_complement()?;
+    }
     Ok(AllPatterns { pat1, pat2, pat })
 }
 
@@ -285,6 +290,78 @@ mod tests {
         let matched_path = out_dir.path().join("universal_pattern.cbq");
         assert!(matched_path.exists(), "expected universal_pattern.cbq");
         assert_eq!(count_binseq(&matched_path)?, DEFAULT_NUM_RECORDS);
+
+        Ok(())
+    }
+
+    /// `--rc` should reverse complement file patterns before matching: a
+    /// pattern file containing the reverse complement of a known substring
+    /// should match reads containing that substring directly.
+    #[test]
+    fn test_split_rc_matches_reverse_complement() -> Result<()> {
+        // "GATTACA" is not a palindrome; its reverse complement is "TGTAATC".
+        let seq = "ACGTACGTGATTACAACGTACGT";
+        let in_tmp = NamedTempFile::with_suffix(".fastq")?;
+        {
+            let mut f = std::fs::File::create(in_tmp.path())?;
+            writeln!(f, "@read1")?;
+            writeln!(f, "{seq}")?;
+            writeln!(f, "+")?;
+            writeln!(f, "{}", "I".repeat(seq.len()))?;
+        }
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let pat_file = write_patterns(&["TGTAATC"])?;
+        let out_dir = tempfile::tempdir()?;
+
+        let cmd = crate::cli::SplitCommand::try_parse_from([
+            "split",
+            bq_tmp.path().to_str().unwrap(),
+            "--file",
+            pat_file.path().to_str().unwrap(),
+            "--basepath",
+            out_dir.path().to_str().unwrap(),
+            "--skip-unmatched",
+            "--quiet",
+            "--rc",
+        ])?;
+        super::run(&cmd)?;
+
+        // The pattern is reverse complemented to "GATTACA" before matching,
+        // and the output alias reflects the RC'd sequence.
+        let matched_path = out_dir.path().join("GATTACA.cbq");
+        assert!(matched_path.exists(), "expected GATTACA.cbq after --rc");
+        assert_eq!(count_binseq(&matched_path)?, 1);
+
+        Ok(())
+    }
+
+    /// `--rc` must reject regex patterns, since reverse complementing a
+    /// regex is undefined.
+    #[test]
+    fn test_split_rc_rejects_regex_pattern() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let pat_file = write_patterns(&["AC.GT"])?;
+        let out_dir = tempfile::tempdir()?;
+
+        let cmd = crate::cli::SplitCommand::try_parse_from([
+            "split",
+            bq_tmp.path().to_str().unwrap(),
+            "--file",
+            pat_file.path().to_str().unwrap(),
+            "--basepath",
+            out_dir.path().to_str().unwrap(),
+            "--quiet",
+            "--rc",
+        ])?;
+        assert!(
+            super::run(&cmd).is_err(),
+            "--rc should reject regex patterns"
+        );
 
         Ok(())
     }

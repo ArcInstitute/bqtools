@@ -45,6 +45,8 @@ It is the _fastest_ variant but _is lossy_ by design.
 - **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
 - **Split**: Split a BINSEQ file into multiple files based on matching patterns.
 - **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ, optionally spawning and supervising the consumer commands directly (`-x`/`-X`).
+- **Revcomp**: Reverse complement the sequences in a BINSEQ file.
+- **Verify**: Compute an order-independent checksum over a BINSEQ file.
 
 ## Installation
 
@@ -118,6 +120,8 @@ bqtools grep --help
 bqtools split --help
 bqtools pipe --help
 bqtools qc --help
+bqtools revcomp --help
+bqtools verify --help
 ```
 
 ### Encoding
@@ -257,6 +261,28 @@ Combine multiple BINSEQ files:
 bqtools cat file1.bq file2.bq file3.bq -o combined.bq
 ```
 
+> Note: `cat`, `revcomp`, and other commands that write BINSEQ output require either `-o/--output`
+> or an explicit `--pipe` flag; binary BINSEQ data is never written to stdout implicitly.
+
+### Reverse Complementing
+
+Reverse complement the sequences in a BINSEQ file, preserving its format and configuration:
+
+```bash
+bqtools revcomp input.cbq -o output.cbq
+```
+
+For paired files, both mates are reverse complemented by default. Use `-M/--mate` to
+reverse complement only one of the two mates (the other is left untouched):
+
+```bash
+# Only reverse complement mate 1
+bqtools revcomp input.cbq -o output.cbq -M 1
+
+# Only reverse complement mate 2
+bqtools revcomp input.cbq -o output.cbq -M 2
+```
+
 ### Information and Statistics
 
 Show information and statistics about a BINSEQ file.
@@ -276,6 +302,52 @@ bqtools info input.cbq --json
 
 > Note: using `info` without the `--json` flag will format the number of records to include underscores to delimit the thousands.
 > To avoid this behavior or to pass raw numerical values forward use the `--json` flag.
+
+### Verify
+
+Compute a checksum over a BINSEQ file to confirm its contents. Because BINSEQ files are
+frequently produced by parallel encoders, record order is not guaranteed to match the input
+FASTQ/FASTA. `verify` accounts for this by hashing each record independently (with `xxh3-64`)
+and combining the per-record hashes with a commutative operation (wrapping sum), so the
+resulting checksum is identical regardless of record order.
+
+```bash
+bqtools verify input.cbq
+```
+
+This prints a tab-separated `<checksum>  <num_records>  <path>`, so two files (or two encode
+runs of the same input) can be confirmed to carry the same data - even if a parallel encoder
+wrote them in different record orders - by comparing checksums:
+
+```bash
+bqtools verify original.cbq
+bqtools verify reencoded.cbq
+```
+
+By default the checksum covers sequence, quality, headers, and the record flag. Use the
+`--skip-*` flags to exclude fields you don't care about (e.g. to ignore header differences
+introduced by a re-encode):
+
+```bash
+bqtools verify input.cbq --skip-headers
+bqtools verify input.cbq --skip-qual --skip-flags
+```
+
+For paired files, both mates are included by default. Use `-M/--mate` to restrict the checksum
+to a single mate:
+
+```bash
+bqtools verify input.cbq -M 1
+```
+
+Export the checksum report (including the field list, mate, and algorithm) as JSON with `--json`:
+
+```bash
+bqtools verify input.cbq --json
+```
+
+> Note: `verify`'s checksum is a fast integrity/reorder check (via `xxh3-64`), not a
+> cryptographic digest - it is not designed to detect deliberate tampering.
 
 ### Grep
 
@@ -311,6 +383,25 @@ bqtools grep input.bq "ACGT[AG]TCCA" --range ..80
 
 # Only search for patterns within a specified range per sequence (basepairs 80-max)
 bqtools grep input.bq "ACGT[AG]TCCA" --range 80..
+```
+
+Patterns can be reverse complemented before matching with `--rc`. This only supports fixed ACGT
+patterns (from CLI arguments or pattern files) — regex patterns are rejected since reverse
+complementing a regex is undefined.
+
+```bash
+# Search for the reverse complement of a fixed pattern
+bqtools grep input.bq "ACGTACGT" --rc
+```
+
+Patterns can be matched against the record header instead of the sequence with `--header`/`-H`.
+This conflicts with `--rc` (reverse complement is undefined for header text) and `--range`
+(a coordinate range is meaningless against header text). Colorized output is also disabled in
+this mode, since match positions would refer to the header rather than the sequence.
+
+```bash
+# Search for a substring in the header instead of the sequence
+bqtools grep input.bq "sample_alpha" --header -x
 ```
 
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
@@ -394,6 +485,7 @@ Some important notes are:
 3. Providing multiple patterns will match records with `OR` logic (this is different behavior from `bqtools grep` default which uses `AND` logic when multiple patterns are provided)
 4. Regular expressions are supported and treated as a single pattern (e.g. `ACGT|TCGA` will return a single output row but match on both `ACGT` and `TCGA`).
 5. Invert is supported for counting patterns and will return the number of records a pattern does not occur in.
+6. `--header` is supported and counts matches against the record header instead of the sequence.
 
 If your patterns are all fixed strings (and not regex), you can improve performance by using the `-x/--fixed` flag.
 This will use the more efficient [Aho-Corasick algorithm](https://en.wikipedia.org/wiki/Aho%E2%80%93Corasick_algorithm) to match patterns.
@@ -435,6 +527,10 @@ A record is only written when it matches exactly one alias; ambiguous records (m
 
 Like `grep`, the backend is auto-selected: fixed-string patterns use Aho-Corasick (or force with `-x/--fixed`), regex patterns use the regex backend, and `-z/--fuzzy` enables fuzzy matching.
 
+Like `grep`, patterns can be reverse complemented before matching with `--rc`. This only supports
+fixed ACGT patterns — regex patterns are rejected since reverse complementing a regex is undefined.
+The output alias reflects the reverse-complemented sequence.
+
 ```bash
 # See full options list
 bqtools split --help
@@ -457,6 +553,9 @@ bqtools split input.cbq --file patterns.fa -z -k2
 
 # Skip writing the unmatched file
 bqtools split input.cbq --file patterns.tsv --skip-unmatched
+
+# Split using the reverse complement of the provided patterns
+bqtools split input.cbq --file patterns.tsv --rc
 ```
 
 Output files with fewer than a minimum number of records are removed (defaults to 1, dropping empty files).

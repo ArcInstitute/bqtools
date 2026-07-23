@@ -31,6 +31,9 @@ pub struct FilterProcessor<Pm: PatternMatch> {
     /// Match within range
     range: Option<SimpleRange>,
 
+    /// Match against the sequence header instead of the sequence
+    header: bool,
+
     /// Local count
     local_count: usize,
 
@@ -72,6 +75,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
         count: bool,
         frac: bool,
         range: Option<SimpleRange>,
+        header: bool,
         writer: SplitWriter,
         format: FileFormat,
         mate: Option<Mate>,
@@ -92,6 +96,7 @@ impl<Pm: PatternMatch> FilterProcessor<Pm> {
             count,
             frac,
             range,
+            header,
             format,
             mate,
             color,
@@ -166,7 +171,12 @@ impl<Pm: PatternMatch> ParallelProcessor for FilterProcessor<Pm> {
 
         let sbuf = record.sseq();
         let xbuf = record.xseq();
-        if self.pattern_match(sbuf, xbuf) {
+        let matched = if self.header {
+            self.pattern_match(record.sheader(), record.xheader())
+        } else {
+            self.pattern_match(sbuf, xbuf)
+        };
+        if matched {
             self.local_count += 1;
             if self.count {
                 // No further processing needed

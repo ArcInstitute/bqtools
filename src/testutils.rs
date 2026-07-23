@@ -59,9 +59,10 @@ fn write_fasta_record<W: Write>(wtr: &mut W, idx: usize, seq: &[u8]) -> Result<(
     Ok(())
 }
 
-fn random_sequence(rng: &mut impl Rng, slen: usize) -> Vec<u8> {
+fn random_sequence(rng: &mut impl Rng, slen: usize, include_n: bool) -> Vec<u8> {
+    let upper = if include_n { 4 } else { 3 };
     (0..slen)
-        .map(|_| match rng.random_range(0..=4) {
+        .map(|_| match rng.random_range(0..=upper) {
             0 => b'A',
             1 => b'C',
             2 => b'G',
@@ -77,13 +78,19 @@ pub fn write_fastx(
     #[builder(default)] comp: Compression,
     #[builder(default = DEFAULT_SEQ_LEN)] slen: usize,
     #[builder(default = DEFAULT_NUM_RECORDS)] nrec: usize,
+    // `bq`/`vbq` (2-bit only) fall back to the encoder's N-substitution
+    // policy, which draws a fresh random replacement per encode run - useful
+    // for exercising that policy, but a confound for tests that need the
+    // *content* to be reproducible across independent encodes (e.g. checking
+    // that record-order shuffling doesn't change a checksum).
+    #[builder(default = true)] include_n: bool,
 ) -> Result<NamedTempFile> {
     let suffix = format!("{}{}", format.fastx_suffix(), comp.suffix());
     let tmp = NamedTempFile::with_suffix(&suffix)?;
     let mut wtr = niffler::to_path(tmp.path(), comp.niffler_format(), Level::Three)?;
     let mut rng = rand::rng();
     for idx in 0..nrec {
-        let seq = random_sequence(&mut rng, slen);
+        let seq = random_sequence(&mut rng, slen, include_n);
         match format {
             FileFormat::Fastq => write_fastq_record(&mut wtr, idx, &seq)?,
             FileFormat::Fasta => write_fasta_record(&mut wtr, idx, &seq)?,

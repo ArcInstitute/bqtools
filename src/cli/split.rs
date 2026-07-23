@@ -60,6 +60,13 @@ pub struct SplitOptions {
     #[clap(short = 'x', long)]
     pub fixed: bool,
 
+    /// Reverse complement all patterns before matching
+    ///
+    /// Only supported for fixed ACGT patterns; regex patterns are rejected
+    /// since reverse complementing a regex is undefined.
+    #[clap(long)]
+    pub rc: bool,
+
     /// Don't use Aho-Corasick DFA (slower, but lower memory)
     #[clap(long)]
     pub no_dfa: bool,
