@@ -516,6 +516,105 @@ mod tests {
         Ok(())
     }
 
+    /// Writes a minimal paired FASTQ record set with the given headers and
+    /// arbitrary-but-distinct ACGT sequences.
+    fn write_paired_fastq(path: &std::path::Path, headers: &[&str]) -> Result<()> {
+        use std::io::Write as _;
+        let bases = [b'A', b'C', b'G', b'T'];
+        let mut f = std::fs::File::create(path)?;
+        for (idx, header) in headers.iter().enumerate() {
+            let seq: String = (0..12).map(|i| bases[(idx + i) % 4] as char).collect();
+            writeln!(f, "@{header}")?;
+            writeln!(f, "{seq}")?;
+            writeln!(f, "+")?;
+            writeln!(f, "{}", "I".repeat(seq.len()))?;
+        }
+        Ok(())
+    }
+
+    /// `-r`/`-R`/positional `--header` patterns must match the primary
+    /// header, extended header, and either header respectively — and must
+    /// NOT cross-match the other mate's header.
+    #[test]
+    fn test_grep_header_respects_primary_extended_either() -> Result<()> {
+        let r1_tmp = NamedTempFile::with_suffix(".fastq")?;
+        let r2_tmp = NamedTempFile::with_suffix(".fastq")?;
+        write_paired_fastq(r1_tmp.path(), &["primary_A", "primary_B", "primary_C"])?;
+        write_paired_fastq(r2_tmp.path(), &["extended_X", "extended_Y", "extended_Z"])?;
+
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        let encode_cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            r1_tmp.path().to_str().unwrap(),
+            r2_tmp.path().to_str().unwrap(),
+            "-o",
+            bq_tmp.path().to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&encode_cmd)?;
+
+        // Counts matched pairs. `--mate` (unset here, defaults to `both`)
+        // also controls which mate's patterns are searched (see
+        // `redistribute_patterns`), so it must stay unset to test `-r`/`-R`
+        // independently; instead, matched pairs are written interleaved
+        // (both mates per match) and the record count is halved.
+        let run = |extra: &[&str]| -> Result<usize> {
+            let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+            let mut args = vec![
+                "grep",
+                bq_tmp.path().to_str().unwrap(),
+                "-o",
+                out_tmp.path().to_str().unwrap(),
+                "--header",
+                "-x",
+            ];
+            args.extend_from_slice(extra);
+            let cmd = crate::cli::GrepCommand::try_parse_from(args)?;
+            super::run(&cmd)?;
+            let records = count_fastx_records(out_tmp.path())?;
+            assert_eq!(records % 2, 0, "expected interleaved R1+R2 pairs");
+            Ok(records / 2)
+        };
+
+        // `-r` searches the primary header only.
+        assert_eq!(
+            run(&["-r", "primary_B"])?,
+            1,
+            "-r should match the primary header it names"
+        );
+        assert_eq!(
+            run(&["-r", "extended_X"])?,
+            0,
+            "-r must not match the extended header"
+        );
+
+        // `-R` searches the extended header only.
+        assert_eq!(
+            run(&["-R", "extended_Z"])?,
+            1,
+            "-R should match the extended header it names"
+        );
+        assert_eq!(
+            run(&["-R", "primary_A"])?,
+            0,
+            "-R must not match the primary header"
+        );
+
+        // A positional (either) pattern matches against whichever header
+        // contains it.
+        assert_eq!(
+            run(&["primary_C"])?,
+            1,
+            "positional pattern should match via the primary header"
+        );
+        assert_eq!(
+            run(&["extended_Y"])?,
+            1,
+            "positional pattern should match via the extended header"
+        );
+
+        Ok(())
+    }
+
     /// `--header` must reject `--rc`, since reverse complementing header text
     /// is undefined.
     #[test]
