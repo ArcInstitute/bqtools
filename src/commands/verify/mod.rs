@@ -2,10 +2,28 @@ mod processor;
 
 use anyhow::{bail, Result};
 use binseq::{BinseqReader, ParallelReader};
+use log::warn;
 use serde::Serialize;
 
 use crate::cli::{Mate, VerifyCommand, VerifyOptions};
 use processor::{FieldMask, VerifyProcessor};
+
+/// Whether `reader`'s underlying file actually stores per-record headers.
+///
+/// BQ never supports headers at all. For VBQ/CBQ files that don't store
+/// them, [`BinseqRecord::sheader`](binseq::BinseqRecord::sheader)/`xheader`
+/// still return *something* - a string synthesized from the record's
+/// position in the file - for use by commands like `decode` that need a
+/// name to print. That fallback must never be hashed by `verify`: it isn't
+/// real header data, and it would leak record order into a checksum that's
+/// supposed to be order-independent.
+fn reader_has_headers(reader: &BinseqReader) -> bool {
+    match reader {
+        BinseqReader::Bq(_) => false,
+        BinseqReader::Vbq(reader) => reader.header().headers,
+        BinseqReader::Cbq(reader) => reader.header().has_headers(),
+    }
+}
 
 fn field_mask(opts: &VerifyOptions) -> Result<FieldMask> {
     let fields = FieldMask {
@@ -56,7 +74,7 @@ struct VerifyResult {
 
 /// Runs the checksum computation without printing, so it can be reused by tests.
 fn compute(args: &VerifyCommand) -> Result<VerifyResult> {
-    let fields = field_mask(&args.opts)?;
+    let mut fields = field_mask(&args.opts)?;
 
     let reader = BinseqReader::new(args.input.path())?;
     if args.opts.mate == Mate::Two && !reader.is_paired() {
@@ -65,6 +83,22 @@ fn compute(args: &VerifyCommand) -> Result<VerifyResult> {
              sequence); the checksum would be computed over no fields",
             args.input.path()
         );
+    }
+
+    if fields.headers && !reader_has_headers(&reader) {
+        fields.headers = false;
+        if fields.seq || fields.qual || fields.flags {
+            warn!(
+                "`{}` has no header data; excluding headers from the checksum",
+                args.input.path()
+            );
+        } else {
+            bail!(
+                "`{}` has no header data, and seq/qual/flags were all skipped; the checksum \
+                 would be computed over no fields",
+                args.input.path()
+            );
+        }
     }
 
     let processor = VerifyProcessor::new(fields, args.opts.mate);
@@ -138,6 +172,17 @@ mod tests {
             in_path.to_str().unwrap(),
             "-o",
             out_path.to_str().unwrap(),
+        ])?;
+        crate::commands::encode::run(&cmd)
+    }
+
+    fn encode_without_headers(in_path: &std::path::Path, out_path: &std::path::Path) -> Result<()> {
+        let cmd = crate::cli::EncodeCommand::try_parse_from([
+            "encode",
+            in_path.to_str().unwrap(),
+            "-o",
+            out_path.to_str().unwrap(),
+            "--skip-headers",
         ])?;
         crate::commands::encode::run(&cmd)
     }
@@ -222,6 +267,72 @@ mod tests {
         let skip_flags = checksum(bq_tmp.path(), &["--skip-flags"])?;
 
         assert_eq!(full, skip_flags);
+        Ok(())
+    }
+
+    /// A file encoded with `--skip-headers` (no header data at all) must
+    /// hash the same whether or not `verify --skip-headers` is passed.
+    #[test]
+    fn test_verify_skip_headers_is_noop_without_header_data() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode_without_headers(in_tmp.path(), bq_tmp.path())?;
+
+        let full = checksum(bq_tmp.path(), &[])?;
+        let skip_headers = checksum(bq_tmp.path(), &["--skip-headers"])?;
+
+        assert_eq!(full, skip_headers);
+        Ok(())
+    }
+
+    /// Regression test: for a headerless file, `BinseqRecord::sheader()`
+    /// falls back to a string synthesized from the record's position, since
+    /// it's also used by commands like `decode` to print a name when none is
+    /// stored. Hashing that fallback would leak record order into the
+    /// checksum - defeating the entire point of `verify` - for any file
+    /// large/parallel enough that record order isn't already incidentally
+    /// stable across encodes. This must not happen: independent encodes of
+    /// the same headerless input must produce the same checksum.
+    #[test]
+    fn test_verify_stable_across_independent_encodes_without_headers() -> Result<()> {
+        for mode in BinseqMode::enum_iter() {
+            // `include_n(false)`: bq/vbq redraw a random replacement for `N`
+            // on every encode, which would (correctly) change the checksum
+            // for an unrelated reason and mask the invariant under test.
+            let in_tmp = write_fastx().nrec(20_000).include_n(false).call()?;
+
+            let bq_a = NamedTempFile::with_suffix(mode.extension())?;
+            encode_without_headers(in_tmp.path(), bq_a.path())?;
+            let bq_b = NamedTempFile::with_suffix(mode.extension())?;
+            encode_without_headers(in_tmp.path(), bq_b.path())?;
+
+            let checksum_a = checksum(bq_a.path(), &[])?;
+            let checksum_b = checksum(bq_b.path(), &[])?;
+            assert_eq!(
+                checksum_a, checksum_b,
+                "headerless checksum differed across independent encodes for {mode:?}"
+            );
+        }
+        Ok(())
+    }
+
+    /// If a file has no header data and the user also skips seq/qual/flags,
+    /// there's nothing left to hash once headers are excluded - this must
+    /// hard-error rather than silently produce a checksum over no fields.
+    #[test]
+    fn test_verify_rejects_no_fields_left_after_dropping_headers() -> Result<()> {
+        use crate::cli::FileFormat;
+
+        let in_tmp = write_fastx().format(FileFormat::Fasta).call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode_without_headers(in_tmp.path(), bq_tmp.path())?;
+
+        let err = checksum(
+            bq_tmp.path(),
+            &["--skip-seq", "--skip-qual", "--skip-flags"],
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("no header data"));
         Ok(())
     }
 

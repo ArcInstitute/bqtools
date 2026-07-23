@@ -38,6 +38,12 @@ fn write_flag(hasher: &mut Xxh3, value: u64) {
 /// wrapping sum, so the resulting checksum does not depend on record order -
 /// required because parallel BINSEQ writers make no guarantee that output
 /// order matches input order.
+///
+/// `fields.headers` must already be forced off by the caller for files that
+/// don't actually store headers: `sheader()`/`xheader()` fall back to a
+/// synthesized string derived from the record's position in that case, and
+/// hashing it would leak record order into the checksum. See
+/// [`super::reader_has_headers`].
 fn hash_record<R: BinseqRecord>(record: &R, fields: FieldMask, mate: Mate) -> u64 {
     let mut hasher = Xxh3::new();
 
