@@ -52,6 +52,7 @@ fn main() -> Result<()> {
         Commands::Split(ref split) => commands::split::run(split),
         Commands::Pipe(ref pipe) => commands::pipe::run(pipe),
         Commands::Qc(ref qc) => commands::qc::run(qc),
+        Commands::Revcomp(ref revcomp) => commands::revcomp::run(revcomp),
     }?;
     trace!("done");
     Ok(())
