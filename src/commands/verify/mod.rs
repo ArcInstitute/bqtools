@@ -209,6 +209,22 @@ mod tests {
         Ok(())
     }
 
+    /// `bqtools encode` never writes per-record flags, so `--skip-flags` has
+    /// nothing to exclude on those files - it must be a no-op, not just
+    /// "different from the other skip flags".
+    #[test]
+    fn test_verify_skip_flags_is_noop_without_flag_data() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let full = checksum(bq_tmp.path(), &[])?;
+        let skip_flags = checksum(bq_tmp.path(), &["--skip-flags"])?;
+
+        assert_eq!(full, skip_flags);
+        Ok(())
+    }
+
     /// Skipping every field is rejected up front.
     #[test]
     fn test_verify_rejects_empty_field_selection() {

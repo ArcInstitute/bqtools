@@ -28,14 +28,8 @@ fn write_field(hasher: &mut Xxh3, data: &[u8]) {
     hasher.write(data);
 }
 
-fn write_flag(hasher: &mut Xxh3, flag: Option<u64>) {
-    match flag {
-        Some(value) => {
-            hasher.write_u8(1);
-            hasher.write_u64(value);
-        }
-        None => hasher.write_u8(0),
-    }
+fn write_flag(hasher: &mut Xxh3, value: u64) {
+    hasher.write_u64(value);
 }
 
 /// Hashes the user-selected fields of a single record.
@@ -73,7 +67,9 @@ fn hash_record<R: BinseqRecord>(record: &R, fields: FieldMask, mate: Mate) -> u6
         }
     }
     if fields.flags {
-        write_flag(&mut hasher, record.flag());
+        if let Some(value) = record.flag() {
+            write_flag(&mut hasher, value);
+        }
     }
 
     hasher.finish()
@@ -249,8 +245,12 @@ mod tests {
         );
     }
 
+    /// A record with no flag (`None`) contributes nothing to the hash - same
+    /// as `--skip-flags` - since binseq only produces `None` for records in
+    /// files that don't carry flags at all. A record that does carry a flag
+    /// (even `Some(0)`) must still change the hash.
     #[test]
-    fn test_hash_record_flag_none_differs_from_some_zero() {
+    fn test_hash_record_flag_none_is_noop() {
         let with_none = record(b"ACGT", b"h", None);
         let with_zero = record(b"ACGT", b"h", Some(0));
         let fields = FieldMask {
@@ -259,9 +259,19 @@ mod tests {
             headers: false,
             flags: true,
         };
+        let no_flags = FieldMask {
+            flags: false,
+            ..fields
+        };
+        assert_eq!(
+            hash_record(&with_none, fields, Mate::Both),
+            hash_record(&with_none, no_flags, Mate::Both),
+            "a record with no flag should hash the same whether or not flags are included"
+        );
         assert_ne!(
             hash_record(&with_none, fields, Mate::Both),
-            hash_record(&with_zero, fields, Mate::Both)
+            hash_record(&with_zero, fields, Mate::Both),
+            "a record that does carry a flag must still change the hash"
         );
     }
 
