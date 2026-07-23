@@ -45,6 +45,7 @@ It is the _fastest_ variant but _is lossy_ by design.
 - **Grep**: Search for fixed-string, regex, or fuzzy matches in BINSEQ files.
 - **Split**: Split a BINSEQ file into multiple files based on matching patterns.
 - **Pipe**: Create named-pipes for efficient data processing with legacy tools that don't support BINSEQ, optionally spawning and supervising the consumer commands directly (`-x`/`-X`).
+- **Revcomp**: Reverse complement the sequences in a BINSEQ file.
 
 ## Installation
 
@@ -118,6 +119,7 @@ bqtools grep --help
 bqtools split --help
 bqtools pipe --help
 bqtools qc --help
+bqtools revcomp --help
 ```
 
 ### Encoding
@@ -255,6 +257,28 @@ Combine multiple BINSEQ files:
 
 ```bash
 bqtools cat file1.bq file2.bq file3.bq -o combined.bq
+```
+
+> Note: `cat`, `revcomp`, and other commands that write BINSEQ output require either `-o/--output`
+> or an explicit `--pipe` flag; binary BINSEQ data is never written to stdout implicitly.
+
+### Reverse Complementing
+
+Reverse complement the sequences in a BINSEQ file, preserving its format and configuration:
+
+```bash
+bqtools revcomp input.cbq -o output.cbq
+```
+
+For paired files, both mates are reverse complemented by default. Use `-M/--mate` to
+reverse complement only one of the two mates (the other is left untouched):
+
+```bash
+# Only reverse complement mate 1
+bqtools revcomp input.cbq -o output.cbq -M 1
+
+# Only reverse complement mate 2
+bqtools revcomp input.cbq -o output.cbq -M 2
 ```
 
 ### Information and Statistics

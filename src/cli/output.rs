@@ -147,7 +147,7 @@ pub struct OutputBinseq {
     #[clap(short = 'o', long)]
     /// Output binseq file
     ///
-    /// To output to stdout, use the `-P/--pipe` flag.
+    /// To output to stdout, use the `--pipe` flag.
     pub output: Option<String>,
 
     #[clap(flatten)]
@@ -159,6 +159,11 @@ pub struct OutputBinseq {
 }
 impl OutputBinseq {
     pub fn as_writer(&self) -> Result<Box<dyn Write + Send>> {
+        if self.output.is_none() && !self.pipe {
+            bail!(
+                "Refusing to write binary BINSEQ data to stdout. Provide an output path with `-o/--output`, or pass `--pipe` to write to stdout explicitly."
+            );
+        }
         let writer = match_output(self.output.as_deref())?;
         Ok(writer)
     }
@@ -438,5 +443,34 @@ impl From<OutputBinseqOptions> for BinseqConfig {
             threads: options.threads(),
             compression_level: options.level,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::OutputBinseq;
+
+    /// Without `-o` or `--pipe`, writing binary BINSEQ data to stdout must be
+    /// refused rather than silently dumping binary into the terminal.
+    #[test]
+    fn test_as_writer_rejects_bare_stdout() {
+        let args = OutputBinseq::try_parse_from(["output"]).unwrap();
+        assert!(args.as_writer().is_err());
+    }
+
+    #[test]
+    fn test_as_writer_allows_explicit_pipe() {
+        let args = OutputBinseq::try_parse_from(["output", "--pipe"]).unwrap();
+        assert!(args.as_writer().is_ok());
+    }
+
+    #[test]
+    fn test_as_writer_allows_output_path() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let args =
+            OutputBinseq::try_parse_from(["output", "-o", tmp.path().to_str().unwrap()]).unwrap();
+        assert!(args.as_writer().is_ok());
     }
 }
