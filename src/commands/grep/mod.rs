@@ -15,6 +15,7 @@ use pattern_count::{
     AhoCorasickPatternCounter, PatternCount, PatternCountProcessor, PatternCounter,
     RegexPatternCounter,
 };
+use patterns::is_fixed;
 pub use patterns::{Pattern, PatternCollection};
 pub use range::SimpleRange;
 
@@ -26,14 +27,6 @@ use crate::{
 
 use anyhow::{bail, Result};
 use binseq::prelude::*;
-
-/// Returns true if the pattern is a fixed DNA string (only ACGT).
-fn is_fixed(pattern: &[u8]) -> bool {
-    !pattern.is_empty()
-        && pattern
-            .iter()
-            .all(|b| matches!(b, b'A' | b'C' | b'G' | b'T'))
-}
 
 /// Returns true if all patterns across multiple sets are fixed DNA strings.
 pub fn all_patterns_fixed(pattern_sets: &[&PatternCollection]) -> bool {
@@ -81,6 +74,11 @@ fn load_patterns(args: &GrepCommand) -> Result<AllPatterns> {
     let mut pat2 = args.grep.patterns_m2()?;
     let mut pat = args.grep.patterns()?;
     redistribute_patterns(&mut pat1, &mut pat2, &mut pat, args.output.mate)?;
+    if args.grep.rc {
+        pat1.reverse_complement()?;
+        pat2.reverse_complement()?;
+        pat.reverse_complement()?;
+    }
     Ok(AllPatterns { pat1, pat2, pat })
 }
 
@@ -402,6 +400,71 @@ mod tests {
                 "grep output count {count} > total for {mode:?} {fmt:?}"
             );
         }
+        Ok(())
+    }
+
+    /// `--rc` should reverse complement the pattern before matching: searching
+    /// for the reverse complement of a known substring should match exactly
+    /// as if the substring itself had been used directly (without --rc).
+    #[test]
+    fn test_grep_rc_matches_reverse_complement() -> Result<()> {
+        use std::io::Write as _;
+
+        // "GATTACA" is not a palindrome; its reverse complement is "TGTAATC".
+        let seq = "ACGTACGTGATTACAACGTACGT";
+        let in_tmp = NamedTempFile::with_suffix(".fastq")?;
+        {
+            let mut f = std::fs::File::create(in_tmp.path())?;
+            writeln!(f, "@read1")?;
+            writeln!(f, "{seq}")?;
+            writeln!(f, "+")?;
+            writeln!(f, "{}", "I".repeat(seq.len()))?;
+        }
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        // Without --rc, searching for the RC pattern directly should not match.
+        let direct = grep_count(bq_tmp.path(), "TGTAATC", false)?;
+        assert_eq!(direct, 0, "TGTAATC should not appear literally in the read");
+
+        // With --rc, the pattern is reverse complemented back to "GATTACA",
+        // which does appear in the read.
+        let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+        let cmd = crate::cli::GrepCommand::try_parse_from([
+            "grep",
+            bq_tmp.path().to_str().unwrap(),
+            "TGTAATC",
+            "-o",
+            out_tmp.path().to_str().unwrap(),
+            "--rc",
+        ])?;
+        super::run(&cmd)?;
+        let rc_count = count_fastx_records(out_tmp.path())?;
+        assert_eq!(rc_count, 1, "--rc should match the reverse complement");
+        Ok(())
+    }
+
+    /// `--rc` must reject regex patterns, since reverse complementing a
+    /// regex is undefined.
+    #[test]
+    fn test_grep_rc_rejects_regex_pattern() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let out_tmp = NamedTempFile::with_suffix(".fastq")?;
+        let cmd = crate::cli::GrepCommand::try_parse_from([
+            "grep",
+            bq_tmp.path().to_str().unwrap(),
+            "AC.GT",
+            "-o",
+            out_tmp.path().to_str().unwrap(),
+            "--rc",
+        ])?;
+        assert!(
+            super::run(&cmd).is_err(),
+            "--rc should reject regex patterns"
+        );
         Ok(())
     }
 }

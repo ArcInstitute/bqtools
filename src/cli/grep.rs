@@ -94,6 +94,14 @@ pub struct GrepArgs {
     #[clap(short = 'x', long)]
     pub fixed: bool,
 
+    /// Reverse complement all patterns before matching
+    ///
+    /// Applies to patterns from any source (CLI arguments and pattern files).
+    /// Only supported for fixed ACGT patterns; regex patterns are rejected
+    /// since reverse complementing a regex is undefined.
+    #[clap(long)]
+    pub rc: bool,
+
     /// Build Aho-Corasick automaton without DFA
     ///
     /// DFA uses more memory, but is significantly faster.
