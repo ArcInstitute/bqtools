@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "bqtools"
-version = "0.5.11"
+version = "0.5.12"
 dependencies = [
  "aho-corasick",
  "anyhow",
