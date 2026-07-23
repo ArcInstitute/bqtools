@@ -23,13 +23,19 @@ pub struct FieldMask {
 ///
 /// The length prefix keeps adjacent fields from being confused for one
 /// another (e.g. hashing "AB" then "C" must not collide with "A" then "BC").
-fn write_field(hasher: &mut Xxh3, data: &[u8]) {
-    hasher.write_u64(data.len() as u64);
+///
+/// The length is written via an explicit `to_le_bytes()`, not
+/// `Hasher::write_u64` - that default method serializes via `to_ne_bytes()`,
+/// so the bytes actually fed into the hasher (and thus the checksum) would
+/// differ between little- and big-endian hosts for the exact same file.
+fn write_field<H: Hasher>(hasher: &mut H, data: &[u8]) {
+    hasher.write(&(data.len() as u64).to_le_bytes());
     hasher.write(data);
 }
 
-fn write_flag(hasher: &mut Xxh3, value: u64) {
-    hasher.write_u64(value);
+/// See [`write_field`] for why this avoids `Hasher::write_u64`.
+fn write_flag<H: Hasher>(hasher: &mut H, value: u64) {
+    hasher.write(&value.to_le_bytes());
 }
 
 /// Hashes the user-selected fields of a single record.
@@ -211,6 +217,45 @@ mod tests {
         headers: true,
         flags: true,
     };
+
+    /// Records every byte handed to it via `Hasher::write`, so tests can pin
+    /// down the exact byte sequence fed into the hash - specifically, that
+    /// it's little-endian and not `Hasher::write_u64`'s `to_ne_bytes()`.
+    /// Note this only catches a regression to `write_u64` if these tests are
+    /// ever run on a big-endian host: on the little-endian hosts this CI
+    /// actually runs on, `to_ne_bytes()` and `to_le_bytes()` produce
+    /// byte-identical output, so a reintroduced `write_u64` call would pass
+    /// this test right along with the intended `to_le_bytes()` call. Code
+    /// review is the real guard against that regression; this test exists to
+    /// pin the intended (portable) encoding, not to detect the mistake.
+    #[derive(Default)]
+    struct SpyHasher {
+        bytes: Vec<u8>,
+    }
+    impl Hasher for SpyHasher {
+        fn finish(&self) -> u64 {
+            0
+        }
+        fn write(&mut self, bytes: &[u8]) {
+            self.bytes.extend_from_slice(bytes);
+        }
+    }
+
+    #[test]
+    fn test_write_field_length_prefix_is_little_endian() {
+        let mut spy = SpyHasher::default();
+        write_field(&mut spy, b"AC");
+        let mut expected = 2u64.to_le_bytes().to_vec();
+        expected.extend_from_slice(b"AC");
+        assert_eq!(spy.bytes, expected);
+    }
+
+    #[test]
+    fn test_write_flag_value_is_little_endian() {
+        let mut spy = SpyHasher::default();
+        write_flag(&mut spy, 0x0102_0304_0506_0708);
+        assert_eq!(spy.bytes, 0x0102_0304_0506_0708u64.to_le_bytes());
+    }
 
     #[test]
     fn test_hash_record_is_deterministic() {
