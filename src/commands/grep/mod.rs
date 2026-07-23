@@ -520,7 +520,7 @@ mod tests {
     /// arbitrary-but-distinct ACGT sequences.
     fn write_paired_fastq(path: &std::path::Path, headers: &[&str]) -> Result<()> {
         use std::io::Write as _;
-        let bases = [b'A', b'C', b'G', b'T'];
+        let bases = *b"ACGT";
         let mut f = std::fs::File::create(path)?;
         for (idx, header) in headers.iter().enumerate() {
             let seq: String = (0..12).map(|i| bases[(idx + i) % 4] as char).collect();
