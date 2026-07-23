@@ -313,6 +313,15 @@ bqtools grep input.bq "ACGT[AG]TCCA" --range ..80
 bqtools grep input.bq "ACGT[AG]TCCA" --range 80..
 ```
 
+Patterns can be reverse complemented before matching with `--rc`. This only supports fixed ACGT
+patterns (from CLI arguments or pattern files) — regex patterns are rejected since reverse
+complementing a regex is undefined.
+
+```bash
+# Search for the reverse complement of a fixed pattern
+bqtools grep input.bq "ACGTACGT" --rc
+```
+
 `bqtools` also support fuzzy matching by making use of [`sassy`](https://github.com/RagnarGrootKoerkamp/sassy).
 
 This requires installing using the `fuzzy` feature flag (see installation above).
@@ -435,6 +444,10 @@ A record is only written when it matches exactly one alias; ambiguous records (m
 
 Like `grep`, the backend is auto-selected: fixed-string patterns use Aho-Corasick (or force with `-x/--fixed`), regex patterns use the regex backend, and `-z/--fuzzy` enables fuzzy matching.
 
+Like `grep`, patterns can be reverse complemented before matching with `--rc`. This only supports
+fixed ACGT patterns — regex patterns are rejected since reverse complementing a regex is undefined.
+The output alias reflects the reverse-complemented sequence.
+
 ```bash
 # See full options list
 bqtools split --help
@@ -457,6 +470,9 @@ bqtools split input.cbq --file patterns.fa -z -k2
 
 # Skip writing the unmatched file
 bqtools split input.cbq --file patterns.tsv --skip-unmatched
+
+# Split using the reverse complement of the provided patterns
+bqtools split input.cbq --file patterns.tsv --rc
 ```
 
 Output files with fewer than a minimum number of records are removed (defaults to 1, dropping empty files).
