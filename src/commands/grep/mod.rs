@@ -141,7 +141,8 @@ fn build_counter(args: &GrepCommand) -> Result<PatternCounter> {
 fn run_pattern_count(args: &GrepCommand, reader: BinseqReader) -> Result<()> {
     let counter = build_counter(args)?;
     let pattern_names = counter.pattern_names();
-    let proc = PatternCountProcessor::new(counter, args.grep.range, pattern_names);
+    let proc =
+        PatternCountProcessor::new(counter, args.grep.range, args.grep.header, pattern_names);
     if let Some(mut span) = args.input.span {
         let num_records = reader.num_records()?;
         reader.process_parallel_range(
@@ -226,6 +227,7 @@ fn run_grep(
         count,
         args.grep.frac,
         args.grep.range,
+        args.grep.header,
         writer,
         format,
         mate,
@@ -466,6 +468,72 @@ mod tests {
             "--rc should reject regex patterns"
         );
         Ok(())
+    }
+
+    /// `--header` should match against the record header (`seq.{idx}`, per
+    /// `write_fastx`) rather than the sequence. The literal "seq.1" can never
+    /// appear in a random ACGT(N) sequence, so it isolates header matching:
+    /// it should hit headers seq.1 and seq.10-seq.19 (11 records out of 100)
+    /// when searching headers, and 0 records when searching sequences.
+    #[test]
+    fn test_grep_header_matches_header_not_sequence() -> Result<()> {
+        let in_tmp = write_fastx().call()?;
+        let bq_tmp = NamedTempFile::with_suffix(".cbq")?;
+        encode(in_tmp.path(), bq_tmp.path())?;
+
+        let header_out = NamedTempFile::with_suffix(".fastq")?;
+        let header_cmd = crate::cli::GrepCommand::try_parse_from([
+            "grep",
+            bq_tmp.path().to_str().unwrap(),
+            "seq.1",
+            "-o",
+            header_out.path().to_str().unwrap(),
+            "--header",
+            "-x",
+        ])?;
+        super::run(&header_cmd)?;
+        let header_count = count_fastx_records(header_out.path())?;
+        assert_eq!(
+            header_count, 11,
+            "expected seq.1 and seq.10-seq.19 to match on header"
+        );
+
+        let seq_out = NamedTempFile::with_suffix(".fastq")?;
+        let seq_cmd = crate::cli::GrepCommand::try_parse_from([
+            "grep",
+            bq_tmp.path().to_str().unwrap(),
+            "seq.1",
+            "-o",
+            seq_out.path().to_str().unwrap(),
+            "-x",
+        ])?;
+        super::run(&seq_cmd)?;
+        let seq_count = count_fastx_records(seq_out.path())?;
+        assert_eq!(
+            seq_count, 0,
+            "'seq.1' cannot appear in an ACGTN sequence, so sequence-mode grep should find nothing"
+        );
+        Ok(())
+    }
+
+    /// `--header` must reject `--rc`, since reverse complementing header text
+    /// is undefined.
+    #[test]
+    fn test_grep_header_rejects_rc() {
+        let result = crate::cli::GrepCommand::try_parse_from([
+            "grep", "input.bq", "seq.1", "--header", "--rc",
+        ]);
+        assert!(result.is_err(), "--header should conflict with --rc");
+    }
+
+    /// `--header` must reject `--range`, since a coordinate range is
+    /// meaningless against header text.
+    #[test]
+    fn test_grep_header_rejects_range() {
+        let result = crate::cli::GrepCommand::try_parse_from([
+            "grep", "input.bq", "seq.1", "--header", "--range", "0..10",
+        ]);
+        assert!(result.is_err(), "--header should conflict with --range");
     }
 }
 

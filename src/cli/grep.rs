@@ -29,6 +29,11 @@ pub struct GrepCommand {
 }
 impl GrepCommand {
     pub fn should_color(&self) -> bool {
+        if self.grep.header {
+            // Match positions refer to header text, not the sequence buffer
+            // that colorized output highlights.
+            return false;
+        }
         match self.output.format() {
             Ok(FileFormat::Bam) => false,
             _ => {
@@ -59,6 +64,15 @@ pub struct GrepArgs {
     #[clap(short = 'v', long)]
     pub invert: bool,
 
+    /// Match patterns against the sequence header instead of the sequence
+    ///
+    /// `-r`/`--sfile` patterns match the primary header, `-R`/`--xfile` patterns
+    /// match the extended header, and positional/`--file` patterns match either.
+    /// Conflicts with `--rc` (reverse complement is undefined for header text)
+    /// and `--range` (which addresses sequence coordinates).
+    #[clap(short = 'H', long, conflicts_with_all = ["rc", "range"])]
+    pub header: bool,
+
     /// Only count matches
     #[clap(short = 'C', long, conflicts_with = "pattern_count")]
     pub count: bool,
@@ -76,7 +90,7 @@ pub struct GrepArgs {
     /// the sequence cannot be sliced within the range (i.e. out of bounds).
     ///
     /// Examples: --range=0..100, --range=..30, --range=60..
-    #[clap(long)]
+    #[clap(long, conflicts_with = "header")]
     pub range: Option<SimpleRange>,
 
     /// Count number of matches per pattern
@@ -99,7 +113,7 @@ pub struct GrepArgs {
     /// Applies to patterns from any source (CLI arguments and pattern files).
     /// Only supported for fixed ACGT patterns; regex patterns are rejected
     /// since reverse complementing a regex is undefined.
-    #[clap(long)]
+    #[clap(long, conflicts_with = "header")]
     pub rc: bool,
 
     /// Build Aho-Corasick automaton without DFA

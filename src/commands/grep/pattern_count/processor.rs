@@ -36,6 +36,7 @@ impl<'a> PatternCountResult<'a> {
 pub struct PatternCountProcessor<Pc: PatternCount> {
     counter: Pc,
     range: Option<SimpleRange>,
+    header: bool,
     pattern_names: Vec<String>,
 
     local_pattern_count: Vec<usize>,
@@ -46,11 +47,17 @@ pub struct PatternCountProcessor<Pc: PatternCount> {
     global_total: Arc<Mutex<usize>>, // total number of reads processed
 }
 impl<Pc: PatternCount> PatternCountProcessor<Pc> {
-    pub fn new(counter: Pc, range: Option<SimpleRange>, pattern_names: Vec<String>) -> Self {
+    pub fn new(
+        counter: Pc,
+        range: Option<SimpleRange>,
+        header: bool,
+        pattern_names: Vec<String>,
+    ) -> Self {
         let num_patterns = counter.num_patterns();
         Self {
             counter,
             range,
+            header,
             pattern_names,
             local_pattern_count: vec![0; num_patterns],
             local_total: 0,
@@ -84,14 +91,16 @@ impl<Pc: PatternCount> PatternCountProcessor<Pc> {
 }
 impl<Pc: PatternCount> ParallelProcessor for PatternCountProcessor<Pc> {
     fn process_record<B: BinseqRecord>(&mut self, record: B) -> binseq::Result<()> {
-        // grab sequences
-        let sbuf = record.sseq();
-        let xbuf = record.xseq();
-
-        let (primary, extended) = if let Some(range) = self.range {
-            (range.slice(sbuf), range.slice(xbuf))
+        let (primary, extended) = if self.header {
+            (record.sheader(), record.xheader())
         } else {
-            (sbuf, xbuf)
+            let sbuf = record.sseq();
+            let xbuf = record.xseq();
+            if let Some(range) = self.range {
+                (range.slice(sbuf), range.slice(xbuf))
+            } else {
+                (sbuf, xbuf)
+            }
         };
 
         self.counter
