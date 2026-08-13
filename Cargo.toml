@@ -12,7 +12,7 @@ keywords = ["bioinformatics", "binseq", "fastx", "file-format", "sequencing"]
 [dependencies]
 aho-corasick = "1.1.4"
 anyhow = "1.0.104"
-binseq = "0.9.4"
+binseq = "0.9.6"
 clap = { version = "4.6.3", features = ["derive"] }
 csv = "1.4.0"
 env_logger = "0.11.11"
@@ -50,9 +50,9 @@ htslib = ["paraseq/htslib"]
 gcs = ["paraseq/gcs"]
 
 [profile.release]
-# debug = true
-lto = true
-codegen-units = 1
+debug = true
+# lto = true
+# codegen-units = 1
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

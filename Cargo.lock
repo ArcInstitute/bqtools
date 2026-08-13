@@ -136,13 +136,14 @@ dependencies = [
 
 [[package]]
 name = "binseq"
-version = "0.9.4"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c03ce47e3c043402933b71d00e26586b91f70d1cc237251097e2eb1ee9621d83"
+checksum = "5fea1e47c3296e0073dc373f24660b1bd8ec36d6c06a7de115e4c75bf5b1753d"
 dependencies = [
  "anyhow",
  "auto_impl",
- "bitnuc",
+ "bitnuc 0.4.1",
+ "bitnuc 0.5.1",
  "bytemuck",
  "byteorder",
  "itoa",
@@ -153,7 +154,7 @@ dependencies = [
  "parking_lot",
  "rand 0.9.5",
  "sucds",
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
  "zstd",
 ]
 
@@ -187,6 +188,16 @@ name = "bitnuc"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7871516cbb4e097e220623917e1491c995ee58c8018d929d4b1e76c378002bf"
+
+[[package]]
+name = "bitnuc"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3502d762bfdca26628d5ebc875f59133f1addc430b3d5987db83ce5c7839ebb"
+dependencies = [
+ "fearless_simd",
+ "thiserror 2.0.20",
+]
 
 [[package]]
 name = "bon"
@@ -558,7 +569,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
 dependencies = [
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -682,6 +693,12 @@ name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
+
+[[package]]
+name = "fearless_simd"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4beca3cb2444e3304ac30843cc091f44ed58932353cd492ce740067bfce6b12"
 
 [[package]]
 name = "find-msvc-tools"
@@ -830,7 +847,7 @@ dependencies = [
  "libz-ng-sys",
  "log",
  "num_cpus",
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -1279,7 +1296,7 @@ dependencies = [
  "cfg-if",
  "flate2",
  "liblzma",
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
  "zstd",
 ]
 
@@ -1365,7 +1382,7 @@ dependencies = [
  "parking_lot",
  "rust-htslib",
  "smallvec",
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
  "which",
 ]
 
@@ -1611,7 +1628,7 @@ dependencies = [
  "linear-map",
  "newtype_derive",
  "regex",
- "thiserror 2.0.19",
+ "thiserror 2.0.20",
  "url",
 ]
 
@@ -1903,11 +1920,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.19"
+version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09a43598840e33d5b0331f38c5e30d13bb11c11210a4b58f0d9b18a5a5eefcd9"
+checksum = "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f"
 dependencies = [
- "thiserror-impl 2.0.19",
+ "thiserror-impl 2.0.20",
 ]
 
 [[package]]
@@ -1923,9 +1940,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.19"
+version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43cbfe0cf76104d42a574802844187e84a305e531ed54455f11fbde0f10541cd"
+checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
 dependencies = [
  "proc-macro2",
  "quote",
