@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "bqtools"
-version = "0.5.14"
+version = "0.5.15"
 dependencies = [
  "aho-corasick",
  "anyhow",
