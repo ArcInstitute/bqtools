@@ -6,7 +6,7 @@ use std::{
 use anyhow::Result;
 use clap::Parser;
 use log::trace;
-use paraseq::{fasta, Record};
+use paraseq::{fasta, ReaderBuilder, Record};
 
 use crate::{
     cli::FileFormat,
@@ -355,7 +355,7 @@ impl PatternFileArgs {
     fn load_patterns(path: &str) -> Result<Vec<Pattern>> {
         if Self::is_fasta(path)? {
             trace!("Loading patterns from fasta: {path}");
-            let mut reader = fasta::Reader::from_path(path)?;
+            let mut reader = ReaderBuilder::path(path).build_fasta()?;
             let mut rset = fasta::RecordSet::default();
             let mut patterns = Vec::new();
 

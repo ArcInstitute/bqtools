@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 use binseq::BinseqReader;
 use clap::Parser;
 use log::{debug, error, warn};
-use paraseq::fastx;
+use paraseq::{fastx, ReaderBuilder};
 
 use crate::{cli::BinseqMode, types::BoxedReader};
 
@@ -197,12 +197,13 @@ fn load_simple_reader(
     } else {
         "stdin".to_string()
     };
+
     if let Some(size) = batch_size {
         debug!("building on-disk fastx reader with batch size {size} from: {path_display}");
-        fastx::Reader::from_optional_path_with_batch_size(path, size)
+        ReaderBuilder::optional_path(path).batch_size(size).build()
     } else {
         debug!("building on-disk fastx reader from: {path_display}");
-        fastx::Reader::from_optional_path(path)
+        ReaderBuilder::optional_path(path).build()
     }
 }
 
@@ -213,10 +214,10 @@ fn load_gcs_reader(
 ) -> Result<fastx::Reader<BoxedReader>, paraseq::Error> {
     if let Some(size) = batch_size {
         debug!("building GCS fastx reader with batch size {size} from: {path}");
-        fastx::Reader::from_gcs_with_batch_size(path, size)
+        ReaderBuilder::gcs(path).batch_size(size).build()
     } else {
         debug!("building GCS fastx reader from: {path}");
-        fastx::Reader::from_gcs(path)
+        ReaderBuilder::gcs(path).build()
     }
 }
 

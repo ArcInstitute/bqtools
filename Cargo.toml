@@ -10,25 +10,25 @@ categories = ["command-line-utilities", "science::bioinformatics", "encoding"]
 keywords = ["bioinformatics", "binseq", "fastx", "file-format", "sequencing"]
 
 [dependencies]
-aho-corasick = "1.1.4"
+aho-corasick = "1.1.5"
 anyhow = "1.0.104"
 binseq = "0.9.6"
-clap = { version = "4.6.3", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive"] }
 csv = "1.4.0"
 env_logger = "0.11.11"
 fixedbitset = "0.5.7"
-gzp = "2.0.2"
+gzp = "2.0.4"
 hashbrown = "0.17.1"
 is-terminal = "0.4.17"
-libc = "0.2.186"
-log = "0.4.33"
+libc = "0.2.189"
+log = "0.4.34"
 memmap2 = "0.9.11"
 niffler = "3.0.1"
 nix = { version = "0.31.3", features = ["fs"] }
 num_cpus = "1.17.0"
-paraseq = "0.4.14"
+paraseq = "0.6.0"
 parking_lot = "0.12.5"
-rand = "0.10.2"
+rand = "0.10.3"
 regex = "1.13.1"
 sassy = { version = "0.2.6", default-features = false, optional = true }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -36,10 +36,10 @@ serde_json = "1.0.151"
 thousands = "0.2.0"
 walkdir = "2.5.0"
 xxhash-rust = { version = "0.8.18", features = ["xxh3"] }
-zstd = { version = "0.13.3", features = ["zstdmt"] }
+zstd = { version = "0.14.0", features = ["zstdmt"] }
 
 [dev-dependencies]
-bon = "3.9.3"
+bon = "3.10.1"
 itertools = "0.15.0"
 tempfile = "3.27.0"
 

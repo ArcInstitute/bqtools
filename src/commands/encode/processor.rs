@@ -2,7 +2,10 @@ use std::{io::Write, ops::AddAssign, sync::Arc};
 
 use binseq::{BinseqWriter, SequencingRecordBuilder};
 use log::trace;
-use paraseq::prelude::{IntoProcessError, PairedParallelProcessor, ParallelProcessor};
+use paraseq::{
+    prelude::{PairedParallelProcessor, ParallelProcessor},
+    IntoParaseqError,
+};
 use parking_lot::Mutex;
 
 /// Default debug interval for logging progress (batches)
@@ -105,11 +108,11 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for Encoder<W> 
             .opt_s_qual(record.qual())
             .s_header(record.id())
             .build()
-            .map_err(IntoProcessError::into_process_error)?;
+            .map_err(IntoParaseqError::into_paraseq_error)?;
         if self
             .t_writer
             .push(rec)
-            .map_err(IntoProcessError::into_process_error)?
+            .map_err(IntoParaseqError::into_paraseq_error)?
         {
             self.t_count += 1;
         } else {
@@ -120,11 +123,11 @@ impl<W: Write + Send, Rf: paraseq::Record> ParallelProcessor<Rf> for Encoder<W> 
     fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(IntoProcessError::into_process_error)
+            .map_err(IntoParaseqError::into_paraseq_error)
     }
     fn on_thread_complete(&mut self) -> paraseq::Result<()> {
         self.write_final()
-            .map_err(IntoProcessError::into_process_error)
+            .map_err(IntoParaseqError::into_paraseq_error)
     }
 }
 
@@ -140,11 +143,11 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Encod
             .opt_x_qual(record2.qual())
             .x_header(record2.id())
             .build()
-            .map_err(IntoProcessError::into_process_error)?;
+            .map_err(IntoParaseqError::into_paraseq_error)?;
         if self
             .t_writer
             .push(rec)
-            .map_err(IntoProcessError::into_process_error)?
+            .map_err(IntoParaseqError::into_paraseq_error)?
         {
             self.t_count += 1;
         } else {
@@ -155,11 +158,11 @@ impl<W: Write + Send, Rf: paraseq::Record> PairedParallelProcessor<Rf> for Encod
     fn on_batch_complete(&mut self) -> paraseq::Result<()> {
         self.update_global_counters();
         self.write_batch()
-            .map_err(IntoProcessError::into_process_error)
+            .map_err(IntoParaseqError::into_paraseq_error)
     }
     fn on_thread_complete(&mut self) -> paraseq::Result<()> {
         self.write_final()
-            .map_err(IntoProcessError::into_process_error)
+            .map_err(IntoParaseqError::into_paraseq_error)
     }
 }
 impl<W: Write + Send> binseq::ParallelProcessor for Encoder<W> {
