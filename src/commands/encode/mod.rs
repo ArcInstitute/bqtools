@@ -157,12 +157,13 @@ fn process_queue(args: &EncodeCommand, queue: Vec<Vec<PathBuf>>, regex: &Regex) 
                 // A collated group always writes to the user-provided output path, even if
                 // it happens to contain only a single file (or file pair).
                 let collate = thread_args.input.batch_encoding_options.collate;
+                let paired = thread_args.input.batch_encoding_options.paired;
                 let outpath = match (collate, &thread_args.output.output, pair.len()) {
                     (true, Some(path), _) => path.clone(),
                     (_, _, 1) => thread_regex
                         .replace_all(&inpaths[0], mode.extension())
                         .to_string(),
-                    (_, _, 2) => generate_output_name(&pair, mode.extension())?,
+                    (_, _, 2) if paired => generate_output_name(&pair, mode.extension())?,
                     _ => bail!("Output path must be provided when collating files"),
                 };
 
@@ -265,6 +266,21 @@ fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<(
 
     if pqueue.is_empty() {
         bail!("No files found matching the expected pattern.");
+    }
+
+    // A collated group has no natural output name unless it is a single file (or file pair).
+    // Check up front so the command fails instead of logging the error from a worker thread.
+    let group_size = if args.input.batch_encoding_options.paired {
+        2
+    } else {
+        1
+    };
+    if args.input.batch_encoding_options.collate
+        && args.output.output.is_none()
+        && pqueue.iter().any(|group| group.len() > group_size)
+    {
+        error!("Output path must be provided when collating multiple files");
+        bail!("Output path must be provided when collating multiple files");
     }
 
     // Log what we found
@@ -487,6 +503,54 @@ mod tests {
                 DEFAULT_NUM_RECORDS,
                 "paired encode count wrong for {mode:?}"
             );
+        }
+        Ok(())
+    }
+
+    /// `--recursive --collate` without `-o` must refuse to auto-name a group of multiple files
+    /// (or file pairs), rather than naming the output after the first file.
+    #[test]
+    fn test_recursive_collate_requires_output() -> Result<()> {
+        for paired in [false, true] {
+            let dir = tempfile::tempdir()?;
+            for group in 0..2 {
+                let names = if paired {
+                    vec![
+                        format!("sample{group}_R1.fq"),
+                        format!("sample{group}_R2.fq"),
+                    ]
+                } else {
+                    vec![format!("sample{group}.fq")]
+                };
+                for name in names {
+                    std::fs::copy(write_fastx().call()?.path(), dir.path().join(name))?;
+                }
+            }
+
+            let mut args = vec![
+                "encode",
+                dir.path().to_str().unwrap(),
+                "--recursive",
+                "--collate",
+            ];
+            if paired {
+                args.push("--paired");
+            }
+            let cmd = crate::cli::EncodeCommand::try_parse_from(args)?;
+            let err = super::run(&cmd).unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains("Output path must be provided when collating multiple files"),
+                "unexpected error: paired={paired}: {err}"
+            );
+
+            let num_binseq = std::fs::read_dir(dir.path())?
+                .filter(|e| {
+                    e.as_ref()
+                        .is_ok_and(|e| e.path().extension().is_some_and(|ext| ext == "cbq"))
+                })
+                .count();
+            assert_eq!(num_binseq, 0, "unexpected output written: paired={paired}");
         }
         Ok(())
     }
