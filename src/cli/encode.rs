@@ -32,7 +32,7 @@ impl EncodeCommand {
         } else if self.input.is_stdin() {
             error!("Output path must be provided if using stdin");
             bail!("Output path must be provided if using stdin")
-        } else if self.input.num_files() > if self.input.paired() { 2 } else { 1 } {
+        } else if self.input.num_files() > 1 + usize::from(self.input.paired()) {
             error!("Output path must be provided if collating multiple files");
             bail!("Output path must be provided if collating multiple files")
         } else {

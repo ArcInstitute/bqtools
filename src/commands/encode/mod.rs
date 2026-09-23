@@ -270,11 +270,7 @@ fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<(
 
     // A collated group has no natural output name unless it is a single file (or file pair).
     // Check up front so the command fails instead of logging the error from a worker thread.
-    let group_size = if args.input.batch_encoding_options.paired {
-        2
-    } else {
-        1
-    };
+    let group_size = 1 + usize::from(args.input.batch_encoding_options.paired);
     if args.input.batch_encoding_options.collate
         && args.output.output.is_none()
         && pqueue.iter().any(|group| group.len() > group_size)
@@ -507,25 +503,41 @@ mod tests {
         Ok(())
     }
 
+    /// Writes `n` single-end files (or file pairs) named `sample{i}[_R1|_R2].fq` into `dir`.
+    fn write_groups(dir: &std::path::Path, paired: bool, n: usize) -> Result<()> {
+        for group in 0..n {
+            let names = if paired {
+                vec![
+                    format!("sample{group}_R1.fq"),
+                    format!("sample{group}_R2.fq"),
+                ]
+            } else {
+                vec![format!("sample{group}.fq")]
+            };
+            for name in names {
+                std::fs::copy(write_fastx().call()?.path(), dir.join(name))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Counts `.cbq` files directly inside `dir`.
+    fn count_cbq(dir: &std::path::Path) -> Result<usize> {
+        Ok(std::fs::read_dir(dir)?
+            .filter(|e| {
+                e.as_ref()
+                    .is_ok_and(|e| e.path().extension().is_some_and(|ext| ext == "cbq"))
+            })
+            .count())
+    }
+
     /// `--recursive --collate` without `-o` must refuse to auto-name a group of multiple files
     /// (or file pairs), rather than naming the output after the first file.
     #[test]
     fn test_recursive_collate_requires_output() -> Result<()> {
         for paired in [false, true] {
             let dir = tempfile::tempdir()?;
-            for group in 0..2 {
-                let names = if paired {
-                    vec![
-                        format!("sample{group}_R1.fq"),
-                        format!("sample{group}_R2.fq"),
-                    ]
-                } else {
-                    vec![format!("sample{group}.fq")]
-                };
-                for name in names {
-                    std::fs::copy(write_fastx().call()?.path(), dir.path().join(name))?;
-                }
-            }
+            write_groups(dir.path(), paired, 2)?;
 
             let mut args = vec![
                 "encode",
@@ -544,12 +556,7 @@ mod tests {
                 "unexpected error: paired={paired}: {err}"
             );
 
-            let num_binseq = std::fs::read_dir(dir.path())?
-                .filter(|e| {
-                    e.as_ref()
-                        .is_ok_and(|e| e.path().extension().is_some_and(|ext| ext == "cbq"))
-                })
-                .count();
+            let num_binseq = count_cbq(dir.path())?;
             assert_eq!(num_binseq, 0, "unexpected output written: paired={paired}");
         }
         Ok(())
@@ -561,19 +568,7 @@ mod tests {
     fn test_recursive_collate_respects_output() -> Result<()> {
         for (paired, num_groups) in iproduct!([false, true], [1, 2]) {
             let dir = tempfile::tempdir()?;
-            for group in 0..num_groups {
-                let names = if paired {
-                    vec![
-                        format!("sample{group}_R1.fq"),
-                        format!("sample{group}_R2.fq"),
-                    ]
-                } else {
-                    vec![format!("sample{group}.fq")]
-                };
-                for name in names {
-                    std::fs::copy(write_fastx().call()?.path(), dir.path().join(name))?;
-                }
-            }
+            write_groups(dir.path(), paired, num_groups)?;
 
             let out_dir = tempfile::tempdir()?;
             let out_path = out_dir.path().join("collated.cbq");
@@ -596,12 +591,7 @@ mod tests {
                 DEFAULT_NUM_RECORDS * num_groups,
                 "collated count wrong: paired={paired} num_groups={num_groups}"
             );
-            let num_binseq = std::fs::read_dir(dir.path())?
-                .filter(|e| {
-                    e.as_ref()
-                        .is_ok_and(|e| e.path().extension().is_some_and(|ext| ext == "cbq"))
-                })
-                .count();
+            let num_binseq = count_cbq(dir.path())?;
             assert_eq!(
                 num_binseq, 0,
                 "unexpected output written next to inputs: paired={paired} num_groups={num_groups}"
