@@ -74,8 +74,10 @@ impl InputFile {
         }
     }
 
+    /// Two inputs are implicitly treated as a pair unless they are being collated as single-end.
     pub fn paired(&self) -> bool {
-        self.input.len() == 2 || self.batch_encoding_options.paired
+        self.batch_encoding_options.paired
+            || (self.input.len() == 2 && !self.batch_encoding_options.collate)
     }
 
     /// Returns the number of input files.
