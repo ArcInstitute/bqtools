@@ -56,9 +56,9 @@ mod tests {
     use super::EncodeCommand;
 
     fn output_path(args: &[&str]) -> anyhow::Result<Option<String>> {
-        let mut argv = vec!["encode"];
-        argv.extend_from_slice(args);
-        EncodeCommand::try_parse_from(argv)?.output_path()
+        let mut argvec = vec!["encode"];
+        argvec.extend_from_slice(args);
+        EncodeCommand::try_parse_from(argvec)?.output_path()
     }
 
     /// Two single-end files collated without `-o` have no natural output name,
