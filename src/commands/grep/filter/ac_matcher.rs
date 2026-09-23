@@ -69,9 +69,8 @@ impl PatternMatch for AhoCorasickMatcher {
         }
         if and_logic {
             unimplemented!("AND logic is not supported for Aho-Corasick")
-        } else {
-            find_and_insert_matches(&mut self.pat1, sequence, matches, self.offset)
         }
+        find_and_insert_matches(&mut self.pat1, sequence, matches, self.offset)
     }
 
     fn match_secondary(
@@ -85,9 +84,8 @@ impl PatternMatch for AhoCorasickMatcher {
         }
         if and_logic {
             unimplemented!("AND logic is not supported for Aho-Corasick")
-        } else {
-            find_and_insert_matches(&mut self.pat2, sequence, matches, self.offset)
         }
+        find_and_insert_matches(&mut self.pat2, sequence, matches, self.offset)
     }
 
     fn match_either(
@@ -103,9 +101,8 @@ impl PatternMatch for AhoCorasickMatcher {
         }
         if and_logic {
             unimplemented!("AND logic is not supported for Aho-Corasick")
-        } else {
-            find_and_insert_matches(&mut self.pat, primary, smatches, self.offset)
-                || find_and_insert_matches(&mut self.pat, secondary, xmatches, self.offset)
         }
+        find_and_insert_matches(&mut self.pat, primary, smatches, self.offset)
+            || find_and_insert_matches(&mut self.pat, secondary, xmatches, self.offset)
     }
 }
