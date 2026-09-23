@@ -32,7 +32,7 @@ impl EncodeCommand {
         } else if self.input.is_stdin() {
             error!("Output path must be provided if using stdin");
             bail!("Output path must be provided if using stdin")
-        } else if self.input.num_files() > 2 {
+        } else if self.input.num_files() > if self.input.paired() { 2 } else { 1 } {
             error!("Output path must be provided if collating multiple files");
             bail!("Output path must be provided if collating multiple files")
         } else {
@@ -46,5 +46,46 @@ impl EncodeCommand {
             trace!("Auto-determined outpath path: {outpath}");
             Ok(Some(outpath))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::EncodeCommand;
+
+    fn output_path(args: &[&str]) -> anyhow::Result<Option<String>> {
+        let mut argvec = vec!["encode"];
+        argvec.extend_from_slice(args);
+        EncodeCommand::try_parse_from(argvec)?.output_path()
+    }
+
+    /// Two single-end files collated without `-o` have no natural output name,
+    /// so this must request an output path rather than falling through to `single_path()`.
+    #[test]
+    fn test_output_path_collate_two_files_requires_output() {
+        let err = output_path(&["a.fq", "b.fq", "--collate"]).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("Output path must be provided if collating multiple files"));
+    }
+
+    #[test]
+    fn test_output_path_two_files_auto_names_pair() {
+        let path = output_path(&["sample_R1.fq", "sample_R2.fq"]).unwrap();
+        assert_eq!(path.as_deref(), Some("sample.cbq"));
+    }
+
+    #[test]
+    fn test_output_path_collate_single_pair_auto_names() {
+        let path = output_path(&["sample_R1.fq", "sample_R2.fq", "--paired", "--collate"]).unwrap();
+        assert_eq!(path.as_deref(), Some("sample.cbq"));
+    }
+
+    #[test]
+    fn test_output_path_collate_uses_explicit_output() {
+        let path = output_path(&["a.fq", "b.fq", "--collate", "-o", "out.cbq"]).unwrap();
+        assert_eq!(path.as_deref(), Some("out.cbq"));
     }
 }
