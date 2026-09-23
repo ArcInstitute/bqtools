@@ -270,11 +270,7 @@ fn process_file_list(args: &EncodeCommand, file_queue: Vec<PathBuf>) -> Result<(
 
     // A collated group has no natural output name unless it is a single file (or file pair).
     // Check up front so the command fails instead of logging the error from a worker thread.
-    let group_size = if args.input.batch_encoding_options.paired {
-        2
-    } else {
-        1
-    };
+    let group_size = 1 + usize::from(args.input.batch_encoding_options.paired);
     if args.input.batch_encoding_options.collate
         && args.output.output.is_none()
         && pqueue.iter().any(|group| group.len() > group_size)
